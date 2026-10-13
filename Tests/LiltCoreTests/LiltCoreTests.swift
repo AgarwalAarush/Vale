@@ -52,13 +52,13 @@ final class LiltCoreTests {
         XCTAssertThrowsError(try TutorReply.decode(Data(#"{"text":"  ","point":null}"#.utf8)))
     }
     func testPromptDoesNotClaimScreenWhenNoneIsAttached() {
-        let prompt = TutorPrompt.build(session: LearningSession(title: "Study"), question: "What can you see?", hasImage: false, pointing: true, reveal: false)
+        let prompt = TutorPrompt.build(session: LearningSession(title: "Study",mode:.learn), question: "What can you see?", hasImage: false, pointing: true, reveal: false)
         XCTAssertTrue(prompt.contains("No screen image is attached"))
         XCTAssertTrue(prompt.contains("Do not reveal a full solution"))
         XCTAssertTrue(prompt.contains("No. Return null for point"))
     }
     func testWalkthroughRequiresExplicitRequest() {
-        let session = LearningSession(title: "Study")
+        let session = LearningSession(title: "Study",mode:.learn)
         let ordinary = TutorPrompt.build(session: session, question: "A hint", hasImage: true, pointing: false, reveal: false)
         let full = TutorPrompt.build(session: session, question: "Show me", hasImage: true, pointing: false, reveal: true)
         XCTAssertFalse(ordinary.contains("explicitly requested a full walkthrough"))
@@ -73,8 +73,70 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testGeneralModeIsUntimedAndDirect() {
+        let chat=LearningSession(title:"New chat")
+        XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
+        let prompt=TutorPrompt.build(session:chat,question:"Write the answer",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Answer directly"));XCTAssertFalse(prompt.contains("Do not reveal a full solution"))
+    }
+    func testLegacyMigrationPreservesLearningAndBacksUp() throws {
+        let dir=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:dir)}
+        let store=try SessionStore(directory:dir)
+        var chat=LearningSession(title:"Old study",duration:1800,mode:.learn)
+        chat.draft="Keep this draft";chat.messages=[Message(role:"user",text:"An old question")]
+        let encoded=try JSONEncoder().encode([chat]);var rows=try JSONSerialization.jsonObject(with:encoded) as! [[String:Any]]
+        rows[0].removeValue(forKey:"mode");rows[0].removeValue(forKey:"webEnabled");rows[0].removeValue(forKey:"pendingAttachments")
+        var messages=rows[0]["messages"] as! [[String:Any]];messages[0].removeValue(forKey:"attachments");rows[0]["messages"]=messages
+        let legacy=try JSONSerialization.data(withJSONObject:rows)
+        try legacy.write(to:dir.appendingPathComponent("sessions.json"))
+        let restored=try store.load()[0]
+        XCTAssertEqual(restored.id,chat.id);XCTAssertEqual(restored.mode,.learn);XCTAssertEqual(restored.draft,"Keep this draft")
+        try XCTAssertEqual(Data(contentsOf:dir.appendingPathComponent("sessions-v1-backup.json")),legacy)
+    }
+    func testAttachmentMetadataAndSearchRoundTrip() throws {
+        var chat=LearningSession(title:"Weekend plan")
+        let file=AttachmentRecord(name:"report.pdf",kind:.pdf,byteCount:400,detail:"2 pages")
+        chat.pendingAttachments=[file];chat.takeaway="Bring a notebook"
+        let restored=try JSONDecoder().decode(LearningSession.self,from:JSONEncoder().encode(chat))
+        XCTAssertEqual(restored.pendingAttachments,[file]);XCTAssertTrue(restored.matches("REPORT"));XCTAssertTrue(restored.matches("notebook"));XCTAssertFalse(restored.matches("unrelated"))
+    }
+    func testUploadedImageIsNotClaimedAsLiveScreen() {
+        let prompt=TutorPrompt.build(session:LearningSession(title:"Images"),question:"Compare",hasImage:true,pointing:true,reveal:false,fileContext:"Two uploaded images",hasWindow:false)
+        XCTAssertTrue(prompt.contains("No live window is shared"));XCTAssertTrue(prompt.contains("No. Return null for point"))
+    }
+    func testUpdaterRequiresHTTPSKeyAndBothVerificationGates() throws {
+        // Published example public key from Sparkle docs; not a generated credential.
+        let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="
+        _=try UpdateConfiguration(feed:"https://updates.example.invalid/appcast.xml",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true)
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"http://updates.example.invalid/appcast.xml",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://user:pass@example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:"bad",requiresSignedFeed:true,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:false,verifiesBeforeExtraction:true))
+    }
+    func testUpdaterRejectsForeignAndInsecureArchiveURLs() throws {
+        let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="
+        let config=try UpdateConfiguration(feed:"https://private.example.invalid/appcast.xml",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true)
+        XCTAssertTrue(config.permitsRelease(URL(string:"https://private.example.invalid/Mythos.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://elsewhere.example.invalid/Mythos.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"http://private.example.invalid/Mythos.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid:444/Mythos.zip")!))
+    }
+    func testUpdaterLocalReleasePolicyFixtures() throws {
+        struct Fixture:Decodable {
+            struct Archive:Decodable {let url:URL;let allowed:Bool}
+            let feed:String;let publicKey:String;let archives:[Archive]
+        }
+        let fixture=try JSONDecoder().decode(Fixture.self,from:Data(contentsOf:Bundle.module.url(forResource:"update-policy",withExtension:"json",subdirectory:"Fixtures")!))
+        let config=try UpdateConfiguration(feed:fixture.feed,publicKey:fixture.publicKey,requiresSignedFeed:true,verifiesBeforeExtraction:true)
+        for archive in fixture.archives {XCTAssertEqual(config.permitsRelease(archive.url),archive.allowed)}
+        XCTAssertThrowsError(try UpdateConfiguration(feed:fixture.feed,publicKey:fixture.publicKey,requiresSignedFeed:true,verifiesBeforeExtraction:false))
+    }
+
 }
 
+@main struct CoreChecks {
+static func main() {
 let tests = LiltCoreTests()
 let cases: [(String, () throws -> Void)] = [
  ("Session timer", tests.testSessionTimeDoesNotBecomeNegative),
@@ -84,7 +146,14 @@ let cases: [(String, () throws -> Void)] = [
  ("Structured reply validation", tests.testValidPointAcceptedAndEmptyResponseRejected),
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
- ("Markdown export", tests.testExportUsesActualConversationAndTakeaway)
+ ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
+ ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
+ ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
+ ("Uploaded images distinguished from live sharing",tests.testUploadedImageIsNotClaimedAsLiveScreen),
+ ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
+ ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
+ ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures)
 ]
 for (name, test) in cases {
  let before = failures.count
@@ -94,3 +163,5 @@ for (name, test) in cases {
 for failure in failures { print("FAIL: \(failure)") }
 print("\(passed)/\(cases.count) core checks passed")
 exit(failures.isEmpty ? 0 : 1)
+}
+}

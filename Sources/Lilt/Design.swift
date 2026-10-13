@@ -44,7 +44,7 @@ struct IconButton: View {
 struct LogoMark: View {
     var size: CGFloat = 25
     var body: some View {
-        Text("L").font(.system(size: size * 0.76, weight: .bold, design: .rounded)).foregroundStyle(Color(red: 0.13, green: 0.23, blue: 0.62))
+        Text("M").font(.system(size: size * 0.61, weight: .bold, design: .rounded)).foregroundStyle(Color(red: 0.13, green: 0.23, blue: 0.62))
             .frame(width: size, height: size).background(LinearGradient(colors: [Color(red: 0.76, green: 0.81, blue: 1), Theme.accent], startPoint: .topLeading, endPoint: .bottomTrailing))
             .clipShape(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: size * 0.25).strokeBorder(.white.opacity(0.2), lineWidth: 0.6))
@@ -61,6 +61,14 @@ struct AudioMark: View {
 final class ComposerTextView: NSTextView {
     var submit: (() -> Void)?
     var escape: (() -> Void)?
+    var pasteFiles: (([URL]) -> Void)?
+    var pasteImage: ((Data) -> Void)?
+    override func paste(_ sender: Any?) {
+        let board=NSPasteboard.general
+        if let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL], !urls.isEmpty,let pasteFiles {pasteFiles(urls);return}
+        if let data=board.data(forType:.png) ?? board.data(forType:.tiff),let pasteImage {pasteImage(data);return}
+        super.paste(sender)
+    }
     override func keyDown(with event: NSEvent) {
         if (event.keyCode == 36 || event.keyCode == 76), !event.modifierFlags.contains(.shift), !hasMarkedText() { submit?(); return }
         if event.keyCode == 53 { escape?(); return }
@@ -71,6 +79,8 @@ struct DraftEditor: NSViewRepresentable {
     @Binding var text: String
     var submit: () -> Void
     var cancel: () -> Void
+    var pasteFiles: (([URL]) -> Void)? = nil
+    var pasteImage: ((Data) -> Void)? = nil
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
@@ -80,13 +90,13 @@ struct DraftEditor: NSViewRepresentable {
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
         editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false; editor.isAutomaticTextReplacementEnabled = false
         editor.delegate = context.coordinator; editor.identifier = NSUserInterfaceItemIdentifier("lilt.composer")
-        editor.setAccessibilityLabel("Message Lilt"); editor.submit = submit; editor.escape = cancel
+        editor.setAccessibilityLabel("Message Lilt"); editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
         scroll.documentView = editor; return scroll
     }
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let editor = nsView.documentView as? ComposerTextView else { return }
-        editor.submit = submit; editor.escape = cancel
+        editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
         if editor.string != text {
             let selection = editor.selectedRange(); editor.string = text
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))

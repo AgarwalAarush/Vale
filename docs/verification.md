@@ -1,25 +1,34 @@
-# Verification record
+# Verification — Mythos 1.1.0
 
-Release 1.0, 12 October 2026. Native macOS application; no browser reconstruction.
+Verified on the Intel development Mac running macOS 15.7.9 with Swift 6.1.2 Command Line Tools and official Codex CLI 0.160.0 using its existing ChatGPT sign-in. No credentials were copied or logged.
 
-## Automated evidence
+## Final app evidence
 
-- Release compilation and ad-hoc bundle signature validation.
-- Eight core checks: timer bounds, atomic storage / file permissions, corrupt-library preservation, rectangle bounds, structured reply validation, truthful no-image prompt, explicit walkthrough policy, and Markdown export.
-- Native app harness: keyboard focus, Shift–Return newline, Return submission, cancellation identity, pause preserving a draft and stopping input/sharing, resume, stable window sizes, completion / review, resume restoring drafts, persistent storage, and unobstructed work / completion window transitions.
-- Real provider integration through the saved ChatGPT Codex sign-in: a typed question receives an answer; the provider reads the data structure named in a screenshot of the app’s own conversation.
-- PNGs rendered from the actual native welcome, library, capsule, coach, typing, paused state, conversation, review, settings, and recovery surfaces. Screenshots are 2x rasterizations of their native view bounds.
+- Release executable and embedded Sparkle framework contain **x86_64 and arm64**. Both slices compile; the Intel slice ran here. Apple Silicon runtime verification on the user's laptop remains pending.
+- `codesign --verify --deep --strict dist/Mythos.app` passes. The app is **ad-hoc signed**, with no TeamIdentifier; it is not Developer ID signed or notarized.
+- Pinned official Sparkle framework reports **2.10.0**, is embedded with symlinks intact, and loads through the bundle's relative Frameworks path.
+- **15/15 core checks** pass: atomic storage and permissions, corrupt-library preservation, legacy migration and exact backup, drafts, general-mode default, optional Learn policy, structured replies/point bounds, attachment metadata/search, and updater configuration/origin fixtures.
+- **5/5 build-time updater configuration cases** pass: no configuration leaves the plist unchanged, valid existing public configuration enables required verification gates, and missing key/insecure feed/malformed key are rejected without partially rewriting the plist.
+- **21/21 native flow checks** pass on the final universal app: immediate general chat, keyboard focus and Return/Shift–Return behavior, cancellation, four-file imports, PDF/text extraction, multiple images, pasted image import, file limits and unsupported-file errors, pause and mode preservation, close/resume, rename/search, deletion of managed bytes, persistence, stable window sizes, and an inactive unconfigured updater.
+- **26/26 live integration checks** pass on the final universal app. The real provider identifies a red circle and blue square, reads the PDF's HARBOR-73 token and text-file reminder, retains message attachments, and performs an explicitly enabled live web search. A real `web_search` event is required by the test; a plausible source link alone does not pass. Search can be switched off again.
 
-The initial native pass found an oversized library window and an overly gray material. Hosting view sizing and dark tint were corrected. The coach was reduced to 410 × 480 points. Native snapshots were inspected after the fixes.
+The initial web integration caught an unavailable tool despite the live-search setting. The provider was corrected to expose the installed CLI's standalone search capability only when enabled; the complete final integration was rerun and passed. Failed intermediate evidence is not used as release evidence.
 
-## Human / OS mediated checks
+## Artifacts
 
-Live microphone recognition and selection through the macOS system window picker require the Mac user’s permission and choice. These are implemented but were not exercised by automatically granting permissions. Voice is turn-based Apple speech recognition plus system speech synthesis, rather than a full-duplex Realtime connection.
+- `artifacts/unit-tests-1.1.log`
+- `artifacts/update-build-config-results.json`
+- `artifacts/universal-build-1.1.log`
+- `artifacts/native-ui-1.1-final/results.json`
+- `artifacts/integration-1.1-final/results.json`
+- Final native PNGs in those two directories. New chat, capsule, attachment composer, PDF preview, chat history, settings/update controls, real multi-file reply, and real web reply were visually inspected. They contain only public generated test fixtures and the public Apple documentation answer.
+- `dist/Mythos-1.1.0-release-manifest.json` and `dist/Mythos-1.1.0-SHA256SUMS.txt` record release/source archive identity and verification state.
 
-The overlay verifies image content and geometry before appearing and checks for movement or content changes while visible. Accuracy of model-generated target coordinates remains a limitation. Multiple displays, Spaces, physical microphone quality, screen lock on this Mac, and different language input methods require hands-on validation; they are not claimed as completed automated checks.
+Test data is isolated under each harness output directory. The harness renders only the app's own views. It does not capture other apps, activate the microphone, alter real chats, or bypass macOS consent. Clipboard import is exercised through the app import function; an interactive user clipboard/drop gesture remains a manual UX check.
 
-No Apple Developer signing identity was present. The delivered app is ad-hoc signed for this Mac and not notarized for public distribution. No production service, launch agent, background coding supervisor, remote server, or paid API fallback was installed.
+## Required first use and production checks
 
-## Reproduction
-
-`./scripts/verify.sh --integration` runs bounded checks and writes logs and JSON results under `artifacts/`. The native integration report is `artifacts/integration/results.json`; core results are in `artifacts/unit-tests.log`. The integration harness uses its own isolated session store.
+- Microphone/speech and single-window capture require the user's native consent. Live microphone transcription, system-picker selection, and pointing over another app have not been end-to-end exercised here because screen-capture preflight requires consent. Typing and file upload work without these permissions.
+- Laptop screenshot delivery and installation remain pending parent confirmation. No denial was bypassed, and no additional access or transfer mechanism was created. The remote installed Lilt 1.0 app was not overwritten by this release build.
+- The updater implementation, public configuration gates, origin policy, embedded framework, and inactive state are verified. **Live signed feed retrieval, archive download, signature-tampering rejection by Sparkle, and update installation have not been exercised.** Production activation needs an authorized private HTTPS feed/archive source, existing Ed25519 signing assets, and Developer ID signing/notarization, followed by an installed previous-version update test.
+- Large documents use bounded excerpts; scanned PDFs include only their first four pages. Word/Excel/PowerPoint and audio/video uploads are not supported in this release. The app does not control other applications or execute uploaded code.

@@ -1,4 +1,6 @@
 .build/
+.build-arm64/
+.build-x86_64/
 dist/
 artifacts/*
 !artifacts/.gitkeep

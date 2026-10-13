@@ -1,90 +1,106 @@
 import AppKit
+import PDFKit
 import LiltCore
 
 extension AppController {
-    func snapshot(_ window: NSWindow, to file: URL) throws {
-        guard let view = window.contentView else { throw AppError("Missing content view") }
-        view.layoutSubtreeIfNeeded(); view.displayIfNeeded()
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw AppError("Couldn’t render native view") }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        guard let data = rep.representation(using: .png, properties: [:]) else { throw AppError("Couldn’t encode native view") }
-        try data.write(to: file)
+    func snapshot(_ window:NSWindow,to file:URL)throws{
+        guard let view=window.contentView else{throw AppError("Missing content view")}
+        view.layoutSubtreeIfNeeded();view.displayIfNeeded()
+        guard let rep=view.bitmapImageRepForCachingDisplay(in:view.bounds) else{throw AppError("Couldn’t render native view")}
+        view.cacheDisplay(in:view.bounds,to:rep)
+        guard let data=rep.representation(using:.png,properties:[:]) else{throw AppError("Couldn’t encode native view")};try data.write(to:file)
     }
-    func settle() async { try? await Task.sleep(nanoseconds: 650_000_000) }
-    func runHarness() async {
-        let output = URL(fileURLWithPath: CommandLine.arguments.last!)
-        var results: [String: Bool] = [:]
-        do {
-            try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-            model.sessions = []; model.activeID = nil; model.selectedID = nil
-            model.onboarding = true; openLibrary(); await settle()
-            try snapshot(library, to: output.appendingPathComponent("01-welcome.png"))
-            model.onboarding = false; await settle()
-            try snapshot(library, to: output.appendingPathComponent("02-library-empty.png"))
-            model.newSession(title: "LeetCode"); await settle()
-            results["learningKeepsLibraryOutOfTheWay"] = !library.isVisible
-            try snapshot(capsule, to: output.appendingPathComponent("03-capsule.png"))
-            try snapshot(coach, to: output.appendingPathComponent("04-coach-empty.png"))
-            func findEditor(_ view: NSView) -> ComposerTextView? {
-                if let editor = view as? ComposerTextView { return editor }
-                for child in view.subviews { if let found = findEditor(child) { return found } }; return nil
-            }
-            let editor = findEditor(coach.contentView!)
-            results["composerGetsKeyboardFocus"] = coach.firstResponder === editor
-            model.draft = "First line"
-            await settle()
-            if let editor, let shiftReturn = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: 0, windowNumber: coach.windowNumber, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36) {
-                editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0)); editor.keyDown(with: shiftReturn)
-                results["shiftReturnAddsNewline"] = model.draft.contains("\n")
-            }
-            model.send("Cancellation probe"); model.cancel()
-            await settle()
-            results["cancelDiscardsPendingCompletion"] = !model.busy && model.active?.messages.last?.role == "user"
-            model.updateActive { $0.messages = [] }
-            model.draft = "Why does a stack fit this problem?"
-            await settle(); try snapshot(coach, to: output.appendingPathComponent("05-typing.png"))
-            model.togglePause(); results["pausePreservesDraft"] = model.draft == "Why does a stack fit this problem?"
+    func settle()async{try? await Task.sleep(nanoseconds:650_000_000)}
+    func waitForReply()async{let start=Date();while model.busy && Date().timeIntervalSince(start)<155{try? await Task.sleep(nanoseconds:200_000_000)}}
+    func makeFixtures(in output:URL)throws->[URL]{
+        let directory=output.appendingPathComponent("fixtures");try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+        var urls:[URL]=[]
+        for (name,color,square) in [("A.png",NSColor.systemRed,false),("B.png",NSColor.systemBlue,true)]{
+            let image=NSImage(size:NSSize(width:400,height:260));image.lockFocus()
+            NSColor.white.setFill();NSRect(x:0,y:0,width:400,height:260).fill();color.setFill()
+            if square{NSRect(x:145,y:90,width:110,height:110).fill()}else{NSBezierPath(ovalIn:NSRect(x:145,y:90,width:110,height:110)).fill()}
+            (name as NSString).draw(at:NSPoint(x:170,y:35),withAttributes:[.font:NSFont.systemFont(ofSize:18),.foregroundColor:NSColor.black]);image.unlockFocus()
+            let rep=NSBitmapImageRep(data:image.tiffRepresentation!)!;let file=directory.appendingPathComponent(name);try rep.representation(using:.png,properties:[:])!.write(to:file);urls.append(file)
+        }
+        let text=NSTextView(frame:NSRect(x:0,y:0,width:500,height:300));text.string="Document verification token: HARBOR-73.\nThis is a public test fixture, not a user document.";text.font = .systemFont(ofSize:18);text.textColor = .black;text.backgroundColor = .white
+        let pdf=directory.appendingPathComponent("Brief.pdf");try text.dataWithPDF(inside:text.bounds).write(to:pdf);urls.append(pdf)
+        let note=directory.appendingPathComponent("Notes.md");try "Reminder: bring a notebook.\n".write(to:note,atomically:true,encoding:.utf8);urls.append(note)
+        return urls
+    }
+    func runHarness()async{
+        let output=URL(fileURLWithPath:CommandLine.arguments.last!);var results:[String:Bool]=[:]
+        do{
+            try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+            model.sessions=[];model.activeID=nil;model.selectedID=nil;model.prepareChat();await settle()
+            results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && coach.isVisible && !library.isVisible
+            try snapshot(coach,to:output.appendingPathComponent("01-new-chat.png"));try snapshot(capsule,to:output.appendingPathComponent("02-capsule.png"))
+            func findEditor(_ view:NSView)->ComposerTextView?{if let editor=view as? ComposerTextView{return editor};for child in view.subviews{if let found=findEditor(child){return found}};return nil}
+            let editor=findEditor(coach.contentView!);results["composerGetsKeyboardFocus"]=coach.firstResponder === editor
+            model.draft="First line";await settle()
+            if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.shift,timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){editor.setSelectedRange(NSRange(location:editor.string.utf16.count,length:0));editor.keyDown(with:enter);results["shiftReturnAddsNewline"]=model.draft.contains("\n")}
+            model.send("Cancellation probe");model.cancel();await settle();results["cancelDiscardsPendingCompletion"] = !model.busy && model.active?.messages.last?.role == "user";model.updateActive{$0.messages=[];$0.title="New chat"}
+            let fixtures=try makeFixtures(in:output);await model.importFiles(fixtures)
+            results["multipleImagePDFTextImports"]=model.pendingFiles.count==4
+            do{_=try model.fileStore!.importData(Data([0,1,2,3]),name:"archive.zip",fileExtension:"zip");results["unsupportedBinaryRejected"]=false}catch{results["unsupportedBinaryRejected"]=true}
+            await model.importFiles(Array(repeating:fixtures[0],count:5));results["fileLimitPreservesExistingAttachments"]=model.pendingFiles.count==4 && model.error != nil;model.error=nil
+            model.pasteImage(try Data(contentsOf:fixtures[0]));results["pastedImageImports"]=model.pendingFiles.count==5 && model.pendingFiles.last?.name == "Pasted image.png"
+            if let pasted=model.pendingFiles.last, pasted.name == "Pasted image.png"{model.removeFile(pasted)}
+            let files=try model.fileStore!.context(for:model.active!.files)
+            results["PDFTextExtraction"]=files.text.contains("HARBOR-73")
+            results["textFileExtraction"]=files.text.contains("bring a notebook")
+            results["twoImagesPrepared"]=files.images.count==2
+            model.draft="Compare the two images and summarize the PDF and notes."
+            await settle();try snapshot(coach,to:output.appendingPathComponent("03-attachments.png"))
+            if let pdf=model.pendingFiles.first(where:{$0.kind == .pdf}){model.showFile?(pdf);await settle();if let window=NSApp.windows.first(where:{$0.title == pdf.name}){try snapshot(window,to:output.appendingPathComponent("04-PDF-preview.png"));window.orderOut(nil)}}
+            model.togglePause();results["pausePreservesDraftAndFiles"]=model.draft.contains("Compare") && model.pendingFiles.count==4
             results["pauseStopsMicAndSharing"] = !model.voice.listening && model.context.filter == nil && !model.busy
-            await settle(); try snapshot(coach, to: output.appendingPathComponent("06-paused.png"))
-            model.togglePause(); results["resumePreservesDraft"] = !model.paused && !model.draft.isEmpty
-            if CommandLine.arguments.contains("--integration-test") {
-                if let editor, let enter = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: coach.windowNumber, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36) { editor.keyDown(with: enter) }
-                results["returnSendsQuestion"] = model.active?.messages.last?.role == "user" && model.draft.isEmpty
-                let start = Date()
-                while model.busy && Date().timeIntervalSince(start) < 155 { try? await Task.sleep(nanoseconds: 200_000_000) }
-                results["realTutorReply"] = model.active?.messages.last?.role == "assistant"
-                results["replyIsNotEmpty"] = model.active?.messages.last?.text.isEmpty == false
-                await settle(); try snapshot(coach, to: output.appendingPathComponent("07-real-tutor-reply.png"))
-                let image = try Data(contentsOf: output.appendingPathComponent("07-real-tutor-reply.png"))
-                let vision = TutorProvider()
-                let answer: Result<TutorReply, Error> = await withCheckedContinuation { continuation in
-                    vision.ask(prompt: "Read the learner question in this attached screenshot of Lilt. Which data structure is it about? Answer in five words or fewer. Return null for point.", image: image) { continuation.resume(returning: $0) }
-                }
-                if case .success(let reply) = answer { results["realImageInput"] = reply.text.lowercased().contains("stack") }
-                else { results["realImageInput"] = false }
-            } else {
-                model.updateActive { $0.messages = [Message(role: "user", text: "Why does a stack fit this problem?"), Message(role: "assistant", text: "When you find a closing bracket, which unmatched opening bracket should it pair with: the earliest one or the most recent one?")] }
-                model.draft = "The most recent one, so last in, first out?"
-                await settle(); try snapshot(coach, to: output.appendingPathComponent("07-conversation-fixture.png"))
+            await settle();try snapshot(coach,to:output.appendingPathComponent("05-paused.png"));model.togglePause()
+            model.setMode(.learn);results["modeSwitchPreservesContext"]=model.pendingFiles.count==4 && !model.draft.isEmpty
+            await settle();try snapshot(coach,to:output.appendingPathComponent("06-optional-learn-mode.png"));model.setMode(.assistant)
+            if CommandLine.arguments.contains("--integration-test"){
+                model.draft="Compare the two images, then give the verification token in the PDF and the reminder in the text file. Be brief."
+                await settle()
+                if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){editor.keyDown(with:enter)}
+                results["returnSendsMessage"]=model.active?.messages.last?.role == "user" && model.draft.isEmpty
+                await waitForReply()
+                let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text.lowercased() : ""
+                results["realMultiImagePDFTextReply"]=answer.contains("red") && answer.contains("blue") && answer.contains("harbor-73") && answer.contains("notebook")
+                results["messageRetainsAttachments"]=model.active?.messages.first?.attachments.count==4 && model.pendingFiles.isEmpty
+                await settle();try snapshot(coach,to:output.appendingPathComponent("07-real-general-reply.png"))
+            }else{
+                let records=model.pendingFiles
+                model.updateActive{$0.messages=[Message(role:"user",text:"Compare these and summarize the documents.",attachments:records),Message(role:"assistant",text:"A shows a red circle; B shows a blue square. The PDF’s verification token is HARBOR-73. Your note says to bring a notebook.")];$0.pendingAttachments=[];$0.title="Compare images and documents"}
+                model.draft="Turn that into a short checklist."
+                await settle();try snapshot(coach,to:output.appendingPathComponent("07-general-reply-fixture.png"))
             }
-            model.draft = "A draft to preserve"
-            model.persist()
-            let id = model.activeID!
-            model.complete(); results["completionHidesFloatingWindows"] = !coach.isVisible && !capsule.isVisible; results["completeSavesSession"] = model.sessions.first?.completed == true
-            model.setTakeaway("Match the most recent unmatched opening bracket first.", for: id)
-            model.persist(); await settle(); try snapshot(library, to: output.appendingPathComponent("08-session-review.png"))
-            model.resume(id); results["resumeRestoresDraft"] = model.draft == "A draft to preserve"
-            model.showLibrary?(); model.settings = true; await settle(); try snapshot(library, to: output.appendingPathComponent("09-settings.png"))
-            model.error = "The tutor connection stopped. Check your sign-in, then retry."; openCoach(); await settle()
-            try snapshot(coach, to: output.appendingPathComponent("10-recovery.png"))
-            results["librarySizeIsStable"] = library.contentView?.bounds.size == NSSize(width: 900, height: 650)
-            results["nativeWindowsHaveExpectedSizes"] = capsule.frame.size == NSSize(width: 430, height: 62) && coach.frame.size == NSSize(width: 410, height: 480)
-            results["sessionStoreRoundTrip"] = (try? SessionStore(directory: output.appendingPathComponent("test-library")).load().first?.draft) == "A draft to preserve"
-            let data = try JSONSerialization.data(withJSONObject: results, options: [.prettyPrinted, .sortedKeys])
-            try data.write(to: output.appendingPathComponent("results.json"))
-            print(String(data: data, encoding: .utf8)!)
-            model.suspend()
-            exit(results.values.allSatisfy { $0 } ? 0 : 1)
-        } catch { print("Harness failed: \(error)"); exit(1) }
+            let id=model.activeID!;model.draft="A draft to preserve";model.persist();model.complete()
+            results["closeChatHidesFloatingWindows"] = !coach.isVisible && !capsule.isVisible
+            model.setTakeaway("A circle and a square; HARBOR-73; bring a notebook.",for:id);model.persist();await settle();try snapshot(library,to:output.appendingPathComponent("08-chat-history.png"))
+            model.resume(id);results["resumeRestoresFilesAndDraft"]=model.active?.files.count==4 && model.draft == "A draft to preserve"
+            model.rename(id,to:"Images and planning notes");results["renameAndSearch"] = model.active?.title == "Images and planning notes" && model.active?.matches("Brief.pdf")==true
+            if let image=model.active?.files.first(where:{$0.kind == .image}){model.removeFile(image);results["removeDeletesManagedFile"]=model.fileStore?.image(for:image)==nil && model.active?.files.count==3}
+            model.showLibrary?();model.settings=true;await settle();try snapshot(library,to:output.appendingPathComponent("09-settings-updates.png"))
+            func scrollSettings(_ view:NSView)->Bool {
+                if let scroll=view as? NSScrollView,scroll.convert(.zero,to:library.contentView).x>190,let document=scroll.documentView{
+                    document.scroll(NSPoint(x:0,y:document.isFlipped ? max(0,document.bounds.height-scroll.contentView.bounds.height) : 0));scroll.reflectScrolledClipView(scroll.contentView);return true
+                }
+                for child in view.subviews{if scrollSettings(child){return true}};return false
+            }
+            _=scrollSettings(library.contentView!);await settle();try snapshot(library,to:output.appendingPathComponent("09b-update-controls.png"))
+            results["unconfiguredUpdaterStaysInactive"] = !model.updates.canCheck && model.updates.configuration==nil
+            results["stableWindowSizes"]=library.contentView?.bounds.size==NSSize(width:900,height:650) && capsule.frame.size==NSSize(width:430,height:62) && coach.frame.size==NSSize(width:410,height:480)
+            results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==3}
+            model.error="The connection stopped. Your message and attachments are saved.";openCoach();await settle();try snapshot(coach,to:output.appendingPathComponent("10-recovery.png"))
+            if CommandLine.arguments.contains("--integration-test"){
+                model.newSession(title:"Web search verification");model.setWeb(true)
+                model.send("Search the web for Apple’s official ScreenCaptureKit documentation. Give one direct link to the developer.apple.com documentation page, with a brief description. You must actually use web search.")
+                await waitForReply()
+                let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text : ""
+                results["explicitWebSearchUsesRealTool"]=model.provider.usedWebSearch && answer.contains("developer.apple.com/documentation/screencapturekit")
+                await settle();try snapshot(coach,to:output.appendingPathComponent("11-live-web-search.png"))
+                model.setWeb(false);results["webSearchCanBeTurnedOff"]=model.active?.webEnabled == false
+            }
+            let data=try JSONSerialization.data(withJSONObject:results,options:[.prettyPrinted,.sortedKeys]);try data.write(to:output.appendingPathComponent("results.json"));print(String(data:data,encoding:.utf8)!);model.suspend();exit(results.values.allSatisfy{$0} ? 0 : 1)
+        }catch{print("Harness failed: \(error)");exit(1)}
     }
 }

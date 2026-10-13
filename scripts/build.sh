@@ -1,14 +1,36 @@
 #!/bin/zsh
 set -euo pipefail
 cd "${0:A:h:h}"
-mkdir -p dist/Lilt.app/Contents/MacOS dist/Lilt.app/Contents/Resources
-export CLANG_MODULE_CACHE_PATH="$PWD/.build/module-cache"
-export SWIFTPM_MODULECACHE_OVERRIDE="$CLANG_MODULE_CACHE_PATH"
-swift build -c release --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$CLANG_MODULE_CACHE_PATH"
-cp .build/release/Lilt dist/Lilt.app/Contents/MacOS/Lilt
-cp Resources/Info.plist dist/Lilt.app/Contents/Info.plist
-cp Resources/tutor.md Resources/reply.schema.json dist/Lilt.app/Contents/Resources/
-if [[ -f Resources/Lilt.icns ]]; then cp Resources/Lilt.icns dist/Lilt.app/Contents/Resources/; fi
-codesign --force --sign - --identifier local.lilt.companion dist/Lilt.app
-codesign --verify --deep --strict dist/Lilt.app
-print "Built ${PWD}/dist/Lilt.app"
+LILT_APP="$PWD/dist/Mythos.app"
+LILT_CACHE="$PWD/.build/module-cache"
+export CLANG_MODULE_CACHE_PATH="$LILT_CACHE"
+export SWIFTPM_MODULECACHE_OVERRIDE="$LILT_CACHE"
+mkdir -p "$LILT_APP/Contents/MacOS" "$LILT_APP/Contents/Resources" "$LILT_APP/Contents/Frameworks"
+swift build -c release --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$LILT_CACHE"
+LILT_NATIVE_ARCH="$(uname -m)"
+case "${MYTHOS_ARCH:-native}" in
+  universal) LILT_OTHER_ARCH="$([[ "$LILT_NATIVE_ARCH" == arm64 ]] && print x86_64 || print arm64)" ;;
+  arm64|x86_64) LILT_OTHER_ARCH="${MYTHOS_ARCH}" ;;
+  native) LILT_OTHER_ARCH="$LILT_NATIVE_ARCH" ;;
+  *) print -u2 "Choose MYTHOS_ARCH=native, arm64, x86_64, or universal."; exit 1 ;;
+esac
+if [[ "$LILT_OTHER_ARCH" != "$LILT_NATIVE_ARCH" ]]; then
+  swift build -c release --triple "$LILT_OTHER_ARCH-apple-macosx14.0" --scratch-path ".build-$LILT_OTHER_ARCH" --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$PWD/.build/module-cache-$LILT_OTHER_ARCH"
+fi
+if [[ "${MYTHOS_ARCH:-native}" == universal ]]; then
+  lipo -create .build/release/Lilt ".build-$LILT_OTHER_ARCH/$LILT_OTHER_ARCH-apple-macosx/release/Lilt" -output "$LILT_APP/Contents/MacOS/Lilt"
+elif [[ "$LILT_OTHER_ARCH" != "$LILT_NATIVE_ARCH" ]]; then
+  cp ".build-$LILT_OTHER_ARCH/$LILT_OTHER_ARCH-apple-macosx/release/Lilt" "$LILT_APP/Contents/MacOS/Lilt"
+else
+  cp .build/release/Lilt "$LILT_APP/Contents/MacOS/Lilt"
+fi
+cp Resources/Info.plist "$LILT_APP/Contents/Info.plist"
+cp Resources/tutor.md Resources/reply.schema.json "$LILT_APP/Contents/Resources/"
+if [[ -f Resources/Lilt.icns ]]; then cp Resources/Lilt.icns "$LILT_APP/Contents/Resources/"; fi
+ditto .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework "$LILT_APP/Contents/Frameworks/Sparkle.framework"
+cp -f .build/checkouts/Sparkle/LICENSE "$LILT_APP/Contents/Resources/Sparkle-LICENSE.txt"
+python3 scripts/configure-updates.py "$LILT_APP/Contents/Info.plist"
+codesign --force --sign - --identifier local.lilt.companion "$LILT_APP"
+codesign --verify --deep --strict "$LILT_APP"
+lipo -archs "$LILT_APP/Contents/MacOS/Lilt"
+print "Built $LILT_APP"

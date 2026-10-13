@@ -1,13 +1,11 @@
 # Release status
 
-Lilt 1.0.0 — local macOS release, 12 October 2026.
+Mythos 1.1.0 (build 2) is a completed local general-assistant release, built for Intel and Apple Silicon.
 
-- Native SwiftUI / AppKit app implemented and release-built without compiler warnings.
-- Original dark floating capsule and compact coach retained.
-- First-class typing, optional voice, explicit window context, progressive hints, transient pointing, session library, editable takeaways, Markdown export, and Forget implemented.
-- Existing signed-in Codex CLI validated with ChatGPT-only authentication; no API fallback configured.
-- Eight core checks and 17 native integration checks passed on the final build.
-- Native screen-capture preflight reports that macOS user consent is required. The system picker and microphone flows are ready for first use; permissions were not bypassed.
-- App ad-hoc signed for local use; no signing identity or notarization service configured.
+The app opens straight into an untimed chat. Typing, multiple image/PDF/text/code uploads, previews, retained drafts/files, optional web search with sources, searchable history, rename, notes, export, and Forget are implemented. Learn and focus timers are optional. The original dark floating UI is retained. Mythos branding preserves the Lilt assistant persona, bundle identity, saved chats, and settings; legacy migration saves an exact backup.
 
-Build and verification are reproducible through scripts/build.sh and scripts/verify.sh. Detailed scope and limits are in docs/verification.md.
+The universal app passes 15 core checks, five build-configuration checks, 21 native flow checks, and 26 live integration checks on Intel. Actual ChatGPT multi-file responses and real web-search events are verified. Native screenshots were inspected. See verification.md for exact evidence and limitations.
+
+Sparkle 2.10.0 is implemented and embedded. Its production configuration is inactive pending a private HTTPS release source and existing trusted signing assets. The app is locally ad-hoc signed and not notarized. No feed, credentials, signing keys, or public release were created.
+
+Apple Silicon runtime verification, laptop delivery/installation, first-use microphone/window-sharing consent, and a production signed-update rollout remain separate pending actions. Laptop installation stays paused until the parent confirms screenshots were delivered locally. The old remote Lilt 1.0 installation remains untouched.

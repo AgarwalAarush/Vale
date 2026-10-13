@@ -1,17 +1,30 @@
 # Architecture
 
-- AppKit controls actual windows, menu bar, global hotkey, visual material, and overlays. SwiftUI supplies the compact capsule, coach, onboarding, library, and settings. An AppKit NSTextView handles Return / Shift–Return and input-method composition.
-- AppModel owns active session state. Every asynchronous capture/provider completion validates its request and session identity. Only the model mutates persisted session data.
-- TutorProvider starts the official Codex CLI with saved ChatGPT auth with forced ChatGPT login method, isolated ephemeral working directory, read-only sandbox, ignored user configuration/rules, and explicitly disabled integrations/tools. Prompts enter through stdin. Structured text + optional rectangle leave through a JSON schema. No credentials are read by Lilt.
-- WindowContext uses the system single-window sharing picker and SCScreenshotManager, never a whole-display fallback. Context snapshots are compressed/resized to a bounded PNG. While a pointing highlight is visible, brief local capture checks clear it if the content scrolls or changes. Temporary request directories are removed after completion or cancellation. Screenshots and audio are not part of the session store.
-- VoiceController uses Apple Speech + AVAudioEngine. When on-device recognition is supported it is required; otherwise Apple speech may use its service, as disclosed in Settings and the native permission prompt. AVSpeechSynthesizer supplies optional speech playback. This is turn-based voice, not a paid Realtime integration.
-- LiltCore owns Codable models, structured reply validation, prompt composition, and atomic session storage. Core tests cover preservation, corruption, permissions, spoiler policy, and pointing bounds.
-- The native harness launches the same app and views used by the product, renders PNGs, and exercises session transitions. The integration harness also asks the real signed-in provider. No browser imitation is used for native UI verification.
+AppKit owns the floating panels, menu bar, global shortcut, native text editor, file picker, previews, and pointing overlay. SwiftUI renders the compact capsule, assistant card, history, and settings. The first screen is general chat; there is no learning setup gate.
+
+AppModel owns chats, drafts, mode, upload metadata, explicit search choice, and request state. Capture/provider completions validate request and chat identity. File import finishes into the originating chat, and cleans up imported bytes if that chat has been deleted. Pause, cancel, sleep, and lock stop transient context and voice. Uploaded files remain intentional chat data.
+
+AttachmentStore retains UUID-named files under the legacy application-support directory with private permissions. ImageIO bounds image inputs to 1600 pixels. PDFKit extracts bounded text, or renders the first four scanned pages with a visible context limitation. Request context has a total text/visual budget. PDF preview renders pages with navigation and copyable page text; text previews are bounded. Imported files are reference data and never executed.
+
+TutorProvider runs the official CLI with forced ChatGPT authentication, ephemeral request storage, ignored user config/rules, read-only sandbox, and disabled local/integration tools. Only the per-chat globe setting exposes live web search. Multiple images use repeated image arguments. Prompts enter via stdin; responses use the bundled strict JSON schema. The provider drains output without logging it; it keeps only a boolean that a web-search event occurred for integration verification. Temporary request files are deleted after completion/cancellation. Credentials are never read by the app.
+
+WindowContext uses ScreenCaptureKit's single-window system picker and fresh SCScreenshotManager captures. There is no display fallback. Pointing requires bounded coordinates, matching generation, identical fresh pixels, and unchanged geometry; local checks clear highlights when content changes. Screen images and microphone audio are not in the chat store.
+
+VoiceController uses Apple Speech and AVAudioEngine only after Talk. On-device recognition is required when supported; otherwise Apple may use its speech service, as disclosed in Settings. AVSpeechSynthesizer provides optional playback. Voice is turn based.
+
+LiltCore provides backward-compatible Codable models, structured replies, prompt policy, search, atomic storage, and updater configuration policy. Legacy records without a mode remain Learn chats, with their IDs/drafts intact; the original JSON is backed up before rewrite. The Mythos rename preserves `local.lilt.companion`, preference keys, and `Application Support/Lilt`.
+
+UpdateController embeds the pinned official Sparkle 2.10.0 framework. Without an existing HTTPS feed and trusted public key, no updater instance starts or checks the network. Configured builds use signed feeds, signature verification before archive extraction, same-origin HTTPS archive policy, and a manual check action. Automatic checks/downloads are disabled. See updates.md for production requirements.
+
+The native harness runs the same NSWindows and views as the product with isolated generated fixtures. It captures app-owned views, exercises transitions, and optionally sends real multi-image/PDF/text and web requests. It does not imitate the interface in a browser or bypass screen/microphone consent.
 
 ## Primary references
 
-- https://learn.chatgpt.com/docs/non-interactive-mode
-- https://learn.chatgpt.com/docs/config-file/config-reference
-- https://developer.apple.com/documentation/screencapturekit/scscreenshotmanager
-- https://developer.apple.com/documentation/screencapturekit/sccontentsharingpickerobserver
-- https://developer.apple.com/documentation/speech/sfspeechrecognitionrequest/requiresondevicerecognition
+- [Codex non-interactive mode and JSON events](https://learn.chatgpt.com/docs/non-interactive-mode)
+- [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+- [Codex web search](https://learn.chatgpt.com/docs/web-search)
+- [ScreenCaptureKit screenshots](https://developer.apple.com/documentation/screencapturekit/scscreenshotmanager)
+- [Apple on-device speech recognition](https://developer.apple.com/documentation/speech/sfspeechrecognitionrequest/requiresondevicerecognition)
+- [Sparkle setup and signed updates](https://sparkle-project.org/documentation/)
+- [Sparkle programmatic setup](https://sparkle-project.github.io/documentation/programmatic-setup/)
+- [Pinned Sparkle 2.10.0 release](https://github.com/sparkle-project/Sparkle/releases/tag/2.10.0)

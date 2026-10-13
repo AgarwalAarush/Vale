@@ -1,34 +1,33 @@
-# Lilt
+# Mythos
 
-A native Mac learning companion. Keep working in your browser, editor, or paper reader. Type a question, talk it through, or choose a window for context. Lilt gives one useful question or hint at a time.
+A native Mac companion for writing, planning, coding, images, documents, and everyday questions. Open it and type. Learn with hints is an optional mode; chats are untimed unless you choose a focus timer.
 
 ## Use it
 
-Open `dist/Lilt.app`, choose a topic, and start learning. **Control–Option–Space** opens the coach from anywhere. Lilt also lives in the menu bar.
+Open `dist/Mythos.app`. Control–Option–Space brings up the compact composer anywhere. Return sends, Shift–Return adds a line, and Escape stops a response or voice playback. Use **New chat** or Command–N for a fresh conversation.
 
-- **Type:** Return sends. Shift–Return adds a line. Paste code normally.
-- **Talk:** choose the microphone, speak your question, and pause briefly. Lilt transcribes it and answers aloud. Choose the microphone again or press Escape to interrupt. Read typed replies aloud is optional.
-- **Share:** choose “Share a window” and select one window in the native macOS picker. Lilt refreshes context when you ask. Click the shared window name for a preview; Stop sharing clears it.
-- **Hints:** ask for Hint, or Point it out with a shared window. A full walkthrough requires an explicit confirmation from the coach menu.
-- **Pause:** stops voice, cancels the current request, clears sharing and highlights, and freezes the timer. Resume keeps your conversation and draft. Choose a window again when ready.
-- **Finish:** Complete session opens your review. Write one takeaway in your own words. Continue, export Markdown notes, or Forget from the session menu.
+- Add images, PDFs, UTF-8 text, or code with **+**, drag and drop, or paste copied files/images. Up to eight files per chat, 25 MB each. Click a file to preview it; remove it with its × button.
+- Use the globe to enable web search for that chat. Search is off by default; web answers include direct source links.
+- Choose **Share a window** for current screen context. Sharing and Talk are optional and require macOS permission when first used. Talk transcribes one spoken turn; replies can be read aloud.
+- **Chat history** lets you search messages, notes, and filenames; rename, continue, export, or forget a chat. Drafts and uploads stay with the conversation. Forget removes the chat and its managed files.
+- The **Ask** menu switches to **Learn** when you want hints. A timer is available under More → Focus timer.
 
-Text works immediately through the official Codex CLI already signed in on this Mac. Microphone/speech access and the system window picker require your own macOS consent when first used. No API key or separate paid voice service is needed by this implementation. Codex requests use the signed-in account’s available usage.
+Uses the official Codex CLI's existing ChatGPT sign-in. No API billing fallback is configured. If the CLI is missing or signed out, Settings explains how to connect it. The assistant is Lilt; the app is Mythos.
 
-Your conversations and takeaways are stored in `~/Library/Application Support/Lilt/sessions.json`. Screenshots are temporary and removed after requests; microphone recordings are not saved by Lilt. Apple speech may use its speech service if on-device recognition is unavailable. Selected screen context and conversation are sent to the tutor when you ask.
+## Build and verify
 
-## Develop and verify
-
-Requires macOS 14 or newer, Apple Command Line Tools with Swift 5.9+, and the official signed-in Codex CLI. Pointing metadata requires macOS 15.2+. This release was built and verified on macOS 15.7.9 with Swift 6.1.2 for Intel.
+macOS 14+, Swift 5.9+ Command Line Tools, and an existing Codex CLI are required. SwiftPM downloads the pinned official Sparkle 2.10.0 framework on first build.
 
 ```sh
-scripts/build.sh
-scripts/verify.sh
-scripts/verify.sh --integration
+scripts/build.sh                       # this Mac's architecture
+MYTHOS_ARCH=universal scripts/build.sh # Intel + Apple Silicon
+scripts/verify.sh                      # core checks + real native UI
+scripts/verify.sh --integration        # also real ChatGPT uploads + web search
+python3 scripts/package-release.py    # package verified universal app and source
 ```
 
-The build has no third-party package dependencies. The core test runner avoids requiring the full Xcode IDE. Verification produces screenshots of the actual native views and a JSON result report in `artifacts/`. Integration checks send two small requests to your signed-in provider: text and an image of the app’s own test conversation. Test data uses an isolated library; it does not change your real sessions.
+`verify.sh` uses isolated test libraries and public generated fixtures. It does not change your saved chats or request microphone/screen permissions. Native screenshots are in `artifacts/`.
 
-`dist/Lilt.app` is ad-hoc signed for local use. It is not notarized for public distribution. `scripts/install.sh` installs a fresh copy into your user Applications folder without replacing an existing app.
+The local app is ad-hoc signed, not notarized. `scripts/install.sh` installs a fresh copy without replacing an existing Mythos app. Installation on the user's laptop remains pending screenshot delivery and local verification.
 
-See [architecture](docs/architecture.md), [requirements](docs/requirements.md), and [verification](docs/verification.md) for scope and evidence.
+See [release status](docs/status.md), [verification](docs/verification.md), [architecture](docs/architecture.md), and [updates](docs/updates.md).

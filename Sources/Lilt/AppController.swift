@@ -8,7 +8,7 @@ final class FloatingPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-@MainActor final class AppController: NSObject, NSApplicationDelegate {
+@MainActor final class AppController: NSObject, NSApplicationDelegate,NSMenuItemValidation {
     var model: AppModel!
     var capsule: FloatingPanel!
     var coach: FloatingPanel!
@@ -36,13 +36,14 @@ final class FloatingPanel: NSPanel {
             guard let self else { return event }
             if event.keyCode == 53 { self.model.cancel(); self.model.voice.stop(); self.clearAnnotation(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "," { self.model.settings = true; self.openLibrary(); return nil }
-            if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.selectedID = nil; self.model.settings = false; self.openLibrary(); return nil }
+            if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.newSession(); return nil }
             return event
         }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.willSleepNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.screensDidSleepNotification, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(systemSuspend), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
-        if testing { Task { await runHarness() } } else { openLibrary() }
+        model.showFile = { [weak self] record in self?.previewFile(record) }
+        if testing { Task { await runHarness() } } else { model.prepareChat() }
     }
     private func setupWindows() {
         let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -53,7 +54,7 @@ final class FloatingPanel: NSPanel {
         coach.contentView = NSHostingView(rootView: CoachView(model: model, close: { [weak self] in self?.coach.orderOut(nil) }))
         coach.setFrameOrigin(NSPoint(x: visible.maxX - 430, y: visible.minY + 24))
         library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-        library.title = "Lilt"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
+        library.title = "Mythos"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
         library.backgroundColor = NSColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1); library.appearance = NSAppearance(named: .darkAqua)
         let libraryHost = NSHostingView(rootView: LibraryView(model: model))
         libraryHost.sizingOptions = []
@@ -76,7 +77,7 @@ final class FloatingPanel: NSPanel {
         return panel
     }
     func openCoach() {
-        guard model.active != nil else { openLibrary(); return }
+        guard model.active != nil else { model.prepareChat(); return }
         library?.orderOut(nil)
         capsule.orderFrontRegardless(); coach.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -92,12 +93,13 @@ final class FloatingPanel: NSPanel {
     private func setupMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); main.addItem(appItem)
-        let appMenu = NSMenu(title: "Lilt"); appItem.submenu = appMenu
+        let appMenu = NSMenu(title: "Mythos"); appItem.submenu = appMenu
         let settings = NSMenuItem(title: "Settings…", action: #selector(menuSettings), keyEquivalent: ","); settings.target = self; appMenu.addItem(settings)
+        let updates=NSMenuItem(title:"Check for Updates…",action:#selector(menuUpdates),keyEquivalent:""); updates.target=self; appMenu.addItem(updates)
         appMenu.addItem(.separator())
-        let appQuit = NSMenuItem(title: "Quit Lilt", action: #selector(menuQuit), keyEquivalent: "q"); appQuit.target = self; appMenu.addItem(appQuit)
+        let appQuit = NSMenuItem(title: "Quit Mythos", action: #selector(menuQuit), keyEquivalent: "q"); appQuit.target = self; appMenu.addItem(appQuit)
         let fileItem = NSMenuItem(); main.addItem(fileItem); let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
-        let newItem = NSMenuItem(title: "New session", action: #selector(menuNew), keyEquivalent: "n"); newItem.target = self; fileMenu.addItem(newItem)
+        let newItem = NSMenuItem(title: "New chat", action: #selector(menuNew), keyEquivalent: "n"); newItem.target = self; fileMenu.addItem(newItem)
         fileMenu.addItem(NSMenuItem(title: "Close window", action: NSSelectorFromString("performClose:"), keyEquivalent: "w"))
         let editItem = NSMenuItem(); main.addItem(editItem); let editMenu = NSMenu(title: "Edit"); editItem.submenu = editMenu
         for (title, selector, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
@@ -105,13 +107,13 @@ final class FloatingPanel: NSPanel {
         }
         NSApp.mainMenu = main
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Lilt")
-        statusItem.button?.toolTip = "Lilt · Control–Option–Space"
+        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Mythos")
+        statusItem.button?.toolTip = "Mythos · Control–Option–Space"
         let menu = NSMenu()
-        for (title, action) in [("Open coach", #selector(menuCoach)), ("Session library", #selector(menuLibrary)), ("Pause session", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
+        for (title, action) in [("Open assistant", #selector(menuCoach)), ("Chat history", #selector(menuLibrary)), ("Pause chat", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item)
         }
-        menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Lilt", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit); statusItem.menu = menu
+        menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Mythos", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit); statusItem.menu = menu
     }
     private func registerHotKey() {
         var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -124,7 +126,7 @@ final class FloatingPanel: NSPanel {
         InstallEventHandler(GetApplicationEventTarget(), handler, 1, &event, pointer, &hotHandler)
         let id = EventHotKeyID(signature: 0x4C696C74, id: 1)
         let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), id, GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { model.error = "The coach shortcut is already in use. You can open Lilt from the menu bar." }
+        if status != noErr { model.error = "The shortcut is already in use. Open Mythos from the menu bar." }
     }
     func point(_ point: PointTarget, snapshot: ContextSnapshot) {
         clearAnnotation()
@@ -163,8 +165,17 @@ final class FloatingPanel: NSPanel {
         window.center(); auxiliary.append(window); window.makeKeyAndOrderFront(nil)
         if auxiliary.count > 3 { auxiliary.removeFirst().close() }
     }
+    private func previewFile(_ record:AttachmentRecord) {
+        guard let files=model.fileStore else{return}
+        let window=NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:550),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
+        window.title=record.name;window.isReleasedWhenClosed=false;window.appearance=NSAppearance(named:.darkAqua)
+        let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550));window.center()
+        auxiliary.append(window);window.makeKeyAndOrderFront(nil);if auxiliary.count>3{auxiliary.removeFirst().close()}
+    }
     @objc func systemSuspend() { model.suspend() }
-    @objc private func menuNew() { model.selectedID = nil; model.settings = false; openLibrary() }
+    @objc private func menuNew() { model.newSession() }
+    @objc private func menuUpdates() { model.updates.check() }
+    func validateMenuItem(_ item:NSMenuItem)->Bool { item.action == #selector(menuUpdates) ? model.updates.canCheck : true }
     @objc private func menuCoach() { openCoach() }
     @objc private func menuLibrary() { openLibrary() }
     @objc private func menuPause() { if model.active != nil { model.togglePause() } }
