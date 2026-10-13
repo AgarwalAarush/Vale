@@ -1,0 +1,1 @@
+{"type":"object","properties":{"text":{"type":"string"},"point":{"anyOf":[{"type":"null"},{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"},"label":{"type":"string"}},"required":["x","y","width","height","label"],"additionalProperties":false}]}},"required":["text","point"],"additionalProperties":false}

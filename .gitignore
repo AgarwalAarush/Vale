@@ -1,0 +1,5 @@
+.build/
+dist/
+artifacts/*
+!artifacts/.gitkeep
+.DS_Store

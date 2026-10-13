@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>Lilt</string>
+<key>CFBundleIdentifier</key><string>local.lilt.companion</string>
+<key>CFBundleName</key><string>Lilt</string>
+<key>CFBundleDisplayName</key><string>Lilt</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>1.0.0</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleIconFile</key><string>Lilt.icns</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSUIElement</key><true/>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSMicrophoneUsageDescription</key><string>Lilt uses your microphone only when you choose to speak to your tutor.</string>
+<key>NSSpeechRecognitionUsageDescription</key><string>Lilt transcribes your spoken question when you choose Talk. Typing is always available.</string>
+<key>NSScreenCaptureUsageDescription</key><string>Lilt captures only the window you choose, when you ask a question, so the tutor can see your context.</string>
+</dict></plist>
