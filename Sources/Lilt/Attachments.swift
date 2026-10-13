@@ -11,9 +11,11 @@ struct FileContext: Sendable {
 
 final class AttachmentStore: Sendable {
     let directory: URL
+    private let unlink:@Sendable(URL)throws->Void
     static let maxBytes = 25_000_000
     static let textExtensions = Set(["txt","md","markdown","csv","json","jsonl","yaml","yml","xml","html","css","js","jsx","ts","tsx","py","swift","rs","go","java","c","h","cpp","hpp","sql","sh","toml","log","tex","rtf"])
-    init(directory: URL) throws {
+    init(directory: URL,unlink:(@Sendable(URL)throws->Void)?=nil) throws {
+        self.unlink=unlink ?? {try FileManager.default.removeItem(at:$0)}
         self.directory=directory.appendingPathComponent("Attachments")
         try FileManager.default.createDirectory(at: self.directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
     }
@@ -46,7 +48,9 @@ final class AttachmentStore: Sendable {
         try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:url(for:record).path)
         return record
     }
-    func remove(_ record: AttachmentRecord) { try? FileManager.default.removeItem(at:url(for:record)) }
+    func remove(_ record: AttachmentRecord)throws {
+        let file=url(for:record);guard FileManager.default.fileExists(atPath:file.path) else{return};try unlink(file)
+    }
     func image(for record: AttachmentRecord) -> NSImage? { record.kind == .image ? NSImage(contentsOf:url(for:record)) : nil }
     func context(for records: [AttachmentRecord]) throws -> FileContext {
         var result=FileContext()

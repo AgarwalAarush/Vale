@@ -24,15 +24,16 @@ public struct Message: Codable, Identifiable, Equatable {
     public var text: String
     public var date: Date
     public var attachments: [AttachmentRecord]
-    public init(role: String, text: String, id: UUID = UUID(), date: Date = Date(), attachments: [AttachmentRecord] = []) {
-        self.id = id; self.role = role; self.text = text; self.date = date; self.attachments = attachments
+    public var screenChanged:Bool
+    public init(role: String, text: String, id: UUID = UUID(), date: Date = Date(), attachments: [AttachmentRecord] = [], screenChanged:Bool=false) {
+        self.id = id; self.role = role; self.text = text; self.date = date; self.attachments = attachments;self.screenChanged=screenChanged
     }
-    private enum CodingKeys: String, CodingKey { case id,role,text,date,attachments }
+    private enum CodingKeys: String, CodingKey { case id,role,text,date,attachments,screenChanged }
     public init(from decoder: Decoder) throws {
         let c=try decoder.container(keyedBy: CodingKeys.self)
         id=try c.decode(UUID.self,forKey:.id); role=try c.decode(String.self,forKey:.role)
         text=try c.decode(String.self,forKey:.text); date=try c.decode(Date.self,forKey:.date)
-        attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? []
+        attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? [];screenChanged=try c.decodeIfPresent(Bool.self,forKey:.screenChanged) ?? false
     }
 }
 
@@ -51,12 +52,13 @@ public struct LearningSession: Codable, Identifiable, Equatable {
     public var mode: ChatMode
     public var webEnabled: Bool
     public var pendingAttachments: [AttachmentRecord]
+    public var guide:GuideProgress?
     public init(title: String, duration: Int = 0, mode: ChatMode = .assistant) {
         id = UUID(); self.title = title; created = Date(); updated = Date()
         messages = []; elapsed = 0; self.duration = duration; completed = false
-        takeaway = ""; draft = ""; hintLevel = 0; self.mode=mode; webEnabled=false; pendingAttachments=[]
+        takeaway = ""; draft = ""; hintLevel = 0; self.mode=mode; webEnabled=false; pendingAttachments=[];guide=nil
     }
-    private enum CodingKeys: String,CodingKey { case id,title,created,updated,messages,elapsed,duration,completed,takeaway,draft,hintLevel,mode,webEnabled,pendingAttachments }
+    private enum CodingKeys: String,CodingKey { case id,title,created,updated,messages,elapsed,duration,completed,takeaway,draft,hintLevel,mode,webEnabled,pendingAttachments,guide }
     public init(from decoder: Decoder) throws {
         let c=try decoder.container(keyedBy:CodingKeys.self)
         id=try c.decode(UUID.self,forKey:.id); title=try c.decode(String.self,forKey:.title)
@@ -69,12 +71,14 @@ public struct LearningSession: Codable, Identifiable, Equatable {
         mode=try c.decodeIfPresent(ChatMode.self,forKey:.mode) ?? .learn
         webEnabled=try c.decodeIfPresent(Bool.self,forKey:.webEnabled) ?? false
         pendingAttachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.pendingAttachments) ?? []
+        guide=try c.decodeIfPresent(GuideProgress.self,forKey:.guide);if guide?.plan.isValid != true{guide=nil}
     }
     public var files: [AttachmentRecord] {
         var seen=Set<UUID>()
         return (messages.flatMap(\.attachments)+pendingAttachments).filter { seen.insert($0.id).inserted }
     }
     public func matches(_ query:String)->Bool { let q=query.trimmingCharacters(in:.whitespacesAndNewlines); return q.isEmpty || ([title,takeaway] + messages.map(\.text) + files.map(\.name)).contains{$0.localizedCaseInsensitiveContains(q)} }
+    public var contextLimited:Bool{ConversationWindow(messages:messages).limited}
     public var remaining: Int { max(0, duration - elapsed) }
     public var timerText: String { Self.formatTime(remaining) }
     public static func formatTime(_ seconds: Int) -> String {
@@ -95,11 +99,16 @@ public struct PointTarget: Codable, Equatable {
 public struct TutorReply: Codable, Equatable {
     public var text: String
     public var point: PointTarget?
-    public init(text: String, point: PointTarget? = nil) { self.text=text; self.point=point }
+    public var guide:GuidePlan?
+    public init(text: String, point: PointTarget? = nil,guide:GuidePlan?=nil) { self.text=text; self.point=point;self.guide=guide }
+    private enum CodingKeys:String,CodingKey{case text,point,guide}
+    public init(from decoder:Decoder)throws{
+        let c=try decoder.container(keyedBy:CodingKeys.self);text=try c.decode(String.self,forKey:.text);point=try c.decodeIfPresent(PointTarget.self,forKey:.point);guide=try c.decodeIfPresent(GuidePlan.self,forKey:.guide)
+    }
     public static func decode(_ data: Data) throws -> TutorReply {
         let reply = try JSONDecoder().decode(TutorReply.self, from: data)
         guard !reply.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw CoreError.emptyReply }
-        return TutorReply(text: reply.text, point: reply.point?.isValid == true ? reply.point : nil)
+        return TutorReply(text: reply.text, point: reply.point?.isValid == true ? reply.point : nil,guide:reply.guide?.isValid == true ? reply.guide : nil)
     }
 }
 public enum CoreError: Error { case emptyReply }
@@ -126,20 +135,40 @@ public final class SessionStore {
         try encoder.encode(sessions).write(to: file, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     }
+    public func forget(_ id:UUID,keeping sessions:[LearningSession])throws {
+        // Purge only this chat from the migration backup, retaining all unrelated records.
+        // Perform this before committing the active library; failures leave the chat retryable.
+        let backup=directory.appendingPathComponent("sessions-v1-backup.json")
+        if FileManager.default.fileExists(atPath:backup.path){
+            let data=try Data(contentsOf:backup)
+            guard let rows=try JSONSerialization.jsonObject(with:data) as? [[String:Any]],rows.allSatisfy({($0["id"] as? String).flatMap(UUID.init(uuidString:)) != nil}) else{throw StorageError.unreadableBackup}
+            let kept=rows.filter{($0["id"] as? String)?.lowercased() != id.uuidString.lowercased()}
+            if kept.count != rows.count {
+                if kept.isEmpty{try FileManager.default.removeItem(at:backup)}
+                else{try JSONSerialization.data(withJSONObject:kept,options:[.prettyPrinted,.sortedKeys]).write(to:backup,options:.atomic);try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:backup.path)}
+            }
+        }
+        try save(sessions.filter{$0.id != id})
+    }
     public static func export(_ session: LearningSession) -> String {
         "# \(session.title)\n\n" + session.messages.map { "## \($0.role == "user" ? "You" : "Lilt")\n\n\($0.text)" + ($0.attachments.isEmpty ? "" : "\n\nAttachments: " + $0.attachments.map(\.name).joined(separator: ", ")) }.joined(separator: "\n\n") + (session.takeaway.isEmpty ? "" : "\n\n## Takeaway\n\n\(session.takeaway)") + "\n"
     }
 }
 
+public enum StorageError:Error{case unreadableBackup}
+
 public enum TutorPrompt {
-    public static func build(session: LearningSession, question: String, hasImage: Bool, pointing: Bool, reveal: Bool, fileContext: String = "", hasWindow: Bool? = nil) -> String {
-        let history = session.messages.suffix(18).map { "\($0.role == "user" ? "USER" : "ASSISTANT"): \($0.text)" }.joined(separator: "\n\n")
+    public static func build(session: LearningSession, question: String, hasImage: Bool, pointing: Bool, reveal: Bool, fileContext: String = "", hasWindow: Bool? = nil,guideRequested:Bool=false) -> String {
+        let window=ConversationWindow(messages:session.messages);let history=window.text
         let policy = session.mode == .assistant
             ? "General assistant mode. Answer directly and helpfully. Write, analyze, compare, debug, plan, or explain as requested. Do not force a teaching question or withhold the answer."
             : "Learning mode. Requested hint level: \(session.hintLevel) of 3. " + (reveal ? "The learner explicitly requested a full walkthrough." : "Do not reveal a full solution. Offer one useful question or hint at a time.")
         return """
         Chat title: \(session.title)
         \(policy)
+        Conversation context: \(window.limited ? "Only recent/excerpted messages are included. Earlier history is saved but unavailable in this request. Do not imply you recall it; ask the user to restate missing details." : "The supplied recent conversation is available.")
+        Guide: \(guideRequested ? "The user explicitly requested a step-by-step guide. Return a short guide plan of 2 to 8 concrete steps and explain only the first step now." : "Return null for guide unless the user explicitly asks to replace the current plan.")
+        Current guide: \(session.guide.map{"\($0.plan.title), step \($0.index+1)/\($0.plan.steps.count): \($0.current)"} ?? "None")
         Image context: \(hasImage ? "Images are attached in the order described below." : "No screen image is attached. Do not imply you can see the screen.")
         Window context: \((hasWindow ?? hasImage) ? "A fresh selected-window screenshot is the first image." : "No live window is shared. Attached images are user-provided files, not live screen access.")
         Web search: \(session.webEnabled ? "Enabled. Search when current information or sources would help. Cite sources with direct Markdown links. Never invent a source or claim to have searched without doing so." : "Disabled. Do not claim to have searched. Mention when current verification is needed.")

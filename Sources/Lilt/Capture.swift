@@ -1,71 +1,131 @@
 import AppKit
 @preconcurrency import ScreenCaptureKit
+import CryptoKit
+import LiltCore
 
 struct ContextSnapshot {
-    var data: Data
-    var image: NSImage
-    var windowID: CGWindowID?
-    var frame: CGRect?
-    var generation: UUID
-    var capturedAt: Date
+    var data:Data
+    var image:NSImage
+    var windowID:CGWindowID?
+    var frame:CGRect?
+    var generation:UUID
+    var capturedAt:Date
+    var evidence:ScreenEvidence{ScreenEvidence(generation:generation,windowID:windowID,frame:frame,fingerprint:Data(SHA256.hash(data:data)),capturedAt:capturedAt)}
 }
 
-@MainActor final class WindowContext: NSObject, ObservableObject, SCContentSharingPickerObserver {
-    @Published var title: String?
-    @Published var lastCapture: Date?
-    @Published var preview: NSImage?
-    private(set) var filter: SCContentFilter?
-    private(set) var generation = UUID()
-    private(set) var windowID: CGWindowID?
-    var changed: (() -> Void)?
-    var failed: ((String) -> Void)?
-    override init() { super.init(); SCContentSharingPicker.shared.add(self) }
-    func choose() {
-        var config = SCContentSharingPickerConfiguration()
-        config.allowedPickerModes = [.singleWindow]
-        config.excludedBundleIDs = [Bundle.main.bundleIdentifier ?? "local.lilt.companion"]
-        SCContentSharingPicker.shared.defaultConfiguration = config
-        SCContentSharingPicker.shared.isActive = true
-        SCContentSharingPicker.shared.present()
+@MainActor private final class CaptureDeadline {
+    var continuation:CheckedContinuation<ContextSnapshot,Error>?
+    var worker:Task<Void,Never>?
+    var timeout:Task<Void,Never>?
+    func finish(_ result:Result<ContextSnapshot,Error>){
+        guard let continuation else{return};self.continuation=nil;worker?.cancel();timeout?.cancel();worker=nil;timeout=nil;continuation.resume(with:result)
     }
-    func stop() {
-        filter = nil; title = nil; preview = nil; lastCapture = nil; windowID = nil; generation = UUID()
-        SCContentSharingPicker.shared.isActive = false; changed?()
+}
+@MainActor private func boundedCapture(seconds:Double,operation:@escaping @MainActor ()async throws->ContextSnapshot)async throws->ContextSnapshot{
+    let gate=CaptureDeadline()
+    return try await withTaskCancellationHandler(operation:{
+        try await withCheckedThrowingContinuation{continuation in
+            gate.continuation=continuation
+            gate.worker=Task{do{try Task.checkCancellation();gate.finish(.success(try await operation()))}catch{gate.finish(.failure(error))}}
+            gate.timeout=Task{try? await Task.sleep(nanoseconds:UInt64(seconds*1_000_000_000));guard !Task.isCancelled else{return};gate.finish(.failure(AppError("The selected window took too long to respond. Stop sharing and choose it again.")))}
+        }
+    },onCancel:{Task{@MainActor in gate.finish(.failure(CancellationError()))}})
+}
+
+@MainActor final class WindowContext:NSObject,ObservableObject,SCContentSharingPickerObserver {
+    @Published private(set) var title:String?
+    @Published private(set) var lastCapture:Date?
+    @Published private(set) var live=false
+    @Published private(set) var capturing=false
+    @Published private(set) var latest:ContextSnapshot?
+    private(set) var filter:SCContentFilter?
+    private(set) var generation=UUID()
+    private(set) var windowID:CGWindowID?
+    private var liveTask:Task<Void,Never>?
+    private var inFlight:Task<ContextSnapshot,Error>?
+    private var captureID=UUID()
+    private var requestedLive=false
+    private var fixtureSource:(()async throws->ContextSnapshot)?
+    private var fixtureFrame:CGRect?
+    private var captureTimeout=6.0
+    var changed:(()->Void)?
+    var failed:((String)->Void)?
+    var hasSelection:Bool{filter != nil || fixtureSource != nil}
+    var preview:NSImage?{latest?.image}
+    override init(){super.init();SCContentSharingPicker.shared.add(self)}
+    func choose(live:Bool=false){
+        stop();requestedLive=live
+        var config=SCContentSharingPickerConfiguration();config.allowedPickerModes=[.singleWindow]
+        config.excludedBundleIDs=[Bundle.main.bundleIdentifier ?? "local.lilt.companion"]
+        SCContentSharingPicker.shared.defaultConfiguration=config;SCContentSharingPicker.shared.isActive=true;SCContentSharingPicker.shared.present()
     }
-    nonisolated func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {}
-    nonisolated func contentSharingPickerStartDidFailWithError(_ error: Error) {
-        DispatchQueue.main.async { self.failed?("Couldn’t open window sharing. You can still type or paste your context.") }
-    }
-    nonisolated func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
-        DispatchQueue.main.async {
-            self.filter = filter; self.generation = UUID(); self.preview = nil; self.lastCapture = nil
-            if #available(macOS 15.2, *), let window = filter.includedWindows.first {
-                self.windowID = window.windowID
-                if let name = window.owningApplication?.applicationName { self.title = "\(name) window" } else { self.title = "Selected window" }
-            } else { self.windowID = nil; self.title = "Selected window" }
-            self.changed?()
+    func startLive(){
+        guard hasSelection else{choose(live:true);return}
+        stopLive();live=true
+        liveTask=Task{[weak self] in
+            while !Task.isCancelled{
+                guard let self,self.live,self.hasSelection else{return}
+                do{_=try await self.capture()}catch{
+                    guard !Task.isCancelled,self.live else{return}
+                    self.stop();self.failed?("Live sharing stopped because the selected window is unavailable. Choose it again; your chat is saved.");return
+                }
+                try? await Task.sleep(nanoseconds:2_000_000_000)
+            }
         }
     }
-    func capture() async throws -> ContextSnapshot {
-        guard let filter else { throw AppError("Choose a window to share first.") }
-        let expected = generation
-        let config = SCStreamConfiguration()
-        let rect = filter.contentRect
-        guard rect.width > 1, rect.height > 1 else { throw AppError("That window is unavailable. Choose another window.") }
-        let scale = min(2.0, 1600.0 / max(rect.width, rect.height))
-        config.width = max(2, Int(rect.width * scale)); config.height = max(2, Int(rect.height * scale))
-        config.showsCursor = false; config.ignoreShadowsSingleWindow = true
-        let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-        guard expected == generation else { throw AppError("Sharing changed. Ask again with the new window.") }
-        let rep = NSBitmapImageRep(cgImage: image)
-        guard let data = rep.representation(using: .png, properties: [:]) else { throw AppError("Couldn’t capture the selected window.") }
-        let preview = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
-        self.preview = preview; lastCapture = Date()
-        return ContextSnapshot(data: data, image: preview, windowID: windowID, frame: currentFrame(), generation: generation, capturedAt: Date())
+    func stopLive(){liveTask?.cancel();liveTask=nil;live=false;latest=nil;lastCapture=nil}
+    func stop(){
+        stopLive();inFlight?.cancel();inFlight=nil;captureID=UUID();capturing=false
+        filter=nil;fixtureSource=nil;fixtureFrame=nil;captureTimeout=6;title=nil;windowID=nil;generation=UUID();requestedLive=false
+        SCContentSharingPicker.shared.isActive=false;changed?()
     }
-    func currentFrame() -> CGRect? {
-        guard let windowID, let entries = CGWindowListCopyWindowInfo(.optionIncludingWindow, windowID) as? [[String: Any]], let row = entries.first,
-              let bounds = row[kCGWindowBounds as String] as? [String: Any], let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary), frame.width > 0, frame.height > 0 else { return nil }
-        return frame
+    nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didCancelFor stream:SCStream?){DispatchQueue.main.async{self.requestedLive=false}}
+    nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){DispatchQueue.main.async{self.stop();self.failed?("Couldn’t open window sharing. Keep typing or attach an image.")}}
+    nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didUpdateWith filter:SCContentFilter,for stream:SCStream?){
+        DispatchQueue.main.async{
+            self.filter=filter;self.generation=UUID();self.latest=nil;self.lastCapture=nil
+            if #available(macOS 15.2,*),let window=filter.includedWindows.first{self.windowID=window.windowID;self.title="\(window.owningApplication?.applicationName ?? "Selected") window"}
+            else{self.windowID=nil;self.title="Selected window"}
+            self.changed?();if self.requestedLive{self.requestedLive=false;self.startLive()}
+        }
+    }
+    func capture()async throws->ContextSnapshot{
+        guard hasSelection else{throw AppError("Choose a window to share first.")}
+        if let task=inFlight{return try await task.value}
+        let expected=generation;let selectedID=windowID;let filter=self.filter;let source=fixtureSource;let token=UUID();let timeout=captureTimeout;captureID=token;capturing=true
+        let task=Task{[weak self] () async throws->ContextSnapshot in
+            try await boundedCapture(seconds:timeout){[weak self]in
+            guard let self else{throw CancellationError()}
+            var result:ContextSnapshot
+            if let source{result=try await source()}
+            else{
+                guard let filter else{throw AppError("Choose a window to share first.")}
+                let rect=filter.contentRect;guard rect.width>1,rect.height>1 else{throw AppError("The selected window is unavailable.")}
+                let config=SCStreamConfiguration();let scale=min(2.0,1600.0/max(rect.width,rect.height))
+                config.width=max(2,Int(rect.width*scale));config.height=max(2,Int(rect.height*scale));config.showsCursor=false;config.ignoreShadowsSingleWindow=true
+                let image=try await SCScreenshotManager.captureImage(contentFilter:filter,configuration:config)
+                guard let data=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else{throw AppError("Couldn’t read the selected window.")}
+                result=ContextSnapshot(data:data,image:NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height)),windowID:selectedID,frame:self.currentFrame(),generation:expected,capturedAt:Date())
+            }
+            guard !Task.isCancelled,self.generation==expected,result.windowID==selectedID else{throw AppError("Sharing changed. Ask again with the selected window.")}
+            result.generation=expected;result.capturedAt=Date();return result
+            }
+        }
+        inFlight=task
+        defer{if captureID==token{inFlight=nil;capturing=false}}
+        let result=try await task.value
+        guard generation==expected,!Task.isCancelled else{throw CancellationError()}
+        latest=live ? result : nil;lastCapture=result.capturedAt
+        if fixtureSource != nil{fixtureFrame=result.frame}
+        return result
+    }
+    func currentFrame()->CGRect?{
+        if fixtureSource != nil{return fixtureFrame}
+        guard let windowID,let entries=CGWindowListCopyWindowInfo(.optionIncludingWindow,windowID) as? [[String:Any]],let row=entries.first,let bounds=row[kCGWindowBounds as String] as? [String:Any],let frame=CGRect(dictionaryRepresentation:bounds as CFDictionary),frame.width>0,frame.height>0 else{return nil};return frame
+    }
+    // App-owned generated fixtures only; unavailable in normal launches.
+    func installFixture(windowID:CGWindowID=42,frame:CGRect=CGRect(x:100,y:100,width:400,height:260),timeout:Double=6,source:@escaping ()async throws->ContextSnapshot){
+        guard CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else{return}
+        stop();self.windowID=windowID;fixtureFrame=frame;captureTimeout=max(0.05,min(6,timeout));fixtureSource=source;title="Synthetic fixture window";changed?()
     }
 }

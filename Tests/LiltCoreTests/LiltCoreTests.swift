@@ -133,6 +133,72 @@ final class LiltCoreTests {
         XCTAssertThrowsError(try UpdateConfiguration(feed:fixture.feed,publicKey:fixture.publicKey,requiresSignedFeed:true,verifiesBeforeExtraction:false))
     }
 
+    func testForgetPurgesTargetFromBackupAndKeepsOthers()throws{
+        let dir=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString);defer{try? FileManager.default.removeItem(at:dir)}
+        let store=try SessionStore(directory:dir);let a=LearningSession(title:"Forget this public fixture",mode:.learn);let b=LearningSession(title:"Keep unrelated public fixture",mode:.learn)
+        var rows=try JSONSerialization.jsonObject(with:JSONEncoder().encode([a,b])) as! [[String:Any]]
+        for i in rows.indices{rows[i].removeValue(forKey:"mode")}
+        try JSONSerialization.data(withJSONObject:rows).write(to:dir.appendingPathComponent("sessions.json"));let chats=try store.load()
+        try store.forget(a.id,keeping:chats)
+        try XCTAssertEqual(store.load().map(\.id),[b.id])
+        let backup=try JSONDecoder().decode([LearningSession].self,from:Data(contentsOf:dir.appendingPathComponent("sessions-v1-backup.json")))
+        XCTAssertEqual(backup.map(\.id),[b.id]);XCTAssertEqual(backup.first?.title,b.title)
+        try store.forget(b.id,keeping:try store.load());XCTAssertFalse(FileManager.default.fileExists(atPath:dir.appendingPathComponent("sessions-v1-backup.json").path));try XCTAssertTrue(store.load().isEmpty)
+    }
+    func testForgetFailurePreservesRetryableChat()throws{
+        let dir=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString);defer{try? FileManager.default.removeItem(at:dir)}
+        let store=try SessionStore(directory:dir);let chat=LearningSession(title:"Retain on failure")
+        try store.save([chat]);try Data("invalid backup".utf8).write(to:dir.appendingPathComponent("sessions-v1-backup.json"))
+        XCTAssertThrowsError(try store.forget(chat.id,keeping:[chat]));try XCTAssertEqual(store.load(),[chat])
+    }
+    func testConversationLimitIsExplicit() {
+        var chat=LearningSession(title:"Long chat");chat.messages=(0..<30).map{Message(role:"user",text:"UNIQUE_\($0)_END")}
+        let window=ConversationWindow(messages:chat.messages);XCTAssertEqual(window.omitted,12);XCTAssertTrue(chat.contextLimited)
+        let prompt=TutorPrompt.build(session:chat,question:"Continue",hasImage:false,pointing:false,reveal:false)
+        XCTAssertFalse(prompt.contains("UNIQUE_0_END"));XCTAssertTrue(prompt.contains("UNIQUE_29_END"));XCTAssertTrue(prompt.contains("Earlier history is saved but unavailable"))
+    }
+    func testConversationExcerptsHaveBoundedBudget(){
+        let messages=(0..<18).map{_ in Message(role:"user",text:String(repeating:"x",count:20_000))}
+        let window=ConversationWindow(messages:messages);XCTAssertTrue(window.excerpted);XCTAssertTrue(window.omitted>0);XCTAssertTrue(window.text.count<49_000);XCTAssertTrue(window.text.contains("Message excerpt"))
+    }
+    func testGuideValidationAndLegacyReplyCompatibility()throws{
+        let valid=GuidePlan(title:"Check the diagram",steps:["Locate the circle","Compare the square"])
+        let reply=TutorReply(text:"Start with the circle",guide:valid)
+        try XCTAssertEqual(TutorReply.decode(JSONEncoder().encode(reply)).guide,valid)
+        let invalid=TutorReply(text:"Answer",guide:GuidePlan(title:"Bad",steps:["Only one"]))
+        try XCTAssertNil(TutorReply.decode(JSONEncoder().encode(invalid)).guide)
+        try XCTAssertNil(TutorReply.decode(Data(#"{"text":"Old reply","point":null}"#.utf8)).guide)
+    }
+    func testGuideProgressClampsPersistedIndex()throws{
+        let plan=GuidePlan(title:"Plan",steps:["One","Two"])
+        let data=try JSONEncoder().encode(GuideProgress(plan:plan,index:99));let result=try JSONDecoder().decode(GuideProgress.self,from:data)
+        XCTAssertEqual(result.index,1);XCTAssertEqual(result.current,"Two")
+    }
+    func testScreenEvidenceRejectsChangedScopeAndPixels(){
+        let now=Date();let id=UUID();let frame=CGRect(x:10,y:20,width:400,height:300)
+        let original=ScreenEvidence(generation:id,windowID:42,frame:frame,fingerprint:Data([1]),capturedAt:now.addingTimeInterval(-10))
+        var current=ScreenEvidence(generation:id,windowID:42,frame:frame,fingerprint:Data([1]),capturedAt:now)
+        XCTAssertTrue(original.matches(current,now:now));current.fingerprint=Data([2]);XCTAssertFalse(original.matches(current,now:now))
+        current.fingerprint=Data([1]);current.windowID=43;XCTAssertFalse(original.matches(current,now:now));current.windowID=42;current.generation=UUID();XCTAssertFalse(original.matches(current,now:now))
+    }
+    func testScreenEvidenceRejectsStaleMovedOrUnknownGeometry(){
+        let now=Date();let id=UUID();let frame=CGRect(x:10,y:20,width:400,height:300)
+        var original=ScreenEvidence(generation:id,windowID:42,frame:frame,fingerprint:Data([1]),capturedAt:now.addingTimeInterval(-10));var current=original;current.capturedAt=now
+        current.frame=CGRect(x:11,y:20,width:400,height:300);XCTAssertFalse(original.matches(current,now:now));current.frame=frame
+        current.capturedAt=now.addingTimeInterval(-6);XCTAssertFalse(original.matches(current,now:now));current.capturedAt=now;original.capturedAt=now.addingTimeInterval(-46);XCTAssertFalse(original.matches(current,now:now))
+        original.capturedAt=now;original.frame=nil;current.frame=nil;XCTAssertFalse(original.matches(current,now:now));original.frame = .zero;current.frame = .zero;XCTAssertFalse(original.matches(current,now:now))
+    }
+    func testTextFreshnessWithoutGeometryStillRejectsPointing(){
+        let now=Date();let id=UUID();let old=ScreenEvidence(generation:id,windowID:nil,frame:nil,fingerprint:Data([1]),capturedAt:now.addingTimeInterval(-60));let fresh=ScreenEvidence(generation:id,windowID:nil,frame:nil,fingerprint:Data([1]),capturedAt:now)
+        XCTAssertTrue(old.reflectsSameView(fresh,now:now));XCTAssertFalse(old.matches(fresh,now:now))
+    }
+    func testGuideRequiresExplicitRequest(){
+        let chat=LearningSession(title:"Explain this")
+        let ordinary=TutorPrompt.build(session:chat,question:"What is it?",hasImage:false,pointing:false,reveal:false)
+        let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
+        XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
+    }
+
 }
 
 @main struct CoreChecks {
@@ -153,15 +219,28 @@ let cases: [(String, () throws -> Void)] = [
  ("Uploaded images distinguished from live sharing",tests.testUploadedImageIsNotClaimedAsLiveScreen),
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
- ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures)
+ ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
+ ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
+ ("Forget failure preserves retryable chat",tests.testForgetFailurePreservesRetryableChat),
+ ("Visible conversation limit",tests.testConversationLimitIsExplicit),
+ ("Bounded message excerpts",tests.testConversationExcerptsHaveBoundedBudget),
+ ("Guide validation and legacy replies",tests.testGuideValidationAndLegacyReplyCompatibility),
+ ("Guide progress bounds",tests.testGuideProgressClampsPersistedIndex),
+ ("Reject changed screen scope and pixels",tests.testScreenEvidenceRejectsChangedScopeAndPixels),
+ ("Reject stale or moved screen geometry",tests.testScreenEvidenceRejectsStaleMovedOrUnknownGeometry),
+ ("Explicit step guide policy",tests.testGuideRequiresExplicitRequest),
+ ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing)
 ]
+var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
  let before = failures.count
  do { try test() } catch { failures.append("\(name): \(error)") }
+ resultMap[name]=failures.count == before
  if failures.count == before { print("PASS: \(name)"); passed += 1 }
 }
 for failure in failures { print("FAIL: \(failure)") }
 print("\(passed)/\(cases.count) core checks passed")
+if let index=CommandLine.arguments.firstIndex(of:"--results"),CommandLine.arguments.count>index+1{try? JSONSerialization.data(withJSONObject:resultMap,options:[.prettyPrinted,.sortedKeys]).write(to:URL(fileURLWithPath:CommandLine.arguments[index+1]))}
 exit(failures.isEmpty ? 0 : 1)
 }
 }

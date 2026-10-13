@@ -6,6 +6,7 @@ root=Path(__file__).resolve().parent.parent
 app=root/'dist/Mythos.app'
 info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
 version=info['CFBundleShortVersionString']
+series='.'.join(version.split('.')[:2])
 def command(*args):
     return subprocess.check_output(args,cwd=root,text=True,stderr=subprocess.STDOUT).strip()
 def digest(path):
@@ -14,14 +15,18 @@ def digest(path):
         for chunk in iter(lambda:stream.read(1_048_576),b''):value.update(chunk)
     return value.hexdigest()
 checks={}
-for label,folder in [('native','native-ui-1.1-final'),('integration','integration-1.1-final')]:
+for label,folder in [('native',f'native-ui-{series}-final'),('integration',f'integration-{series}-final')]:
     path=root/'artifacts'/folder/'results.json'
     values=json.loads(path.read_text())
     if not values or not all(value is True for value in values.values()):
         raise SystemExit(f'{label} verification has not passed: {path}')
     checks[label]={'passed':len(values),'results':values}
-if '15/15 core checks passed' not in (root/'artifacts/unit-tests-1.1.log').read_text():
+core_checks=json.loads((root/f'artifacts/core-results-{series}.json').read_text())
+if not core_checks or not all(value is True for value in core_checks.values()):
     raise SystemExit('Core verification has not passed.')
+repeat_checks=json.loads((root/f'artifacts/native-ui-{series}-repeat.log').read_text())
+if not repeat_checks or not all(value is True for value in repeat_checks.values()):
+    raise SystemExit('Repeated native verification has not passed.')
 update_checks=json.loads((root/'artifacts/update-build-config-results.json').read_text())
 if not update_checks or not all(value is True for value in update_checks.values()):
     raise SystemExit('Build-time updater configuration verification has not passed.')
@@ -36,8 +41,8 @@ source=root/'dist'/f'Mythos-{version}-source-and-evidence.zip'
 paths=command('git','ls-files','--cached','--others','--exclude-standard').splitlines()
 prefix=f'Mythos-{version}-source/'
 selected={
-    'native-ui-1.1-final':['01-new-chat.png','02-capsule.png','03-attachments.png','04-PDF-preview.png','08-chat-history.png','09-settings-updates.png','09b-update-controls.png'],
-    'integration-1.1-final':['07-real-general-reply.png','11-live-web-search.png']
+    f'native-ui-{series}-final':['01-new-chat.png','02-capsule.png','03-attachments.png','04-PDF-preview.png','05-paused.png','06-optional-learn-mode.png','08-chat-history.png','09-settings-updates.png','09b-update-controls.png','12-live-context.png','12b-live-capsule.png','13-loading.png','14-window-changed.png','15-error-retry.png','17-conversation.png','17b-conversation-capsule.png','19-step-guide.png','21-context-limit.png','22-deletion-error.png','23-forget-recovered.png'],
+    f'integration-{series}-final':['07-real-general-reply.png','11-live-web-search.png','24-real-guide-synthetic-screen.png']
 }
 with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as archive:
     for relative in paths:
@@ -45,10 +50,10 @@ with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as archive:
         if path.is_file() and not relative.startswith(('artifacts/','dist/','.build','.git/')):
             archive.write(path,prefix+relative)
     for folder,names in selected.items():
-        for name in names+['results.json']:
+        for name in names+['results.json','privacy-proof.json']:
             path=root/'artifacts'/folder/name
             archive.write(path,prefix+'evidence/'+folder+'/'+name)
-    for name in ['unit-tests-1.1.log','universal-build-1.1.log','update-build-config-results.json']:
+    for name in [f'unit-tests-{series}.log',f'universal-build-{series}.log',f'core-results-{series}.json',f'native-ui-{series}-repeat.log','update-build-config-results.json']:
         archive.write(root/'artifacts'/name,prefix+'evidence/'+name)
 manifest={
     'product':info['CFBundleName'],'version':version,'build':info['CFBundleVersion'],
@@ -58,9 +63,10 @@ manifest={
     'updater':{'framework':'Sparkle 2.10.0','configured':bool(info.get('SUFeedURL') and info.get('SUPublicEDKey')),'signedFeedRequired':info['SURequireSignedFeed'],'verificationBeforeExtraction':info['SUVerifyUpdateBeforeExtraction'],'automaticChecks':False},
     'runtimeVerified':{'architecture':platform.machine(),'macOS':platform.mac_ver()[0]},
     'arm64RuntimeVerified':False,'laptopInstalled':False,
-    'verification':{'corePassed':15,'updateBuildConfigPassed':len(update_checks),**checks},
+    'verification':{'corePassed':len(core_checks),'nativeRepeatPassed':len(repeat_checks),'updateBuildConfigPassed':len(update_checks),**checks},
+    'interaction':{'localSelectedWindowRefreshSeconds':2,'captureTimeoutSeconds':6,'screenSentOnlyOnQuestionOrGuideAction':True,'conversation':'explicit opt-in turn-taking with final provider replies','networkStreaming':False,'fullDuplexAudio':False,'realHardwareScreenVerified':False,'realHardwareVoiceVerified':False,'syntheticWindowGuideWithRealProvider':checks['integration']['results'].get('realProviderGuideWithSyntheticScreen',False)},
     'files':[{ 'name':path.name,'bytes':path.stat().st_size,'sha256':digest(path)} for path in [release,source]],
-    'remaining':['Screenshot delivery and laptop runtime verification','Existing private feed and trusted signing assets for live updates','Developer ID signing and notarization for distribution','First-use microphone and window-sharing consent']
+    'remaining':['Screenshot delivery and laptop runtime verification','Existing private feed and trusted signing assets for live updates','Developer ID signing and notarization for distribution','Native microphone/window consent and real hardware flow testing','VoiceOver, real picker/drop/clipboard and multi-display checks']
 }
 manifest_path=root/'dist'/f'Mythos-{version}-release-manifest.json'
 manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')

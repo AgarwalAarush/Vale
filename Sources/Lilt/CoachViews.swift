@@ -6,15 +6,15 @@ struct CapsuleView: View {
     var openCoach: () -> Void
     var body: some View {
         HStack(spacing: 15) {
-            Button(action: openCoach) { AudioMark(active: model.voice.listening || model.voice.speaking) }.buttonStyle(.plain).help("Open coach")
+            Button(action: openCoach) {HStack(spacing:5){AudioMark(active: model.voice.listening || model.voice.speaking);if model.context.hasSelection{Image(systemName:model.context.live ? "record.circle.fill" : "macwindow").font(.system(size:10)).foregroundStyle(Theme.accent)}}}.buttonStyle(.plain).help(model.context.live ? "Live window context is on" : "Open assistant").accessibilityLabel(model.context.live ? "Open assistant. Live window context is on" : "Open assistant")
             Button(action: openCoach) {
                 HStack(spacing: 12) {
                     if let chat=model.active,chat.duration>0 { Text(chat.timerText).font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit() }
-                    Text(model.active?.title == "New chat" ? "Mythos" : model.active?.title ?? "Mythos").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? 185 : 118, alignment: .leading)
+                    Text(model.active?.title == "New chat" ? "Mythos" : model.active?.title ?? "Mythos").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
                 }
             }.buttonStyle(.plain).help("Type a question")
             Spacer(minLength: 0)
-            IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : "Talk", tint: model.voice.listening ? Theme.accent : Theme.ink) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
+            IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.ink) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
             Button { model.togglePause() } label: { Label(model.paused ? "Resume" : "Pause", systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)
             Menu {
                 Button("Open coach", action: openCoach)
@@ -45,26 +45,21 @@ struct CoachView: View {
                 Menu {
                     Toggle("Read typed replies aloud", isOn: $model.readAloud)
                     Button("New chat") {model.newSession()}
-                    Button("Point it out") {model.pointItOut()}.disabled(model.context.filter == nil || model.busy)
+                    Button("Point it out") {model.pointItOut()}.disabled(!model.context.hasSelection || model.busy)
                     if model.active?.mode == .learn { Button("Show a full walkthrough…") { walkthrough = true }.disabled(model.active?.messages.isEmpty != false || model.busy) }
                     Menu("Focus timer") {Button("30 minutes"){model.setFocus(minutes:30)};Button("60 minutes"){model.setFocus(minutes:60)};Button("No timer"){model.setFocus(minutes:0)}}
                     Button("Close chat") { model.complete() }.disabled(model.active == nil)
                     Divider(); Button("Settings…") { model.settings = true; model.showLibrary?() }
                 } label: { Image(systemName: "ellipsis").font(.system(size: 14)).frame(width: 24, height: 30) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                IconButton(symbol:model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",label:model.expanded ? "Compact assistant" : "Expand assistant"){model.expandCoach?()}
                 IconButton(symbol: "xmark", label: "Collapse coach", action: close)
             }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11)
-            HStack(spacing: 8) {
-                Image(systemName: "macwindow").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                if let context = model.contextName {
-                    Button { model.previewContext() } label: { Text(context).lineLimit(1).font(.system(size: 11)).foregroundStyle(Theme.muted) }.buttonStyle(.plain).help("Preview shared context")
-                    Spacer(minLength: 4)
-                    Button("Stop sharing") { model.stopSharing() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent)
-                } else {
-                    Button("Share a window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.muted).disabled(model.paused)
-                    Spacer()
-                    Text("Optional").font(.system(size: 10)).foregroundStyle(Theme.muted.opacity(0.65))
-                }
-            }.padding(.horizontal, 13).padding(.vertical, 10).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 18)
+            ContextStrip(model:model)
+            if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
+            if model.active?.contextLimited == true{
+                HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
+            }
+            if let guide=model.active?.guide{GuideCard(model:model,guide:guide)}
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -82,6 +77,9 @@ struct CoachView: View {
                                     Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                                     if !message.attachments.isEmpty {
                                         ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
+                                    }
+                                    if message.screenChanged{
+                                        HStack{Image(systemName:"arrow.clockwise");Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:10)).foregroundStyle(Theme.muted)
                                     }
                                     if message.role == "assistant" {
                                         HStack(spacing: 8) {
@@ -110,10 +108,10 @@ struct CoachView: View {
             }.frame(maxHeight: .infinity)
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 11)).foregroundStyle(Color(red: 0.96, green: 0.77, blue: 0.49)); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain) }
+                    HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 11)).foregroundStyle(Color(red: 0.96, green: 0.77, blue: 0.49)); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
                     HStack(spacing: 14) {
                         if model.active?.messages.last?.role == "user" { Button("Retry message") { model.retry() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
-                        if model.context.filter != nil { Button("Change window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
+                        if model.context.hasSelection { Button("Change window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
                     }
                 }.padding(11).background(Color.orange.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 9)).padding(.horizontal, 18).padding(.bottom, 10)
             }
@@ -128,15 +126,16 @@ struct CoachView: View {
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text("Ask quietly…").font(.system(size: 14)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.top, 6).padding(.leading, 7).allowsHitTesting(false) }
-                    DraftEditor(text: $model.draft, submit: { model.send() }, cancel: { model.cancel(); model.voice.stop() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
+                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
                 }
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
                     IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}
+                    IconButton(symbol:"list.number",label:"Start step-by-step help"){model.startGuide()}.disabled(model.busy || model.paused)
                     Spacer()
-                    if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.voice.stopSpeaking() } }
-                    IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : "Talk", tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
-                    Button { if model.busy { model.cancel() } else { model.send() } } label: {
+                    if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
+                    IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
+                    Button { if model.busy { model.stopResponse() } else { model.send() } } label: {
                         Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink).frame(width: 30, height: 30).background(Theme.accent.opacity(!model.hasInput && !model.busy ? 0.12 : 0.35)).clipShape(Circle())
                     }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || model.paused || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
@@ -145,7 +144,7 @@ struct CoachView: View {
             HStack {
                 Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                 Spacer()
-                Text("⌃⌥Space").font(.system(size: 10)).foregroundStyle(Theme.muted.opacity(0.75)).help("Open the coach from anywhere")
+                Button{model.setConversation(!model.conversation)}label:{Label(model.conversation ? "End conversation" : "Conversation",systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 14)
         }.modifier(GlassSurface(radius: 20))
             .dropDestination(for:URL.self){urls,_ in Task{await model.importFiles(urls)};return urls.contains(where:{$0.isFileURL})}

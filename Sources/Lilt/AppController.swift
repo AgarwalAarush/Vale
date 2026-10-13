@@ -8,7 +8,7 @@ final class FloatingPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-@MainActor final class AppController: NSObject, NSApplicationDelegate,NSMenuItemValidation {
+@MainActor final class AppController: NSObject, NSApplicationDelegate,NSMenuItemValidation,NSWindowDelegate {
     var model: AppModel!
     var capsule: FloatingPanel!
     var coach: FloatingPanel!
@@ -20,21 +20,25 @@ final class FloatingPanel: NSPanel {
     private var hotHandler: EventHandlerRef?
     private var monitor: Any?
     private var auxiliary: [NSWindow] = []
+    private var contextPreviews:[NSWindow]=[]
+    private var filePreviews:[ObjectIdentifier:UUID]=[:]
     private var testing = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         testing = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")
         let testDirectory = testing ? URL(fileURLWithPath: CommandLine.arguments.last!).appendingPathComponent("test-library") : nil
         model = AppModel(dataDirectory: testDirectory)
-        setupWindows(); setupMenu(); registerHotKey()
+        setupWindows(); setupMenu(); if !testing{registerHotKey()}
         model.showCoach = { [weak self] in self?.openCoach() }
         model.showLibrary = { [weak self] in self?.openLibrary() }
         model.hideOverlay = { [weak self] in self?.clearAnnotation() }
         model.showPoint = { [weak self] point, snapshot in self?.point(point, snapshot: snapshot) }
+        model.contextReset = { [weak self] in guard let self else{return};for window in self.contextPreviews{window.close()} }
+        model.filesRemoved = { [weak self] ids in guard let self else{return};for window in self.auxiliary.filter({self.filePreviews[ObjectIdentifier($0)].map{ids.contains($0)} ?? false}){window.close()} }
         model.showPreview = { [weak self] image in self?.preview(image) }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            if event.keyCode == 53 { self.model.cancel(); self.model.voice.stop(); self.clearAnnotation(); return nil }
+            if event.keyCode == 53 { self.model.stopInteraction(); self.clearAnnotation(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "," { self.model.settings = true; self.openLibrary(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.newSession(); return nil }
             return event
@@ -42,6 +46,7 @@ final class FloatingPanel: NSPanel {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.willSleepNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.screensDidSleepNotification, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(systemSuspend), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+        model.expandCoach = { [weak self] in self?.toggleCoachSize() }
         model.showFile = { [weak self] record in self?.previewFile(record) }
         if testing { Task { await runHarness() } } else { model.prepareChat() }
     }
@@ -51,7 +56,7 @@ final class FloatingPanel: NSPanel {
         capsule.contentView = NSHostingView(rootView: CapsuleView(model: model, openCoach: { [weak self] in self?.openCoach() }))
         capsule.setFrameOrigin(NSPoint(x: visible.maxX - 450, y: visible.maxY - 82))
         coach = makePanel(size: NSSize(width: 410, height: 480))
-        coach.contentView = NSHostingView(rootView: CoachView(model: model, close: { [weak self] in self?.coach.orderOut(nil) }))
+        let coachHost=NSHostingView(rootView:CoachView(model:model,close:{[weak self]in self?.coach.orderOut(nil)}));coachHost.sizingOptions=[];coachHost.autoresizingMask=[.width,.height];coach.contentView=coachHost;coach.setContentSize(NSSize(width:410,height:480))
         coach.setFrameOrigin(NSPoint(x: visible.maxX - 430, y: visible.minY + 24))
         library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         library.title = "Mythos"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
@@ -90,6 +95,12 @@ final class FloatingPanel: NSPanel {
         }
     }
     func openLibrary() { coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
+    private func toggleCoachSize(){
+        model.expanded.toggle();let visible=NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
+        let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
+        let origin=NSPoint(x:max(visible.minX+16,min(coach.frame.maxX-size.width,visible.maxX-size.width-16)),y:max(visible.minY+20,min(coach.frame.minY,visible.maxY-size.height-20)))
+        coach.setFrame(NSRect(origin:origin,size:size),display:true,animate:true)
+    }
     private func setupMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); main.addItem(appItem)
@@ -126,7 +137,7 @@ final class FloatingPanel: NSPanel {
         InstallEventHandler(GetApplicationEventTarget(), handler, 1, &event, pointer, &hotHandler)
         let id = EventHotKeyID(signature: 0x4C696C74, id: 1)
         let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), id, GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { model.error = "The shortcut is already in use. Open Mythos from the menu bar." }
+        if status != noErr { model.shortcutWarning = "The shortcut is already in use. Open Mythos from the menu bar." }
     }
     func point(_ point: PointTarget, snapshot: ContextSnapshot) {
         clearAnnotation()
@@ -161,16 +172,20 @@ final class FloatingPanel: NSPanel {
     private func preview(_ image: NSImage) {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 520), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Shared context preview"; window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .darkAqua)
-        window.contentView = NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background))
+        let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self;contextPreviews.append(window)
         window.center(); auxiliary.append(window); window.makeKeyAndOrderFront(nil)
         if auxiliary.count > 3 { auxiliary.removeFirst().close() }
     }
     private func previewFile(_ record:AttachmentRecord) {
         guard let files=model.fileStore else{return}
         let window=NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:550),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
-        window.title=record.name;window.isReleasedWhenClosed=false;window.appearance=NSAppearance(named:.darkAqua)
+        window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua)
         let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550));window.center()
         auxiliary.append(window);window.makeKeyAndOrderFront(nil);if auxiliary.count>3{auxiliary.removeFirst().close()}
+    }
+    func windowWillClose(_ notification:Notification){
+        guard let window=notification.object as? NSWindow else{return}
+        auxiliary.removeAll{$0===window};contextPreviews.removeAll{$0===window};filePreviews.removeValue(forKey:ObjectIdentifier(window));window.contentView=nil
     }
     @objc func systemSuspend() { model.suspend() }
     @objc private func menuNew() { model.newSession() }

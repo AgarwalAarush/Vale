@@ -28,3 +28,11 @@ The native harness runs the same NSWindows and views as the product with isolate
 - [Sparkle setup and signed updates](https://sparkle-project.org/documentation/)
 - [Sparkle programmatic setup](https://sparkle-project.github.io/documentation/programmatic-setup/)
 - [Pinned Sparkle 2.10.0 release](https://github.com/sparkle-project/Sparkle/releases/tag/2.10.0)
+
+## 1.2 interaction update
+
+WindowContext coalesces capture requests behind a bounded cancellation-aware deadline. The system filter is one explicitly selected window. Live samples locally, keeps one preview in RAM, and clears it on stop/failure; on-demand requests do not keep preview pixels. Request-time and post-reply captures compare scope, pixels and geometry. ScreenEvidence separately permits text freshness without older-OS geometry while requiring finite known geometry and recent matching evidence for a point. Stale replies are labeled; new stale guides and points are suppressed.
+
+VoiceController separates recognition/playback generations and exposes natural playback completion. AppModel rearms recognition only for the current explicitly opted-in conversation, after playback, with chat/request identity checks. Interruption, typing, errors, stop/pause, sleep and session changes cancel pending rearm. Test-only adapters bypass physical audio/capture while using those same state transitions. These adapters require explicit harness launch arguments.
+
+GuidePlan/GuideProgress validate bounded plans and persist navigation; user-triggered navigation requests a fresh frame. ConversationWindow selects bounded recent excerpts and supplies a visible/prompted limit notice. SessionStore.forget filters only the target from the legacy backup before saving the active library. AttachmentStore throws unlink failures; AppModel retains retryable metadata and reports partial deletion. AppController releases preview contents on close, sharing reset or managed-file removal.

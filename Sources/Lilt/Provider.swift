@@ -19,6 +19,7 @@ private final class SearchEventProbe: @unchecked Sendable {
     }
 }
 @MainActor final class TutorProvider {
+    var fixtureReply:((String,[Data],Bool,@escaping (Result<TutorReply,Error>)->Void)->Void)?
     private(set) var usedWebSearch=false
     private var process: Process?
     private var timeout: DispatchWorkItem?
@@ -36,6 +37,7 @@ private final class SearchEventProbe: @unchecked Sendable {
     func ask(prompt: String, images: [Data] = [], search: Bool = false, completion: @escaping (Result<TutorReply, Error>) -> Void) {
         cancel()
         usedWebSearch=false
+        if let fixtureReply,(CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")){fixtureReply(prompt,images,search,completion);return}
         guard let executable else { completion(.failure(AppError("Codex wasn’t found. Open Settings to choose the Codex executable."))); return }
         self.completion = completion
         do {

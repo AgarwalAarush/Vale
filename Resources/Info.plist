@@ -5,15 +5,15 @@
 <key>CFBundleIdentifier</key><string>local.lilt.companion</string>
 <key>CFBundleName</key><string>Mythos</string>
 <key>CFBundleDisplayName</key><string>Mythos</string>
-<key>CFBundleVersion</key><string>2</string>
-<key>CFBundleShortVersionString</key><string>1.1.0</string>
+<key>CFBundleVersion</key><string>3</string>
+<key>CFBundleShortVersionString</key><string>1.2.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>Lilt.icns</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
-<key>NSMicrophoneUsageDescription</key><string>Mythos uses your microphone only when you choose Talk.</string>
-<key>NSSpeechRecognitionUsageDescription</key><string>Mythos transcribes your spoken message when you choose Talk. Typing is always available.</string>
+<key>NSMicrophoneUsageDescription</key><string>Mythos uses your microphone when you choose Talk or Conversation.</string>
+<key>NSSpeechRecognitionUsageDescription</key><string>Mythos transcribes your spoken message when you choose Talk or Conversation. Typing is always available.</string>
 <key>NSScreenCaptureUsageDescription</key><string>Mythos captures only the window you choose when you ask, so your assistant can see the context.</string>
 <key>SUEnableAutomaticChecks</key><false/>
 <key>SUAutomaticallyUpdate</key><false/>

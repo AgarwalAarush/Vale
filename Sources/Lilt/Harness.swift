@@ -31,13 +31,13 @@ extension AppController {
         let output=URL(fileURLWithPath:CommandLine.arguments.last!);var results:[String:Bool]=[:]
         do{
             try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
-            model.sessions=[];model.activeID=nil;model.selectedID=nil;model.prepareChat();await settle()
+            model.voice.enableFixtures();model.sessions=[];model.activeID=nil;model.selectedID=nil;model.prepareChat();await settle()
             results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && coach.isVisible && !library.isVisible
             try snapshot(coach,to:output.appendingPathComponent("01-new-chat.png"));try snapshot(capsule,to:output.appendingPathComponent("02-capsule.png"))
             func findEditor(_ view:NSView)->ComposerTextView?{if let editor=view as? ComposerTextView{return editor};for child in view.subviews{if let found=findEditor(child){return found}};return nil}
             let editor=findEditor(coach.contentView!);results["composerGetsKeyboardFocus"]=coach.firstResponder === editor
             model.draft="First line";await settle()
-            if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.shift,timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){editor.setSelectedRange(NSRange(location:editor.string.utf16.count,length:0));editor.keyDown(with:enter);results["shiftReturnAddsNewline"]=model.draft.contains("\n")}
+            if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.shift,timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){editor.setSelectedRange(NSRange(location:editor.string.utf16.count,length:0));NSApp.sendEvent(enter);results["shiftReturnAddsNewline"]=model.draft.contains("\n")}
             model.send("Cancellation probe");model.cancel();await settle();results["cancelDiscardsPendingCompletion"] = !model.busy && model.active?.messages.last?.role == "user";model.updateActive{$0.messages=[];$0.title="New chat"}
             let fixtures=try makeFixtures(in:output);await model.importFiles(fixtures)
             results["multipleImagePDFTextImports"]=model.pendingFiles.count==4
@@ -60,7 +60,7 @@ extension AppController {
             if CommandLine.arguments.contains("--integration-test"){
                 model.draft="Compare the two images, then give the verification token in the PDF and the reminder in the text file. Be brief."
                 await settle()
-                if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){editor.keyDown(with:enter)}
+                if editor != nil,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){NSApp.sendEvent(enter)}
                 results["returnSendsMessage"]=model.active?.messages.last?.role == "user" && model.draft.isEmpty
                 await waitForReply()
                 let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text.lowercased() : ""
@@ -100,6 +100,7 @@ extension AppController {
                 await settle();try snapshot(coach,to:output.appendingPathComponent("11-live-web-search.png"))
                 model.setWeb(false);results["webSearchCanBeTurnedOff"]=model.active?.webEnabled == false
             }
+            try await runInteractionFixtures(output:output,results:&results)
             let data=try JSONSerialization.data(withJSONObject:results,options:[.prettyPrinted,.sortedKeys]);try data.write(to:output.appendingPathComponent("results.json"));print(String(data:data,encoding:.utf8)!);model.suspend();exit(results.values.allSatisfy{$0} ? 0 : 1)
         }catch{print("Harness failed: \(error)");exit(1)}
     }

@@ -84,6 +84,7 @@ struct SessionDetail: View {
                     Spacer()
                     Menu{Button("Rename…",action:renameAction);Button("Export chat…"){model.export(session)};Button("Forget chat…",role:.destructive,action:deleteAction)}label:{Image(systemName:"ellipsis").frame(width:25,height:25)}.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
+                if let error=model.error{VStack(alignment:.leading,spacing:10){Text(error).font(.system(size:12)).foregroundStyle(.orange).textSelection(.enabled).fixedSize(horizontal:false,vertical:true);if model.deletionToRetry==session.id{Button("Retry Forget"){model.delete(session.id)}.buttonStyle(QuietButton())}}}
                 Button(session.id == model.activeID ? "Return to chat" : "Continue chat"){if session.id == model.activeID{model.showCoach?()}else{model.resume(session.id)}}.buttonStyle(QuietButton(filled:true))
                 if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,model:model)}}}.scrollIndicators(.hidden)}
                 Divider().overlay(Theme.line)
@@ -119,11 +120,12 @@ struct SettingsView: View {
                 }
                 Divider().overlay(Theme.line)
                 Toggle("Read typed replies aloud", isOn: $model.readAloud).toggleStyle(.switch).font(.system(size: 13))
-                Text("The microphone turns on only when you choose Talk. Spoken questions use Apple’s speech recognition; on-device recognition is used when available.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
+                Text("The microphone starts when you choose Talk or Conversation. Conversation listens again after each answer; Pause or Escape stops it. Apple’s on-device speech recognition is used when available.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
+                VoiceSettings()
                 Divider().overlay(Theme.line)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Your context, your choice").font(.system(size: 16, weight: .medium))
-                    Text("Your messages, uploaded files, and the window you explicitly share are sent when you ask. A selected window includes whichever page is visible inside it.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
+                    Text("Your messages, uploaded files, and the window you explicitly share are sent when you ask. Live refresh keeps only the latest selected-window preview in memory, every two seconds. Images are sent when you ask, not on every refresh. A selected window includes whichever page is visible inside it.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
                     Text("Chats and uploaded files are retained locally. Forget removes a chat and its files. Captured screens and microphone recordings are not saved to chat history.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
                 }
                 VStack(alignment:.leading,spacing:12){
@@ -141,7 +143,7 @@ struct SettingsView: View {
                     }.padding(.top, 15)
                 }.font(.system(size: 12))
                 Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                Text("Mythos 1.1 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
+                Text("Mythos 1.2 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
             }.padding(.horizontal, 42).padding(.top, 54).padding(.bottom, 40)
         }.scrollIndicators(.hidden)
     }
