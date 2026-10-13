@@ -48,6 +48,8 @@ struct ContextSnapshot {
     private var fixtureSource:(()async throws->ContextSnapshot)?
     private var fixtureFrame:CGRect?
     private var captureTimeout=6.0
+    private var fixtureOnScreen=true
+    private var fixturePointVisible=true
     var changed:(()->Void)?
     var failed:((String)->Void)?
     var hasSelection:Bool{filter != nil || fixtureSource != nil}
@@ -96,6 +98,7 @@ struct ContextSnapshot {
         let task=Task{[weak self] () async throws->ContextSnapshot in
             try await boundedCapture(seconds:timeout){[weak self]in
             guard let self else{throw CancellationError()}
+            guard selectedID==nil || self.currentFrame() != nil else{throw AppError("The selected window is hidden or unavailable. Bring it into view or choose it again.")}
             var result:ContextSnapshot
             if let source{result=try await source()}
             else{
@@ -107,7 +110,7 @@ struct ContextSnapshot {
                 guard let data=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else{throw AppError("Couldn’t read the selected window.")}
                 result=ContextSnapshot(data:data,image:NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height)),windowID:selectedID,frame:self.currentFrame(),generation:expected,capturedAt:Date())
             }
-            guard !Task.isCancelled,self.generation==expected,result.windowID==selectedID else{throw AppError("Sharing changed. Ask again with the selected window.")}
+            guard !Task.isCancelled,self.generation==expected,result.windowID==selectedID,(selectedID==nil || self.currentFrame() != nil) else{throw AppError("Sharing changed. Ask again with the selected window.")}
             result.generation=expected;result.capturedAt=Date();return result
             }
         }
@@ -120,12 +123,25 @@ struct ContextSnapshot {
         return result
     }
     func currentFrame()->CGRect?{
-        if fixtureSource != nil{return fixtureFrame}
-        guard let windowID,let entries=CGWindowListCopyWindowInfo(.optionIncludingWindow,windowID) as? [[String:Any]],let row=entries.first,let bounds=row[kCGWindowBounds as String] as? [String:Any],let frame=CGRect(dictionaryRepresentation:bounds as CFDictionary),frame.width>0,frame.height>0 else{return nil};return frame
+        if fixtureSource != nil{return fixtureOnScreen ? fixtureFrame : nil}
+        guard let windowID,let entries=CGWindowListCopyWindowInfo(.optionIncludingWindow,windowID) as? [[String:Any]],let row=entries.first,row[kCGWindowIsOnscreen as String] as? Bool == true,let bounds=row[kCGWindowBounds as String] as? [String:Any],let frame=CGRect(dictionaryRepresentation:bounds as CFDictionary),frame.width>0,frame.height>0 else{return nil};return frame
+    }
+    func pointIsVisible(_ point:PointTarget,frame:CGRect,windowID:CGWindowID?,ignoring:CGWindowID?=nil)->Bool{
+        guard point.isValid,let windowID,self.windowID==windowID,currentFrame()==frame else{return false}
+        if fixtureSource != nil{return fixtureOnScreen && fixturePointVisible}
+        guard let rows=CGWindowListCopyWindowInfo(.optionOnScreenOnly,kCGNullWindowID) as? [[String:Any]] else{return false}
+        let windows=rows.compactMap{row->PointWindow? in
+            let id=(row[kCGWindowNumber as String] as? NSNumber)?.uint32Value ?? 0
+            if id==ignoring{return nil}
+            let bounds=(row[kCGWindowBounds as String] as? [String:Any]).flatMap{CGRect(dictionaryRepresentation:$0 as CFDictionary)}
+            return PointWindow(id:id,bounds:bounds,opacity:(row[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1)
+        }
+        let box=CGRect(x:frame.minX+point.x*frame.width,y:frame.minY+point.y*frame.height,width:point.width*frame.width,height:point.height*frame.height).intersection(frame)
+        return PointVisibility.isVisible(targetID:windowID,box:box,frontToBack:windows)
     }
     // App-owned generated fixtures only; unavailable in normal launches.
-    func installFixture(windowID:CGWindowID=42,frame:CGRect=CGRect(x:100,y:100,width:400,height:260),timeout:Double=6,source:@escaping ()async throws->ContextSnapshot){
+    func installFixture(windowID:CGWindowID=42,frame:CGRect=CGRect(x:100,y:100,width:400,height:260),timeout:Double=6,onScreen:Bool=true,pointVisible:Bool=true,source:@escaping ()async throws->ContextSnapshot){
         guard CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else{return}
-        stop();self.windowID=windowID;fixtureFrame=frame;captureTimeout=max(0.05,min(6,timeout));fixtureSource=source;title="Synthetic fixture window";changed?()
+        stop();self.windowID=windowID;fixtureFrame=frame;captureTimeout=max(0.05,min(6,timeout));fixtureOnScreen=onScreen;fixturePointVisible=pointVisible;fixtureSource=source;title="Synthetic fixture window";changed?()
     }
 }

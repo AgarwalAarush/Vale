@@ -25,15 +25,16 @@ public struct Message: Codable, Identifiable, Equatable {
     public var date: Date
     public var attachments: [AttachmentRecord]
     public var screenChanged:Bool
-    public init(role: String, text: String, id: UUID = UUID(), date: Date = Date(), attachments: [AttachmentRecord] = [], screenChanged:Bool=false) {
-        self.id = id; self.role = role; self.text = text; self.date = date; self.attachments = attachments;self.screenChanged=screenChanged
+    public var highlightUnavailable:Bool
+    public init(role: String, text: String, id: UUID = UUID(), date: Date = Date(), attachments: [AttachmentRecord] = [], screenChanged:Bool=false,highlightUnavailable:Bool=false) {
+        self.id = id; self.role = role; self.text = text; self.date = date; self.attachments = attachments;self.screenChanged=screenChanged;self.highlightUnavailable=highlightUnavailable
     }
-    private enum CodingKeys: String, CodingKey { case id,role,text,date,attachments,screenChanged }
+    private enum CodingKeys: String, CodingKey { case id,role,text,date,attachments,screenChanged,highlightUnavailable }
     public init(from decoder: Decoder) throws {
         let c=try decoder.container(keyedBy: CodingKeys.self)
         id=try c.decode(UUID.self,forKey:.id); role=try c.decode(String.self,forKey:.role)
         text=try c.decode(String.self,forKey:.text); date=try c.decode(Date.self,forKey:.date)
-        attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? [];screenChanged=try c.decodeIfPresent(Bool.self,forKey:.screenChanged) ?? false
+        attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? [];screenChanged=try c.decodeIfPresent(Bool.self,forKey:.screenChanged) ?? false;highlightUnavailable=try c.decodeIfPresent(Bool.self,forKey:.highlightUnavailable) ?? false
     }
 }
 

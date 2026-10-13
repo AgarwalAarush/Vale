@@ -53,6 +53,7 @@ extension AppController {
         let geometrySent=transmitted;model.context.installFixture(frame:.zero){snapshotFor(first)};model.pointItOut();results["fixture_missingGeometryExplainsPointingLimitWithoutSending"]=transmitted==geometrySent && model.error?.contains("position is unavailable")==true
         model.context.installFixture(timeout:0.15){try await Task.sleep(nanoseconds:5_000_000_000);return snapshotFor(first)};model.context.startLive();await until{!model.context.live}
         results["fixture_captureTimeoutStopsAndClearsContext"] = !model.context.hasSelection && model.context.latest==nil && !model.context.capturing
+        let hiddenSent=transmitted;model.context.installFixture(onScreen:false){snapshotFor(first)};model.context.startLive();await until{!model.context.live};results["fixture_hiddenSelectedWindowStopsBeforeTransmission"]=transmitted==hiddenSent && !model.context.hasSelection && model.context.latest==nil
         model.newSession(title:"Synthetic spoken conversation");selectFixture()
         model.provider.fixtureReply={_,_,_,complete in transmitted+=1;complete(.success(TutorReply(text:"A short synthetic spoken answer.")))}
         model.setConversation(true);let token=model.voice.fixtureRecognitionToken
@@ -82,6 +83,8 @@ extension AppController {
         let saved=try SessionStore(directory:output.appendingPathComponent("test-library")).load().first{$0.id==model.activeID}
         results["fixture_guideProgressPersists"]=saved?.guide?.index==1
         await settle();try snapshot(coach,to:output.appendingPathComponent("19-step-guide.png"))
+        let pointsBefore=pointCount;model.context.installFixture(pointVisible:false){captureCount+=1;return snapshotFor(first)};model.pointItOut();await until{!model.busy};results["fixture_occludedPointIsSuppressedAndExplained"]=pointCount==pointsBefore && model.active?.messages.last?.highlightUnavailable==true
+        await settle();try snapshot(coach,to:output.appendingPathComponent("20-occluded-highlight.png"));selectFixture()
         model.endGuide();if model.expanded{model.expandCoach?();await settle()}
         model.updateActive{$0.messages=(0..<30).map{Message(role:"user",text:"Generated earlier context message \($0)")}}
         await settle();results["fixture_contextLimitIsExposed"]=model.active?.contextLimited==true;try snapshot(coach,to:output.appendingPathComponent("21-context-limit.png"))

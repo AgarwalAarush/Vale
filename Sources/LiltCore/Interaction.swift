@@ -44,3 +44,26 @@ public struct ScreenEvidence:Equatable {
         return generation==current.generation && windowID != nil && windowID==current.windowID && frame != nil && frame==current.frame && fingerprint==current.fingerprint && now.timeIntervalSince(capturedAt)>=0 && now.timeIntervalSince(capturedAt)<=45 && now.timeIntervalSince(current.capturedAt)>=0 && now.timeIntervalSince(current.capturedAt)<=5
     }
 }
+
+public struct PointWindow {
+    public var id:UInt32
+    public var bounds:CGRect?
+    public var opacity:Double
+    public init(id:UInt32,bounds:CGRect?,opacity:Double=1){self.id=id;self.bounds=bounds;self.opacity=opacity}
+}
+public enum PointVisibility {
+    public static func isVisible(targetID:UInt32,box:CGRect,frontToBack:[PointWindow])->Bool{
+        guard box.origin.x.isFinite,box.origin.y.isFinite,box.width.isFinite,box.height.isFinite,box.width>0,box.height>0 else{return false}
+        for window in frontToBack{
+            if window.id==targetID{
+                guard window.opacity.isFinite,window.opacity>0.01,let bounds=window.bounds,bounds.origin.x.isFinite,bounds.origin.y.isFinite,bounds.width.isFinite,bounds.height.isFinite,bounds.width>1,bounds.height>1 else{return false}
+                return bounds.contains(box)
+            }
+            guard window.opacity.isFinite else{return false}
+            if window.opacity<=0.01{continue}
+            guard let bounds=window.bounds else{return false}
+            if bounds.intersects(box){return false}
+        }
+        return false
+    }
+}

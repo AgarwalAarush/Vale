@@ -10,7 +10,7 @@ A native Mac companion for writing, coding, documents, and talking through what 
 4. Use the numbered-list button for a short step guide. Back/Next asks for help at that step with fresh context. Progress is saved with the chat; the assistant never treats navigation as proof that an action happened.
 5. **Pause** or **Escape** stops voice, pending replies, sharing, and highlights. A new chat or sleep/lock also clears live context. Resume does not restart the microphone or sharing automatically.
 
-The selected window is the capture boundary, including whichever page is visible inside it. There is no automatic frontmost-window selection, full-display fallback, or continuous cloud video transmission. If the window changes while an answer is being prepared, the answer is marked and its point/guide is withheld; use Refresh for the current view. Missing geometry prevents pointing with a visible explanation.
+The selected window is the capture boundary, including whichever page is visible inside it. There is no automatic frontmost-window selection, full-display fallback, or continuous cloud video transmission. If the window changes while an answer is being prepared, the answer is marked and its point/guide is withheld; use Refresh for the current view. Missing geometry prevents pointing with a visible explanation. Hidden windows stop capture; a covered highlight is suppressed with visible feedback.
 
 This release uses Apple dictation/speech and the official Codex CLI's existing ChatGPT sign-in. Voice is interruption-safe turn-taking with final provider replies. It is not network streaming or full-duplex audio. No paid API fallback or new service is configured.
 

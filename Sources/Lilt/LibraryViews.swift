@@ -143,7 +143,7 @@ struct SettingsView: View {
                     }.padding(.top, 15)
                 }.font(.system(size: 12))
                 Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                Text("Mythos 1.2 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
+                Text("Mythos 1.2.1 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
             }.padding(.horizontal, 42).padding(.top, 54).padding(.bottom, 40)
         }.scrollIndicators(.hidden)
     }

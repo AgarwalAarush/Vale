@@ -6,7 +6,7 @@ root=Path(__file__).resolve().parent.parent
 app=root/'dist/Mythos.app'
 info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
 version=info['CFBundleShortVersionString']
-series='.'.join(version.split('.')[:2])
+series=version
 def command(*args):
     return subprocess.check_output(args,cwd=root,text=True,stderr=subprocess.STDOUT).strip()
 def digest(path):
@@ -41,7 +41,7 @@ source=root/'dist'/f'Mythos-{version}-source-and-evidence.zip'
 paths=command('git','ls-files','--cached','--others','--exclude-standard').splitlines()
 prefix=f'Mythos-{version}-source/'
 selected={
-    f'native-ui-{series}-final':['01-new-chat.png','02-capsule.png','03-attachments.png','04-PDF-preview.png','05-paused.png','06-optional-learn-mode.png','08-chat-history.png','09-settings-updates.png','09b-update-controls.png','12-live-context.png','12b-live-capsule.png','13-loading.png','14-window-changed.png','15-error-retry.png','17-conversation.png','17b-conversation-capsule.png','19-step-guide.png','21-context-limit.png','22-deletion-error.png','23-forget-recovered.png'],
+    f'native-ui-{series}-final':['01-new-chat.png','02-capsule.png','03-attachments.png','04-PDF-preview.png','05-paused.png','06-optional-learn-mode.png','08-chat-history.png','09-settings-updates.png','09b-update-controls.png','12-live-context.png','12b-live-capsule.png','13-loading.png','14-window-changed.png','15-error-retry.png','17-conversation.png','17b-conversation-capsule.png','19-step-guide.png','20-occluded-highlight.png','21-context-limit.png','22-deletion-error.png','23-forget-recovered.png'],
     f'integration-{series}-final':['07-real-general-reply.png','11-live-web-search.png','24-real-guide-synthetic-screen.png']
 }
 with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as archive:

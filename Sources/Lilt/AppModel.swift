@@ -144,9 +144,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             if snapshot != nil,self.context.hasSelection{fresh=try? await self.context.capture()}
                             guard self.requestID==id,self.activeID==chatID else{return}
                             let changed=snapshot.map{original in fresh.map{!original.evidence.reflectsSameView($0.evidence)} ?? true} ?? false
+                            let canPoint:Bool
+                            if let point=reply.point,let snapshot,let fresh,let frame=snapshot.frame,!changed{canPoint=snapshot.evidence.matches(fresh.evidence) && self.context.pointIsVisible(point,frame:frame,windowID:snapshot.windowID)}else{canPoint=false}
                             self.busy=false
                             self.updateActive{chat in
-                                chat.messages.append(Message(role:"assistant",text:reply.text,screenChanged:changed));chat.updated=Date()
+                                chat.messages.append(Message(role:"assistant",text:reply.text,screenChanged:changed,highlightUnavailable:reply.point != nil && !changed && !canPoint));chat.updated=Date()
                                 if let plan=reply.guide,guideRequested,!changed{chat.guide=GuideProgress(plan:plan)}
                             }
                             if guideRequested,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
@@ -154,7 +156,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(reply.text)}
                             else if changed,(self.readAloud || spoken || self.conversation){self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
-                            if let point=reply.point,let snapshot,let fresh,!changed,point.isValid,snapshot.evidence.matches(fresh.evidence){self.showPoint?(point,snapshot)}
+                            if canPoint,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
                             self.persist()
                         case .failure(let error):self.busy=false;self.conversation=false;self.error=error.localizedDescription
                         }

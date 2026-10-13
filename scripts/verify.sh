@@ -4,7 +4,7 @@ cd "${0:A:h:h}"
 export CLANG_MODULE_CACHE_PATH="$PWD/.build/module-cache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$CLANG_MODULE_CACHE_PATH"
 MYTHOS_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
-MYTHOS_SERIES="${MYTHOS_VERSION%.*}"
+MYTHOS_SERIES="$MYTHOS_VERSION"
 MYTHOS_INTEGRATION=false
 MYTHOS_REPEAT=false
 for option in "$@"; do

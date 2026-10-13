@@ -141,7 +141,7 @@ final class FloatingPanel: NSPanel {
     }
     func point(_ point: PointTarget, snapshot: ContextSnapshot) {
         clearAnnotation()
-        guard point.isValid, let bounds = snapshot.frame, snapshot.generation == model.context.generation else { return }
+        guard point.isValid, let bounds = snapshot.frame, snapshot.generation == model.context.generation,model.context.pointIsVisible(point,frame:bounds,windowID:snapshot.windowID) else { return }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 900
         let frame = NSRect(x: bounds.minX + CGFloat(point.x) * bounds.width - 6, y: primaryHeight - bounds.minY - CGFloat(point.y + point.height) * bounds.height - 6, width: CGFloat(point.width) * bounds.width + 12, height: CGFloat(point.height) * bounds.height + 12)
         let window = NSWindow(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
@@ -154,7 +154,7 @@ final class FloatingPanel: NSPanel {
         annotationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if Date().timeIntervalSince(created) > 5 || self.model.context.generation != expectedGeneration || self.model.context.currentFrame() != expectedFrame { self.clearAnnotation(); return }
+                if Date().timeIntervalSince(created) > 5 || self.model.context.generation != expectedGeneration || self.model.context.currentFrame() != expectedFrame || !self.model.context.pointIsVisible(point,frame:bounds,windowID:snapshot.windowID,ignoring:CGWindowID(window.windowNumber)) { self.clearAnnotation(); return }
                 if !checkingFrame {
                     checkingFrame = true
                     Task { [weak self, weak window] in

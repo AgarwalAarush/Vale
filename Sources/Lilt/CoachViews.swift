@@ -78,6 +78,7 @@ struct CoachView: View {
                                     if !message.attachments.isEmpty {
                                         ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
                                     }
+                                    if message.highlightUnavailable{Label("Highlight unavailable · check your selected window",systemImage:"eye.slash").font(.system(size:10)).foregroundStyle(Theme.muted)}
                                     if message.screenChanged{
                                         HStack{Image(systemName:"arrow.clockwise");Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:10)).foregroundStyle(Theme.muted)
                                     }

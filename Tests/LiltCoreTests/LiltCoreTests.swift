@@ -192,6 +192,24 @@ final class LiltCoreTests {
         let now=Date();let id=UUID();let old=ScreenEvidence(generation:id,windowID:nil,frame:nil,fingerprint:Data([1]),capturedAt:now.addingTimeInterval(-60));let fresh=ScreenEvidence(generation:id,windowID:nil,frame:nil,fingerprint:Data([1]),capturedAt:now)
         XCTAssertTrue(old.reflectsSameView(fresh,now:now));XCTAssertFalse(old.matches(fresh,now:now))
     }
+    func testPointVisibilityRejectsForegroundOcclusion(){
+        let bounds=CGRect(x:100,y:100,width:400,height:300);let box=CGRect(x:200,y:200,width:80,height:60);let target=PointWindow(id:42,bounds:bounds)
+        XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[target]))
+        XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:box),target]))
+        XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:CGRect(x:600,y:100,width:50,height:50)),target]))
+    }
+    func testPointVisibilityRejectsMissingAndUnknownWindows(){
+        let box=CGRect(x:200,y:200,width:80,height:60);let target=PointWindow(id:42,bounds:CGRect(x:100,y:100,width:400,height:300))
+        XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[]))
+        XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil),target]))
+        XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:nil)]))
+        XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:target.bounds,opacity:0)]))
+    }
+    func testPointVisibilityIgnoresFullyTransparentForegroundOnly(){
+        let box=CGRect(x:200,y:200,width:80,height:60);let target=PointWindow(id:42,bounds:CGRect(x:100,y:100,width:400,height:300))
+        XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil,opacity:0),target]))
+        XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:.zero,frontToBack:[target]))
+    }
     func testGuideRequiresExplicitRequest(){
         let chat=LearningSession(title:"Explain this")
         let ordinary=TutorPrompt.build(session:chat,question:"What is it?",hasImage:false,pointing:false,reveal:false)
@@ -229,7 +247,10 @@ let cases: [(String, () throws -> Void)] = [
  ("Reject changed screen scope and pixels",tests.testScreenEvidenceRejectsChangedScopeAndPixels),
  ("Reject stale or moved screen geometry",tests.testScreenEvidenceRejectsStaleMovedOrUnknownGeometry),
  ("Explicit step guide policy",tests.testGuideRequiresExplicitRequest),
- ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing)
+ ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
+ ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
+ ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
