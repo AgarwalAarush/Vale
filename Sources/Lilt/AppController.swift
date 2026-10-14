@@ -83,7 +83,7 @@ final class FloatingPanel: NSPanel {
         coach = capsule
         library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         library.title = "Vale"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
-        library.backgroundColor = NSColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1); library.appearance = NSAppearance(named: .darkAqua)
+        library.backgroundColor = Theme.canvasNS; library.appearance = NSAppearance(named: .darkAqua)
         let libraryHost = NSHostingView(rootView: LibraryView(model: model))
         libraryHost.sizingOptions = []
         libraryHost.frame = NSRect(x: 0, y: 0, width: 900, height: 650)

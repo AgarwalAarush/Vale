@@ -6,7 +6,7 @@ import LiltCore
 struct ContextStrip:View {
     @ObservedObject var model:AppModel
     var body:some View{
-        VStack(alignment:.leading,spacing:7){
+        VStack(alignment:.leading,spacing:8){
             HStack(spacing:8){
                 Image(systemName:model.context.hasSelection ? "record.circle" : "macwindow").font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
                 if model.context.hasSelection{
@@ -25,26 +25,26 @@ struct ContextStrip:View {
                     Spacer(minLength:3)
                     if model.context.capturing{Text("Refreshing…").foregroundStyle(Theme.accent)}
                     else if let date=model.context.lastCapture{Text("\(max(0,Int(Date().timeIntervalSince(date))))s ago").monospacedDigit()}
-                }.font(.system(size:9)).foregroundStyle(Theme.muted)
+                }.font(.system(size:11)).foregroundStyle(Theme.faint).monospacedDigit()
             }
-        }.padding(.horizontal,10).padding(.vertical,7).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius:8)).padding(.horizontal,14)
+        }.padding(.horizontal,8).padding(.vertical,8).background(Theme.raised).clipShape(RoundedRectangle(cornerRadius:8,style:.continuous)).overlay(RoundedRectangle(cornerRadius:8,style:.continuous).strokeBorder(Theme.line,lineWidth:0.5)).padding(.horizontal,16)
     }
 }
 struct GuideCard:View {
     @ObservedObject var model:AppModel
     let guide:GuideProgress
     var body:some View{
-        VStack(alignment:.leading,spacing:9){
-            HStack{Text("STEP \(guide.index+1) OF \(guide.plan.steps.count)").font(.system(size:9,weight:.medium)).tracking(0.8).foregroundStyle(Theme.accent);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:10)).foregroundStyle(Theme.muted)}
-            Text(guide.current).font(.system(size:12,weight:.medium)).lineLimit(3).frame(maxWidth:.infinity,alignment:.leading)
-            HStack(spacing:10){
+        VStack(alignment:.leading,spacing:8){
+            HStack{Text("Step \(guide.index+1) of \(guide.plan.steps.count)").font(.system(size:11,weight:.medium)).foregroundStyle(Theme.accent).monospacedDigit();Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:12)).foregroundStyle(Theme.muted)}
+            Text(guide.current).font(.system(size:13,weight:.medium)).lineLimit(3).frame(maxWidth:.infinity,alignment:.leading)
+            HStack(spacing:12){
                 Button("Back"){model.moveGuide(-1)}.buttonStyle(.plain).disabled(guide.index==0)
                 Button("Point it out"){model.pointItOut()}.buttonStyle(.plain).disabled(!model.context.hasSelection)
                 Spacer()
-                if guide.index+1<guide.plan.steps.count{Button("Next step →"){model.moveGuide(1)}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
+                if guide.index+1<guide.plan.steps.count{Button("Next step"){model.moveGuide(1)}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
                 else{Button("Finish guide"){model.endGuide()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
-            }.font(.system(size:10)).disabled(model.busy || model.paused)
-        }.padding(12).background(Theme.accent.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.accent.opacity(0.16),lineWidth:0.7)).padding(.horizontal,14).padding(.top,8)
+            }.font(.system(size:12)).disabled(model.busy || model.paused)
+        }.padding(12).background(Theme.raised).clipShape(RoundedRectangle(cornerRadius:8,style:.continuous)).overlay(RoundedRectangle(cornerRadius:8,style:.continuous).strokeBorder(Theme.line,lineWidth:0.5)).padding(.horizontal,16).padding(.top,8)
     }
 }
 struct VoiceSettings:View {

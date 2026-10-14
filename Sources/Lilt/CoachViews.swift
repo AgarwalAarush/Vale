@@ -23,16 +23,6 @@ enum CompanionMenus {
     }
 }
 
-struct CommandEntry: Identifiable {
-    var id: String
-    var title: String
-    var symbol: String
-    var shortcut: String = ""
-    var disabled = false
-    var checked = false
-    var action: () -> Void
-}
-
 struct CompanionSurface: View {
     @ObservedObject var model: AppModel
     var summon: () -> Void
@@ -84,32 +74,13 @@ struct CompanionSurface: View {
         }.padding(.leading, 10).padding(.trailing, 4).frame(height: SurfaceMetrics.compact.height)
     }
     private var commandMenu: some View {
-        let sections = menuSections
-        let flat = sections.flatMap { $0 }
-        return VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
-                if index > 0 { Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1).padding(.horizontal, 8).padding(.vertical, 4) }
-                ForEach(section) { item in
-                    let selected = flat.indices.contains(highlight) && flat[highlight].id == item.id
-                    Button { guard !item.disabled else { return }; model.commandMenu = false; item.action() } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: item.symbol).font(.system(size: 11)).frame(width: 14)
-                            Text(item.title).lineLimit(1)
-                            Spacer(minLength: 8)
-                            if item.checked { Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.accent) }
-                            else if !item.shortcut.isEmpty { Text(item.shortcut).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.muted) }
-                        }
-                        .font(.system(size: 12))
-                        .foregroundStyle(item.disabled ? Theme.muted.opacity(0.45) : Theme.ink)
-                        .padding(.horizontal, 8).frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(selected && !item.disabled ? Color.white.opacity(0.08) : .clear))
-                    }.buttonStyle(.plain).disabled(item.disabled).onHover { if $0, let idx = flat.firstIndex(where: { $0.id == item.id }) { highlight = idx } }
-                }
-            }
+        CommandList(sections: menuSections, highlight: $highlight) { item in
+            guard !item.disabled else { return }
+            model.commandMenu = false
+            item.action()
         }
-        .padding(4)
-        .frame(maxWidth: model.coachPresented ? 250 : .infinity, alignment: .leading)
-        .background { if model.coachPresented { RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(red: 0.12, green: 0.125, blue: 0.135)).overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)) } }
+        .frame(maxWidth: model.coachPresented ? 240 : .infinity, alignment: .leading)
+        .background { if model.coachPresented { RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.background).overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5)) } }
         .onAppear { highlight = 0 }
     }
     private var menuSections: [[CommandEntry]] {
@@ -173,7 +144,7 @@ struct CoachBody: View {
     var body: some View {
         VStack(spacing: 0) {
             Rectangle().fill(Theme.line).frame(height: 1)
-            ContextStrip(model: model).padding(.top, 10)
+            ContextStrip(model: model).padding(.top, 8)
             if let warning = model.shortcutWarning { Text(warning).font(.system(size: 10)).foregroundStyle(.orange).padding(.horizontal, 16).padding(.top, 8) }
             if model.active?.contextLimited == true {
                 HStack(alignment: .top, spacing: 7) { Image(systemName: "clock.arrow.circlepath"); Text("Using recent messages only. Earlier context stays in History."); Spacer(minLength: 0); Button("History") { model.showLibrary?() }.buttonStyle(.plain).foregroundStyle(Theme.accent) }.font(.system(size: 10)).foregroundStyle(Theme.muted).padding(.horizontal, 16).padding(.top, 8)
@@ -191,7 +162,7 @@ struct CoachBody: View {
                             }
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(0.8).foregroundStyle(Theme.muted)
+                                    Text(message.role == "user" ? "You" : "Lilt").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.faint)
                                     Text(.init(message.text)).font(.system(size: 13)).lineSpacing(3).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                                     if !message.attachments.isEmpty { ScrollView(.horizontal) { HStack(spacing: 7) { ForEach(message.attachments) { record in FileChip(record: record, model: model, removable: true) } } }.scrollIndicators(.hidden) }
                                     if message.highlightUnavailable { Label("Highlight unavailable · check your selected window", systemImage: "eye.slash").font(.system(size: 10)).foregroundStyle(Theme.muted) }
