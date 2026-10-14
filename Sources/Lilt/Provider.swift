@@ -25,9 +25,39 @@ private final class SearchEventProbe: @unchecked Sendable {
     private var timeout: DispatchWorkItem?
     private var completion: ((Result<TutorReply, Error>) -> Void)?
     private var work: URL?
+    private var shellResolved: String?
+    var located:(()->Void)?
     var executable: String? {
         let custom = UserDefaults.standard.string(forKey: "codexPath")
-        return [custom, "/usr/local/bin/codex", "/opt/homebrew/bin/codex", "/Applications/Codex.app/Contents/Resources/codex"].compactMap { $0 }.first { FileManager.default.isExecutableFile(atPath: $0) }
+        let candidates = CodexLocator.candidatePaths(home: FileManager.default.homeDirectoryForCurrentUser, customPath: custom, environmentPath: ProcessInfo.processInfo.environment["PATH"])
+        if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) { return found }
+        if let shellResolved, FileManager.default.isExecutableFile(atPath: shellResolved) { return shellResolved }
+        return nil
+    }
+    func locateWithLoginShell() {
+        let args = CommandLine.arguments
+        guard !args.contains("--self-test"), !args.contains("--integration-test"), executable == nil else { return }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            process.arguments = ["-lc", "command -v codex"]
+            let output = Pipe()
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+            do { try process.run() } catch { return }
+            let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3, execute: timeout)
+            process.waitUntilExit()
+            timeout.cancel()
+            let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let path = CodexLocator.shellExecutable(from: text)
+            guard let resolved = path, FileManager.default.isExecutableFile(atPath: resolved) else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.shellResolved = resolved
+                self.located?()
+            }
+        }
     }
     var resources: URL {
         let bundled = Bundle.main.resourceURL!
@@ -38,7 +68,7 @@ private final class SearchEventProbe: @unchecked Sendable {
         cancel()
         usedWebSearch=false
         if let fixtureReply,(CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")){fixtureReply(prompt,images,search,completion);return}
-        guard let executable else { completion(.failure(AppError("Codex wasn’t found. Open Settings to choose the Codex executable."))); return }
+        guard let executable else { completion(.failure(AppError("Codex wasn’t found. Choose it in Settings, or install the Codex CLI and run codex login in Terminal.", offersSettings: true))); return }
         self.completion = completion
         do {
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("lilt-\(UUID().uuidString)")
@@ -75,7 +105,7 @@ private final class SearchEventProbe: @unchecked Sendable {
                     if finished.terminationStatus == 0 {
                         do { self.finish(.success(try TutorReply.decode(Data(contentsOf: output)))) }
                         catch { self.finish(.failure(AppError("The assistant returned an unreadable reply. Your question is saved; try again."))) }
-                    } else { self.finish(.failure(AppError("The connection stopped. Check your Codex sign-in or plan usage, then retry."))) }
+                    } else { self.finish(.failure(AppError("The connection stopped. Check your Codex sign-in or plan usage in Settings, then retry.", offersSettings: true))) }
                 }
             }
             try process.run()
@@ -104,6 +134,7 @@ private final class SearchEventProbe: @unchecked Sendable {
 }
 struct AppError: LocalizedError {
     let message: String
-    init(_ message: String) { self.message = message }
+    var offersSettings = false
+    init(_ message: String, offersSettings: Bool = false) { self.message = message; self.offersSettings = offersSettings }
     var errorDescription: String? { message }
 }

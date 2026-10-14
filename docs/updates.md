@@ -7,7 +7,7 @@ The updater is implemented in `Sources/Lilt/Updates.swift`, backed by the embedd
 - HTTPS feed without embedded credentials or fragments.
 - Existing 32-byte Ed25519 public key, encoded as base64.
 - `SURequireSignedFeed=true` and `SUVerifyUpdateBeforeExtraction=true`.
-- HTTPS release archives on the feed's same host and port; other origins are rejected by the updater delegate.
+- HTTPS release archives on the feed's same host and port. The primary enclosure and every delta enclosure on that item must match. The URL Sparkle is about to download, including a full-archive fallback after a delta, is checked again; a disallowed URL is cleared so Sparkle aborts before connecting. Sparkle's downloader can still follow an HTTP redirect, so signature verification before extraction stays required.
 - Manual checks, without automatic checks, downloads, or installation.
 - Sparkle handles signature verification, update selection, download, and installation; the app does not implement an unchecked custom downloader.
 

@@ -12,7 +12,14 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var busy = false
     @Published var conversation=false
     @Published var importing = false
-    @Published var error: String?
+    @Published private(set) var errorOffersSettings = false
+    private var settingsForNextError = false
+    @Published var error: String? {
+        didSet {
+            if error == nil { errorOffersSettings = false; settingsForNextError = false }
+            else { errorOffersSettings = settingsForNextError; settingsForNextError = false }
+        }
+    }
     @Published var draft = "" { didSet { if !loading { updateActive { $0.draft = draft }; scheduleSave() } } }
     @Published var selectedID: UUID?
     @Published var settings = false
@@ -68,11 +75,15 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         voice.playbackInterrupted = { [weak self] in self?.conversation=false }
         voice.partial = { [weak self] text in guard let self else{return}; self.draft=self.spokenDraftPrefix+text }
         voice.finished = { [weak self] _ in self?.send(spoken:true) }
+        provider.located = { [weak self] in self?.objectWillChange.send() }
+        provider.locateWithLoginShell()
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
+    func openSettings() { settings = true; showLibrary?() }
+    func showError(_ message: String, settings: Bool = false) { settingsForNextError = settings; error = message }
     func prepareChat() {
         guard active == nil else { showCoach?(); return }
-        if let recent=sessions.first(where:{ !$0.completed && $0.mode == .assistant }) { resume(recent.id) }
+        if let recent=LaunchSelection.resumeID(in: sessions) { resume(recent.id) }
         else { newSession() }
     }
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
@@ -158,7 +169,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             else if self.conversation{self.listenForNextTurn()}
                             if canPoint,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
                             self.persist()
-                        case .failure(let error):self.busy=false;self.conversation=false;self.error=error.localizedDescription
+                        case .failure(let failure):
+                            self.busy=false;self.conversation=false
+                            let app=failure as? AppError
+                            self.showError(app?.message ?? failure.localizedDescription, settings: app?.offersSettings == true)
                         }
                     }
                 }
