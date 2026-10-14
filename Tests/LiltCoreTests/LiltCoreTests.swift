@@ -121,6 +121,10 @@ final class LiltCoreTests {
         XCTAssertFalse(config.permitsRelease(URL(string:"https://elsewhere.example.invalid/Vale.zip")!))
         XCTAssertFalse(config.permitsRelease(URL(string:"http://private.example.invalid/Vale.zip")!))
         XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid:444/Vale.zip")!))
+        let same=[URL(string:"https://private.example.invalid/Vale.zip")!,URL(string:"https://private.example.invalid/Vale.delta")!]
+        XCTAssertTrue(config.permitsReleases(same))
+        XCTAssertFalse(config.permitsReleases(same+[URL(string:"https://cdn.example.invalid/Vale.zip")!]))
+        XCTAssertFalse(config.permitsReleases([]))
     }
     func testUpdaterLocalReleasePolicyFixtures() throws {
         struct Fixture:Decodable {
@@ -210,6 +214,26 @@ final class LiltCoreTests {
         XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil,opacity:0),target]))
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:.zero,frontToBack:[target]))
     }
+    func testLaunchResumesNewestUnfinishedChat() {
+        var older=LearningSession(title:"Older ask",mode:.assistant); older.updated=Date(timeIntervalSince1970:10); older.completed=false
+        var newer=LearningSession(title:"Newer learn",mode:.learn); newer.updated=Date(timeIntervalSince1970:20); newer.completed=false
+        var done=LearningSession(title:"Finished",mode:.assistant); done.updated=Date(timeIntervalSince1970:30); done.completed=true
+        XCTAssertEqual(LaunchSelection.resumeID(in:[done,newer,older]),newer.id)
+        XCTAssertNil(LaunchSelection.resumeID(in:[done]))
+    }
+    func testCodexLookupIncludesUserInstallAndParsesShellPath() {
+        let home=URL(fileURLWithPath:"/Users/vale",isDirectory:true)
+        let paths=CodexLocator.candidatePaths(home:home,customPath:" /custom/codex ",environmentPath:"/usr/bin:/Users/vale/.local/bin")
+        XCTAssertEqual(paths.first,"/custom/codex")
+        XCTAssertTrue(paths.contains("/Users/vale/.local/bin/codex"))
+        XCTAssertTrue(paths.contains("/opt/homebrew/bin/codex"))
+        XCTAssertTrue(paths.contains("/usr/local/bin/codex"))
+        XCTAssertTrue(paths.contains("/Applications/Codex.app/Contents/Resources/codex"))
+        XCTAssertEqual(paths.filter{$0=="/Users/vale/.local/bin/codex"}.count,1)
+        XCTAssertEqual(CodexLocator.shellExecutable(from:"welcome\n/opt/homebrew/bin/codex\n"),"/opt/homebrew/bin/codex")
+        XCTAssertNil(CodexLocator.shellExecutable(from:"codex not found\n"))
+        XCTAssertNil(CodexLocator.shellExecutable(from:""))
+    }
     func testGuideRequiresExplicitRequest(){
         let chat=LearningSession(title:"Explain this")
         let ordinary=TutorPrompt.build(session:chat,question:"What is it?",hasImage:false,pointing:false,reveal:false)
@@ -237,6 +261,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Uploaded images distinguished from live sharing",tests.testUploadedImageIsNotClaimedAsLiveScreen),
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
+ ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
+ ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
  ("Forget failure preserves retryable chat",tests.testForgetFailurePreservesRetryableChat),

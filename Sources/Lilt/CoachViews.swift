@@ -69,6 +69,13 @@ struct CoachView: View {
                                     Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: 9, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
                                     Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
                                     Text(session.mode == .learn ? "Think it through with a little guidance." : "Ask anything, drop a file, or share a window.").font(.system(size: 13)).foregroundStyle(Theme.muted).lineSpacing(3)
+                                    if model.provider.executable == nil {
+                                        HStack(alignment: .top, spacing: 8) {
+                                            Text("Codex isn’t available yet. Install the CLI and run codex login, or choose it in Settings.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
+                                            Spacer(minLength: 0)
+                                            Button("Settings") { model.openSettings() }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
+                                        }
+                                    }
                                 }.padding(.top, 16)
                             }
                             ForEach(session.messages) { message in
@@ -112,6 +119,7 @@ struct CoachView: View {
                     HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 11)).foregroundStyle(Color(red: 0.96, green: 0.77, blue: 0.49)); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
                     HStack(spacing: 14) {
                         if model.active?.messages.last?.role == "user" { Button("Retry message") { model.retry() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
+                        if model.errorOffersSettings { Button("Open Settings") { model.openSettings() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
                         if model.context.hasSelection { Button("Change window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
                     }
                 }.padding(11).background(Color.orange.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 9)).padding(.horizontal, 18).padding(.bottom, 10)

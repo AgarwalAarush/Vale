@@ -29,8 +29,27 @@ import LiltCore
         controller.checkForUpdates(nil)
     }
     nonisolated func updater(_ updater:SPUUpdater,shouldProceedWithUpdate updateItem:SUAppcastItem,updateCheck:SPUUpdateCheck) throws {
-        let permitted=MainActor.assumeIsolated { updateItem.fileURL.map {configuration?.permitsRelease($0) == true} ?? false }
+        let permitted=MainActor.assumeIsolated { self.permits(updateItem) }
         guard permitted else {throw NSError(domain:"ValeUpdates",code:1,userInfo:[NSLocalizedDescriptionKey:"The update archive is outside the configured HTTPS release source."])}
     }
+    nonisolated func updater(_ updater:SPUUpdater,willDownloadUpdate item:SUAppcastItem,with request:NSMutableURLRequest) {
+        let permitted=MainActor.assumeIsolated {
+            guard let target=request.url,configuration?.permitsRelease(target) == true else { return false }
+            return item.fileURL.map { configuration?.permitsRelease($0) == true } ?? true
+        }
+        // Sparkle aborts a download whose scheme is missing before it opens a connection.
+        if !permitted { request.url = nil }
+    }
     nonisolated func feedURLString(for updater:SPUUpdater)->String?{MainActor.assumeIsolated{configuration?.feed.absoluteString}}
+    private func permits(_ item:SUAppcastItem)->Bool {
+        guard let primary=item.fileURL else { return false }
+        var urls=[primary]
+        if let deltas=item.deltaUpdates {
+            for delta in deltas.values {
+                guard let url=delta.fileURL else { return false }
+                urls.append(url)
+            }
+        }
+        return configuration?.permitsReleases(urls) == true
+    }
 }

@@ -65,7 +65,12 @@ struct LibraryView: View {
                     }.buttonStyle(.plain)
                     Divider().overlay(Theme.line)
                 }
-                if let error=model.error{Text(error).font(.system(size:12)).foregroundStyle(.orange.opacity(0.9)).padding(.top,20)}
+                if let error=model.error{
+                    VStack(alignment:.leading,spacing:8){
+                        Text(error).font(.system(size:12)).foregroundStyle(.orange.opacity(0.9))
+                        if model.errorOffersSettings{Button("Open Settings"){model.openSettings()}.buttonStyle(.plain).font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent)}
+                    }.padding(.top,20)
+                }
             }.padding(.horizontal,42).padding(.top,56).padding(.bottom,40).frame(maxWidth:.infinity,alignment:.leading)
         }.scrollIndicators(.hidden)
     }
@@ -84,7 +89,7 @@ struct SessionDetail: View {
                     Spacer()
                     Menu{Button("Rename…",action:renameAction);Button("Export chat…"){model.export(session)};Button("Forget chat…",role:.destructive,action:deleteAction)}label:{Image(systemName:"ellipsis").frame(width:25,height:25)}.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
-                if let error=model.error{VStack(alignment:.leading,spacing:10){Text(error).font(.system(size:12)).foregroundStyle(.orange).textSelection(.enabled).fixedSize(horizontal:false,vertical:true);if model.deletionToRetry==session.id{Button("Retry Forget"){model.delete(session.id)}.buttonStyle(QuietButton())}}}
+                if let error=model.error{VStack(alignment:.leading,spacing:10){Text(error).font(.system(size:12)).foregroundStyle(.orange).textSelection(.enabled).fixedSize(horizontal:false,vertical:true);if model.errorOffersSettings{Button("Open Settings"){model.openSettings()}.buttonStyle(.plain).font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent)};if model.deletionToRetry==session.id{Button("Retry Forget"){model.delete(session.id)}.buttonStyle(QuietButton())}}}
                 Button(session.id == model.activeID ? "Return to chat" : "Continue chat"){if session.id == model.activeID{model.showCoach?()}else{model.resume(session.id)}}.buttonStyle(QuietButton(filled:true))
                 if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,model:model)}}}.scrollIndicators(.hidden)}
                 Divider().overlay(Theme.line)
@@ -114,7 +119,7 @@ struct SettingsView: View {
                 Text("Settings").font(.system(size: 28, weight: .medium)).tracking(-0.7)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("ChatGPT via Codex").font(.system(size: 16, weight: .medium))
-                    Text(connection.isEmpty ? (model.provider.executable == nil ? "Codex wasn’t found on this Mac." : "Uses the sign-in saved by your Codex CLI.") : connection).font(.system(size: 12)).foregroundStyle(Theme.muted)
+                    Text(connection.isEmpty ? (model.provider.executable == nil ? "Codex wasn’t found in ~/.local/bin, Homebrew, the app bundle, or your PATH." : "Uses the sign-in saved by your Codex CLI.") : connection).font(.system(size: 12)).foregroundStyle(Theme.muted)
                     Button("Check connection") { checkConnection() }.buttonStyle(QuietButton())
                     Text("To sign in, run codex login in Terminal.").font(.system(size: 11)).foregroundStyle(Theme.muted).textSelection(.enabled)
                 }
