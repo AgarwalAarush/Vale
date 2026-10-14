@@ -96,8 +96,8 @@ struct CompanionSurface: View {
                             Image(systemName: item.symbol).font(.system(size: 11)).frame(width: 14)
                             Text(item.title).lineLimit(1)
                             Spacer(minLength: 8)
-                            if item.checked { Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)) }
-                            else if !item.shortcut.isEmpty { Text(item.shortcut).font(.system(size: 10)).foregroundStyle(Theme.muted) }
+                            if item.checked { Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.accent) }
+                            else if !item.shortcut.isEmpty { Text(item.shortcut).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.muted) }
                         }
                         .font(.system(size: 12))
                         .foregroundStyle(item.disabled ? Theme.muted.opacity(0.45) : Theme.ink)
@@ -109,7 +109,7 @@ struct CompanionSurface: View {
         }
         .padding(4)
         .frame(maxWidth: model.coachPresented ? 250 : .infinity, alignment: .leading)
-        .background { if model.coachPresented { RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(red: 0.11, green: 0.12, blue: 0.13)).overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.white.opacity(0.12), lineWidth: 0.7)).shadow(color: .black.opacity(0.35), radius: 18, y: 10) } }
+        .background { if model.coachPresented { RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(red: 0.12, green: 0.125, blue: 0.135)).overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)) } }
         .onAppear { highlight = 0 }
     }
     private var menuSections: [[CommandEntry]] {
@@ -185,8 +185,8 @@ struct CoachBody: View {
                         if let session = model.active {
                             if session.messages.isEmpty {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(session.mode == .learn ? "What are we working through?" : "How can I help?").font(.system(size: 20, weight: .medium)).tracking(-0.4)
-                                    Text(session.mode == .learn ? "Think it through with a little guidance." : "Ask anything, drop a file, or share a window.").font(.system(size: 12)).foregroundStyle(Theme.muted)
+                                    Text(session.mode == .learn ? "What are we working through?" : "How can I help?").font(.system(size: 16, weight: .semibold)).tracking(-0.3)
+                                    Text(session.mode == .learn ? "Think it through with a little guidance." : "Ask anything, drop a file, or share a window.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(2)
                                 }.padding(.top, 6)
                             }
                             ForEach(session.messages) { message in
@@ -248,18 +248,18 @@ struct CoachBody: View {
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent, side: 26) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted, side: 26) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
                     Button { if model.busy { model.stopResponse() } else { model.send() } } label: {
-                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink).frame(width: 26, height: 26).background(Theme.accent.opacity(!model.hasInput && !model.busy ? 0.12 : 0.4)).clipShape(Circle())
+                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 11, weight: .bold)).foregroundStyle(model.hasInput || model.busy ? Color(red: 0.08, green: 0.09, blue: 0.11) : Theme.muted).frame(width: 24, height: 24).background(model.hasInput || model.busy ? Theme.accent : Color.white.opacity(0.06)).clipShape(Circle())
                     }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || model.paused || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message").padding(.leading, 4)
                 }
-            }.padding(.horizontal, 8).padding(.vertical, 6).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.1), lineWidth: 0.7)).padding(.horizontal, 12)
+            }.padding(.horizontal, 8).padding(.vertical, 4).background(.white.opacity(0.03)).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)).padding(.horizontal, 12)
             HStack(spacing: 8) {
                 Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted).lineLimit(1)
-                Spacer(minLength: 6)
-                HStack(spacing: 2) {
+                Spacer(minLength: 8)
+                HStack(spacing: 0) {
                     ForEach(ChatMode.allCases, id: \.self) { mode in
-                        Button(mode.label) { if model.active?.mode != mode { model.setMode(mode) } }.buttonStyle(.plain).font(.system(size: 10, weight: model.active?.mode == mode ? .semibold : .regular)).foregroundStyle(model.active?.mode == mode ? Theme.ink : Theme.muted).padding(.horizontal, 7).padding(.vertical, 3).background(model.active?.mode == mode ? Color.white.opacity(0.08) : .clear).clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous)).accessibilityLabel(mode == .assistant ? "Assistant mode" : "Learn mode")
+                        Button(mode.label) { if model.active?.mode != mode { model.setMode(mode) } }.buttonStyle(.plain).font(.system(size: 10, weight: model.active?.mode == mode ? .semibold : .medium)).foregroundStyle(model.active?.mode == mode ? Theme.ink : Theme.muted).padding(.horizontal, 8).padding(.vertical, 3).background(model.active?.mode == mode ? Color.white.opacity(0.08) : .clear).clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous)).accessibilityLabel(mode == .assistant ? "Assistant mode" : "Learn mode")
                     }
-                }
+                }.padding(2).overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5))
                 Button { model.setConversation(!model.conversation) } label: { Image(systemName: model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted) }.buttonStyle(.plain).disabled(model.paused).help(model.conversation ? "End conversation" : "Conversation").accessibilityLabel(model.conversation ? "End conversation" : "Conversation")
                 IconButton(symbol: model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", label: model.expanded ? "Compact assistant" : "Expand assistant", side: 22) { model.expandCoach?() }
             }.padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 8)

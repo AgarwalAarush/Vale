@@ -164,7 +164,13 @@ final class FloatingPanel: NSPanel {
         if frame.minY < visible.minY { frame.origin.y = visible.minY + 8 }
         if frame.maxX > visible.maxX { frame.origin.x = visible.maxX - frame.width - 8 }
         if frame.maxY > visible.maxY { frame.origin.y = visible.maxY - frame.height - 8 }
-        if capsule.frame.integral != frame.integral { capsule.setFrame(frame, display: true, animate: animate && capsule.isVisible) }
+        guard capsule.frame.integral != frame.integral else { return }
+        guard animate, capsule.isVisible else { capsule.setFrame(frame, display: true, animate: false); return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.16
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            capsule.animator().setFrame(frame, display: true)
+        }
     }
     private func installTracking() {
         guard let view = capsule.contentView else { return }

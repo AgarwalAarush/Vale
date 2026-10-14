@@ -18,9 +18,9 @@ struct GlassMaterial: NSViewRepresentable {
 struct GlassSurface: ViewModifier {
     var radius: CGFloat = 20
     func body(content: Content) -> some View {
-        content.background(GlassMaterial().overlay(Theme.background.opacity(0.86)))
+        content.background(GlassMaterial().overlay(Theme.background.opacity(0.9)))
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.7))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
             .foregroundStyle(Theme.ink).preferredColorScheme(.dark)
     }
 }
