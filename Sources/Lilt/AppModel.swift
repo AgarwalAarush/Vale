@@ -44,6 +44,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var showPreview: ((NSImage) -> Void)?
     var expandCoach:(()->Void)?
     @Published var expanded=false
+    @Published var coachPresented=false
+    @Published var commandMenu=false
     var showFile: ((AttachmentRecord) -> Void)?
     var active: LearningSession? { sessions.first { $0.id == activeID } }
     var selected: LearningSession? { sessions.first { $0.id == selectedID } }

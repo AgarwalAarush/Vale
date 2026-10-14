@@ -1,6 +1,6 @@
 # Architecture
 
-AppKit owns the floating panels, menu bar, global shortcut, native text editor, file picker, previews, and pointing overlay. SwiftUI renders the compact capsule, assistant card, history, and settings. The first screen is general chat; there is no learning setup gate.
+AppKit owns one floating panel, the menu bar, global shortcut, native text editor, file picker, previews, and pointing overlay. SwiftUI renders the compact capsule and the conversation that opens downward from it, plus history and settings. The first screen is the capsule; there is no learning setup gate.
 
 AppModel owns chats, drafts, mode, upload metadata, explicit search choice, and request state. Capture/provider completions validate request and chat identity. File import finishes into the originating chat, and cleans up imported bytes if that chat has been deleted. Pause, cancel, sleep, and lock stop transient context and voice. Uploaded files remain intentional chat data.
 

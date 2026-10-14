@@ -34,10 +34,10 @@ struct QuietButton: ButtonStyle {
     }
 }
 struct IconButton: View {
-    var symbol: String; var label: String; var tint: Color = Theme.muted; var action: () -> Void
+    var symbol: String; var label: String; var tint: Color = Theme.muted; var side: CGFloat = 30; var action: () -> Void
     @State private var hover = false
     var body: some View {
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).frame(width: 30, height: 30).background(Color.white.opacity(hover ? 0.075 : 0)).clipShape(Circle()) }
+        Button(action: action) { Image(systemName: symbol).font(.system(size: side > 26 ? 13 : 11, weight: .medium)).foregroundStyle(tint).frame(width: side, height: side).background(Color.white.opacity(hover ? 0.08 : 0)).clipShape(Circle()) }
             .buttonStyle(.plain).help(label).accessibilityLabel(label).onHover { hover = $0 }
     }
 }
@@ -53,8 +53,9 @@ struct LogoMark: View {
 }
 struct AudioMark: View {
     var active: Bool
+    var height: CGFloat = 15
     var body: some View {
-        HStack(spacing: 3) { ForEach(Array([9.0,18.0,25.0,15.0,7.0].enumerated()), id: \.offset) { _, value in Capsule().fill(active ? Theme.accent : Theme.accent.opacity(0.75)).frame(width: 3, height: value) } }.frame(width: 29, height: 27).accessibilityHidden(true)
+        HStack(spacing: 2) { ForEach(Array([0.38,0.72,1.0,0.62,0.3].enumerated()), id: \.offset) { _, value in Capsule().fill(active ? Theme.accent : Theme.accent.opacity(0.75)).frame(width: 2, height: max(3, height * value)) } }.frame(width: 16, height: height).accessibilityHidden(true)
     }
 }
 

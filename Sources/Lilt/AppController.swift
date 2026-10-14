@@ -6,6 +6,9 @@ import LiltCore
 final class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    var hover: ((Bool) -> Void)?
+    override func mouseEntered(with event: NSEvent) { hover?(true) }
+    override func mouseExited(with event: NSEvent) { hover?(false) }
 }
 
 @MainActor final class AppController: NSObject, NSApplicationDelegate,NSMenuItemValidation,NSWindowDelegate {
@@ -23,13 +26,16 @@ final class FloatingPanel: NSPanel {
     private var contextPreviews:[NSWindow]=[]
     private var filePreviews:[ObjectIdentifier:UUID]=[:]
     private var testing = false
+    private var launching = false
+    private var pinned = false
+    private var hoverWork: DispatchWorkItem?
+    private var clickMonitor: Any?
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         testing = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")
         let testDirectory = testing ? URL(fileURLWithPath: CommandLine.arguments.last!).appendingPathComponent("test-library") : nil
         model = AppModel(dataDirectory: testDirectory)
         setupWindows(); setupMenu(); if !testing{registerHotKey()}
-        model.showCoach = { [weak self] in self?.openCoach() }
         model.showLibrary = { [weak self] in self?.openLibrary() }
         model.hideOverlay = { [weak self] in self?.clearAnnotation() }
         model.showPoint = { [weak self] point, snapshot in self?.point(point, snapshot: snapshot) }
@@ -38,9 +44,18 @@ final class FloatingPanel: NSPanel {
         model.showPreview = { [weak self] image in self?.preview(image) }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            if event.keyCode == 53 { self.model.stopInteraction(); self.clearAnnotation(); return nil }
+            if self.model.commandMenu, !event.modifierFlags.contains(.command) { return event }
+            if event.keyCode == 53 { self.model.stopInteraction(); self.clearAnnotation(); if self.model.coachPresented { self.collapseSurface() }; return nil }
+            if event.window === self.capsule, self.model.coachPresented { self.pinned = true }
+            if !self.model.coachPresented, event.window === self.capsule, [125, 36, 49].contains(Int(event.keyCode)) { self.openCoach(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "," { self.model.settings = true; self.openLibrary(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.newSession(); return nil }
+            return event
+        }
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self else { return event }
+            if event.window === self.capsule, self.model.coachPresented || self.model.commandMenu { self.pinned = true }
+            else if self.model.commandMenu { self.model.commandMenu = false; self.applyChrome() }
             return event
         }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.willSleepNotification, object: nil)
@@ -48,16 +63,24 @@ final class FloatingPanel: NSPanel {
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(systemSuspend), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
         model.expandCoach = { [weak self] in self?.toggleCoachSize() }
         model.showFile = { [weak self] record in self?.previewFile(record) }
+        model.showCoach = { [weak self] in
+            guard let self else { return }
+            if self.launching { self.presentCapsule() } else { self.openCoach() }
+        }
+        launching = true
         if testing { Task { await runHarness() } } else { model.prepareChat() }
+        launching = false
     }
     private func setupWindows() {
         let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        capsule = makePanel(size: NSSize(width: 430, height: 62))
-        capsule.contentView = NSHostingView(rootView: CapsuleView(model: model, openCoach: { [weak self] in self?.openCoach() }))
-        capsule.setFrameOrigin(NSPoint(x: visible.maxX - 450, y: visible.maxY - 82))
-        coach = makePanel(size: NSSize(width: 410, height: 480))
-        let coachHost=NSHostingView(rootView:CoachView(model:model,close:{[weak self]in self?.coach.orderOut(nil)}));coachHost.sizingOptions=[];coachHost.autoresizingMask=[.width,.height];coach.contentView=coachHost;coach.setContentSize(NSSize(width:410,height:480))
-        coach.setFrameOrigin(NSPoint(x: visible.maxX - 430, y: visible.minY + 24))
+        capsule = makePanel(size: SurfaceMetrics.compact)
+        let host = NSHostingView(rootView: CompanionSurface(model: model, summon: { [weak self] in self?.openCoach() }, dismiss: { [weak self] in self?.collapseSurface() }, layout: { [weak self] in self?.syncChrome() }, focus: { [weak self] in self?.focusComposer() }))
+        host.sizingOptions = []; host.autoresizingMask = [.width, .height]
+        capsule.contentView = host
+        capsule.setFrame(NSRect(x: visible.maxX - SurfaceMetrics.compact.width - 16, y: visible.maxY - SurfaceMetrics.compact.height - 16, width: SurfaceMetrics.compact.width, height: SurfaceMetrics.compact.height), display: false)
+        capsule.hover = { [weak self] inside in DispatchQueue.main.async { self?.noteHover(inside) } }
+        installTracking()
+        coach = capsule
         library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         library.title = "Vale"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
         library.backgroundColor = NSColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1); library.appearance = NSAppearance(named: .darkAqua)
@@ -81,25 +104,82 @@ final class FloatingPanel: NSPanel {
         panel.appearance = NSAppearance(named: .darkAqua)
         return panel
     }
-    func openCoach() {
+    func openCoach(pin: Bool = true) {
+        hoverWork?.cancel()
         guard model.active != nil else { model.prepareChat(); return }
         library?.orderOut(nil)
-        capsule.orderFrontRegardless(); coach.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        if pin { pinned = true }
+        model.commandMenu = false
+        model.coachPresented = true
+        applyChrome(animate: true)
+        if pin {
+            capsule.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); focusComposer()
+        } else { capsule.orderFrontRegardless() }
+    }
+    func presentCapsule() {
+        hoverWork?.cancel(); pinned = false; model.coachPresented = false; model.commandMenu = false; model.expanded = false
+        applyChrome(animate: false); capsule.orderFrontRegardless()
+    }
+    func collapseSurface() {
+        hoverWork?.cancel(); pinned = false; model.coachPresented = false; model.commandMenu = false; model.expanded = false
+        applyChrome(animate: capsule.isVisible)
+    }
+    func openLibrary() {
+        collapseSurface()
+        if model.active == nil { capsule.orderOut(nil) }
+        library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    private func toggleCoachSize() {
+        guard model.coachPresented else { model.expanded = true; openCoach(); return }
+        model.expanded.toggle(); pinned = true; applyChrome(animate: true)
+    }
+    private func syncChrome() {
+        if model.commandMenu { pinned = true; if !capsule.isKeyWindow { capsule.makeKey() } }
+        applyChrome(animate: true)
+    }
+    private func noteHover(_ inside: Bool) {
+        guard !testing else { return }
+        hoverWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            if inside {
+                guard self.capsule.isVisible, !self.model.coachPresented, !self.model.commandMenu else { return }
+                self.openCoach(pin: false)
+            } else if !self.pinned, !self.model.commandMenu, self.model.coachPresented {
+                self.collapseSurface()
+            }
+        }
+        hoverWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + (inside ? 0.14 : 0.28), execute: work)
+    }
+    private func applyChrome(animate: Bool) {
+        let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        var size = SurfaceMetrics.compact
+        if model.coachPresented { size = model.expanded ? SurfaceMetrics.large : SurfaceMetrics.open }
+        else if model.commandMenu { size.height += CompanionMenus.height(model) }
+        size.width = min(size.width, visible.width - 24); size.height = min(size.height, visible.height - 24)
+        let anchor = NSPoint(x: capsule.frame.maxX, y: capsule.frame.maxY)
+        var frame = NSRect(x: anchor.x - size.width, y: anchor.y - size.height, width: size.width, height: size.height)
+        if frame.minX < visible.minX { frame.origin.x = visible.minX + 8 }
+        if frame.minY < visible.minY { frame.origin.y = visible.minY + 8 }
+        if frame.maxX > visible.maxX { frame.origin.x = visible.maxX - frame.width - 8 }
+        if frame.maxY > visible.maxY { frame.origin.y = visible.maxY - frame.height - 8 }
+        if capsule.frame.integral != frame.integral { capsule.setFrame(frame, display: true, animate: animate && capsule.isVisible) }
+    }
+    private func installTracking() {
+        guard let view = capsule.contentView else { return }
+        for area in view.trackingAreas { view.removeTrackingArea(area) }
+        view.addTrackingArea(NSTrackingArea(rect: view.bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: capsule, userInfo: nil))
+    }
+    private func focusComposer() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self, let root = self.coach.contentView else { return }
+            guard let self, self.model.coachPresented, !self.model.commandMenu, let root = self.capsule.contentView else { return }
             func editor(_ view: NSView) -> NSView? {
                 if view.identifier?.rawValue == "lilt.composer" { return view }
                 for child in view.subviews { if let result = editor(child) { return result } }; return nil
             }
-            if let input = editor(root) { self.coach.makeFirstResponder(input) }
+            if let input = editor(root) { self.capsule.makeFirstResponder(input) }
         }
-    }
-    func openLibrary() { coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
-    private func toggleCoachSize(){
-        model.expanded.toggle();let visible=NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
-        let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
-        let origin=NSPoint(x:max(visible.minX+16,min(coach.frame.maxX-size.width,visible.maxX-size.width-16)),y:max(visible.minY+20,min(coach.frame.minY,visible.maxY-size.height-20)))
-        coach.setFrame(NSRect(origin:origin,size:size),display:true,animate:true)
     }
     private func setupMenu() {
         let main = NSMenu()
@@ -197,5 +277,5 @@ final class FloatingPanel: NSPanel {
     @objc private func menuSettings() { model.settings = true; openLibrary() }
     @objc private func menuQuit() { NSApp.terminate(nil) }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { openLibrary(); return true }
-    func applicationWillTerminate(_ notification: Notification) { model.suspend(); if let hotKey { UnregisterEventHotKey(hotKey) }; if let monitor { NSEvent.removeMonitor(monitor) } }
+    func applicationWillTerminate(_ notification: Notification) { model.suspend(); hoverWork?.cancel(); if let hotKey { UnregisterEventHotKey(hotKey) }; if let monitor { NSEvent.removeMonitor(monitor) }; if let clickMonitor { NSEvent.removeMonitor(clickMonitor) } }
 }

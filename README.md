@@ -27,7 +27,7 @@ This release uses Apple dictation/speech and the official Codex CLI's existing C
 
 ## Everyday use
 
-Control–Option–Space summons the composer. Return sends, Shift–Return inserts a newline, Command–N starts a chat, and the corner arrow expands/compacts the assistant. A shortcut conflict is reported rather than silently cleared.
+The capsule stays small. Hover it, or press Control–Option–Space, Down, Return, or Space while it is focused, and the conversation opens downward from that same panel. Escape hides it again. Return sends, Shift–Return inserts a newline, and Command–N starts a chat. A shortcut conflict is reported rather than silently cleared.
 
 Add images, PDFs, UTF-8 text, or code through **+**, drop, or paste. Up to eight files/chat, 25 MB each. Click to preview and × to remove. Uploaded files stay with messages; screen captures and microphone recordings are not saved in chat history.
 

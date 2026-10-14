@@ -32,8 +32,12 @@ extension AppController {
         do{
             try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
             model.voice.enableFixtures();model.sessions=[];model.activeID=nil;model.selectedID=nil;model.prepareChat();await settle()
-            results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && coach.isVisible && !library.isVisible
-            try snapshot(coach,to:output.appendingPathComponent("01-new-chat.png"));try snapshot(capsule,to:output.appendingPathComponent("02-capsule.png"))
+            collapseSurface();await settle()
+            let rested=capsule.isVisible && !model.coachPresented && capsule.frame.size==SurfaceMetrics.compact && coach===capsule && !library.isVisible
+            try snapshot(capsule,to:output.appendingPathComponent("02-capsule.png"))
+            openCoach();await settle()
+            results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && rested && model.coachPresented && capsule.frame.size==SurfaceMetrics.open && coach===capsule
+            try snapshot(coach,to:output.appendingPathComponent("01-new-chat.png"))
             func findEditor(_ view:NSView)->ComposerTextView?{if let editor=view as? ComposerTextView{return editor};for child in view.subviews{if let found=findEditor(child){return found}};return nil}
             let editor=findEditor(coach.contentView!);results["composerGetsKeyboardFocus"]=coach.firstResponder === editor
             model.draft="First line";await settle()
@@ -88,7 +92,7 @@ extension AppController {
             }
             _=scrollSettings(library.contentView!);await settle();try snapshot(library,to:output.appendingPathComponent("09b-update-controls.png"))
             results["unconfiguredUpdaterStaysInactive"] = !model.updates.canCheck && model.updates.configuration==nil
-            results["stableWindowSizes"]=library.contentView?.bounds.size==NSSize(width:900,height:650) && capsule.frame.size==NSSize(width:430,height:62) && coach.frame.size==NSSize(width:410,height:480)
+            results["stableWindowSizes"]=library.contentView?.bounds.size==NSSize(width:900,height:650) && capsule.frame.size==SurfaceMetrics.compact && coach===capsule
             results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==3}
             model.error="The connection stopped. Your message and attachments are saved.";openCoach();await settle();try snapshot(coach,to:output.appendingPathComponent("10-recovery.png"))
             if CommandLine.arguments.contains("--integration-test"){
