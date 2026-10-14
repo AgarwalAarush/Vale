@@ -12,5 +12,8 @@ public struct UpdateConfiguration: Equatable {
     public func permitsRelease(_ url:URL)->Bool{
         url.scheme?.lowercased()=="https" && url.host?.lowercased()==feed.host?.lowercased() && (url.port ?? 443)==(feed.port ?? 443) && url.user==nil && url.password==nil
     }
+    public func permitsReleases(_ urls:[URL])->Bool {
+        !urls.isEmpty && urls.allSatisfy(permitsRelease)
+    }
 }
 public enum UpdateConfigurationError: Error {case insecureFeed,invalidKey,incompleteVerification}
