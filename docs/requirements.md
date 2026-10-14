@@ -1,4 +1,4 @@
-# Mythos 1.2
+# Vale 1.2
 
 Build a general-purpose companion with explicit live-window context, interruption-safe spoken turn-taking, typing fallback, and step-by-step learning help. Preserve the dark floating UI, Lilt persona, legacy bundle/data identity, uploaded files, and saved chats. Exclude notch integration, persistent agents, routine/connector platforms, and autonomous computer actions.
 
@@ -21,4 +21,4 @@ Build a general-purpose companion with explicit live-window context, interruptio
 
 Local refresh is bounded snapshot context, not video streaming. Spoken interaction is turn-taking through final CLI responses. Synthetic adapters do not establish real microphone, speech, picker, capture or overlay accuracy. Hardware consent, VoiceOver, real drop/paste/picker gestures, multi-display/fullscreen behavior, and Apple Silicon runtime require further testing. Strict pixel comparison can react to animations and needs hardware UX validation.
 
-The embedded Sparkle updater remains manual and inactive without an authorized private HTTPS feed, existing trusted Ed25519 signing assets and a signed/notarized deployment workflow. No Gatekeeper or denied computer-use access may be bypassed. Screenshot delivery must precede laptop installation.
+The embedded Sparkle updater remains manual and inactive without an authorized private HTTPS feed, existing trusted Ed25519 signing assets and a signed/notarized deployment workflow. No Gatekeeper or denied computer-use access may be bypassed. Hardware testing must use explicit native consent.

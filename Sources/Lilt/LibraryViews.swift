@@ -11,7 +11,7 @@ struct LibraryView: View {
     var body:some View{
         HStack(spacing:0){
             VStack(alignment:.leading,spacing:0){
-                HStack(spacing:10){LogoMark(size:26);Text("Mythos").font(.system(size:18,weight:.semibold)).tracking(-0.5)}.padding(.horizontal,22).padding(.top,35).padding(.bottom,28)
+                HStack(spacing:10){LogoMark(size:26);Text("Vale").font(.system(size:18,weight:.semibold)).tracking(-0.5)}.padding(.horizontal,22).padding(.top,35).padding(.bottom,28)
                 Button{model.newSession()}label:{Label("New chat",systemImage:"square.and.pencil").font(.system(size:13,weight:.medium)).frame(maxWidth:.infinity,alignment:.leading).padding(12).background(.white.opacity(0.065)).clipShape(RoundedRectangle(cornerRadius:8))}.buttonStyle(.plain).padding(.horizontal,12)
                 Button{model.selectedID=nil;model.settings=false}label:{Label("All chats",systemImage:"rectangle.stack").font(.system(size:12)).foregroundStyle(Theme.muted).padding(.horizontal,12).padding(.vertical,13)}.buttonStyle(.plain).padding(.horizontal,12)
                 Text("RECENT").font(.system(size:9,weight:.medium)).tracking(1.2).foregroundStyle(Theme.muted).padding(.horizontal,24).padding(.top,17).padding(.bottom,12)
@@ -143,7 +143,7 @@ struct SettingsView: View {
                     }.padding(.top, 15)
                 }.font(.system(size: 12))
                 Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                Text("Mythos 1.2.1 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
+                Text("Vale 1.2.2 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
             }.padding(.horizontal, 42).padding(.top, 54).padding(.bottom, 40)
         }.scrollIndicators(.hidden)
     }

@@ -117,10 +117,10 @@ final class LiltCoreTests {
     func testUpdaterRejectsForeignAndInsecureArchiveURLs() throws {
         let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="
         let config=try UpdateConfiguration(feed:"https://private.example.invalid/appcast.xml",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true)
-        XCTAssertTrue(config.permitsRelease(URL(string:"https://private.example.invalid/Mythos.zip")!))
-        XCTAssertFalse(config.permitsRelease(URL(string:"https://elsewhere.example.invalid/Mythos.zip")!))
-        XCTAssertFalse(config.permitsRelease(URL(string:"http://private.example.invalid/Mythos.zip")!))
-        XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid:444/Mythos.zip")!))
+        XCTAssertTrue(config.permitsRelease(URL(string:"https://private.example.invalid/Vale.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://elsewhere.example.invalid/Vale.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"http://private.example.invalid/Vale.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid:444/Vale.zip")!))
     }
     func testUpdaterLocalReleasePolicyFixtures() throws {
         struct Fixture:Decodable {

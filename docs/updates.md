@@ -11,7 +11,7 @@ The updater is implemented in `Sources/Lilt/Updates.swift`, backed by the embedd
 - Manual checks, without automatic checks, downloads, or installation.
 - Sparkle handles signature verification, update selection, download, and installation; the app does not implement an unchecked custom downloader.
 
-The build accepts existing public configuration through `MYTHOS_UPDATE_FEED_URL` and `MYTHOS_UPDATE_PUBLIC_KEY`. `scripts/configure-updates.py` validates these and embeds them before signing. It never creates a key, reads a private signing key, publishes a feed, or uploads an artifact. Never put a private key in these variables.
+The build accepts existing public configuration through `VALE_UPDATE_FEED_URL` and `VALE_UPDATE_PUBLIC_KEY`. `scripts/configure-updates.py` validates these and embeds them before signing. It never creates a key, reads a private signing key, publishes a feed, or uploads an artifact. Never put a private key in these variables.
 
 ## Local verification versus production rollout
 

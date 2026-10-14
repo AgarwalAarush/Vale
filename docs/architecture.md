@@ -12,7 +12,7 @@ WindowContext uses ScreenCaptureKit's single-window system picker and fresh SCSc
 
 VoiceController uses Apple Speech and AVAudioEngine only after Talk. On-device recognition is required when supported; otherwise Apple may use its speech service, as disclosed in Settings. AVSpeechSynthesizer provides optional playback. Voice is turn based.
 
-LiltCore provides backward-compatible Codable models, structured replies, prompt policy, search, atomic storage, and updater configuration policy. Legacy records without a mode remain Learn chats, with their IDs/drafts intact; the original JSON is backed up before rewrite. The Mythos rename preserves `local.lilt.companion`, preference keys, and `Application Support/Lilt`.
+LiltCore provides backward-compatible Codable models, structured replies, prompt policy, search, atomic storage, and updater configuration policy. Legacy records without a mode remain Learn chats, with their IDs/drafts intact; the original JSON is backed up before rewrite. The Vale rename preserves `local.lilt.companion`, preference keys, and `Application Support/Lilt`.
 
 UpdateController embeds the pinned official Sparkle 2.10.0 framework. Without an existing HTTPS feed and trusted public key, no updater instance starts or checks the network. Configured builds use signed feeds, signature verification before archive extraction, same-origin HTTPS archive policy, and a manual check action. Automatic checks/downloads are disabled. See updates.md for production requirements.
 

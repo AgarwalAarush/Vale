@@ -52,7 +52,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var hasInput: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty }
     var status: String { paused ? "Paused" : importing ? "Adding files…" : voice.starting ? "Waiting for microphone…" : voice.listening ? "Listening…" : busy ? "Thinking…" : voice.speaking ? "Speaking · tap mic to interrupt" : conversation ? "Conversation ready" : "Voice off" }
     init(dataDirectory: URL? = nil,fileRemoval:(@Sendable(URL)throws->Void)?=nil) {
-        // Retain the 1.0 storage identifier so the Mythos rename never strands chats.
+        // Retain the 1.0 storage identifier so the Vale rename never strands chats.
         let directory = dataDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("Lilt")
         var loadedStore: SessionStore?; var loadedFiles: AttachmentStore?
         do { let candidate=try SessionStore(directory:directory); sessions=try candidate.load().sorted{$0.updated>$1.updated}; loadedFiles=try AttachmentStore(directory:directory,unlink:fileRemoval); loadedStore=candidate }

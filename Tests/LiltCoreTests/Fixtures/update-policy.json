@@ -2,12 +2,12 @@
   "feed": "https://private.example.invalid/appcast.xml",
   "publicKey": "pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ=",
   "archives": [
-    { "url": "https://private.example.invalid/releases/Mythos.zip", "allowed": true },
-    { "url": "https://private.example.invalid:443/releases/Mythos.zip", "allowed": true },
-    { "url": "http://private.example.invalid/releases/Mythos.zip", "allowed": false },
-    { "url": "https://other.example.invalid/Mythos.zip", "allowed": false },
-    { "url": "https://private.example.invalid:444/Mythos.zip", "allowed": false },
-    { "url": "https://user:password@private.example.invalid/Mythos.zip", "allowed": false },
-    { "url": "file:///private/tmp/Mythos.zip", "allowed": false }
+    { "url": "https://private.example.invalid/releases/Vale.zip", "allowed": true },
+    { "url": "https://private.example.invalid:443/releases/Vale.zip", "allowed": true },
+    { "url": "http://private.example.invalid/releases/Vale.zip", "allowed": false },
+    { "url": "https://other.example.invalid/Vale.zip", "allowed": false },
+    { "url": "https://private.example.invalid:444/Vale.zip", "allowed": false },
+    { "url": "https://user:password@private.example.invalid/Vale.zip", "allowed": false },
+    { "url": "file:///private/tmp/Vale.zip", "allowed": false }
   ]
 }

@@ -59,7 +59,7 @@ final class FloatingPanel: NSPanel {
         let coachHost=NSHostingView(rootView:CoachView(model:model,close:{[weak self]in self?.coach.orderOut(nil)}));coachHost.sizingOptions=[];coachHost.autoresizingMask=[.width,.height];coach.contentView=coachHost;coach.setContentSize(NSSize(width:410,height:480))
         coach.setFrameOrigin(NSPoint(x: visible.maxX - 430, y: visible.minY + 24))
         library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-        library.title = "Mythos"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
+        library.title = "Vale"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
         library.backgroundColor = NSColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1); library.appearance = NSAppearance(named: .darkAqua)
         let libraryHost = NSHostingView(rootView: LibraryView(model: model))
         libraryHost.sizingOptions = []
@@ -104,11 +104,11 @@ final class FloatingPanel: NSPanel {
     private func setupMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); main.addItem(appItem)
-        let appMenu = NSMenu(title: "Mythos"); appItem.submenu = appMenu
+        let appMenu = NSMenu(title: "Vale"); appItem.submenu = appMenu
         let settings = NSMenuItem(title: "Settings…", action: #selector(menuSettings), keyEquivalent: ","); settings.target = self; appMenu.addItem(settings)
         let updates=NSMenuItem(title:"Check for Updates…",action:#selector(menuUpdates),keyEquivalent:""); updates.target=self; appMenu.addItem(updates)
         appMenu.addItem(.separator())
-        let appQuit = NSMenuItem(title: "Quit Mythos", action: #selector(menuQuit), keyEquivalent: "q"); appQuit.target = self; appMenu.addItem(appQuit)
+        let appQuit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); appQuit.target = self; appMenu.addItem(appQuit)
         let fileItem = NSMenuItem(); main.addItem(fileItem); let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
         let newItem = NSMenuItem(title: "New chat", action: #selector(menuNew), keyEquivalent: "n"); newItem.target = self; fileMenu.addItem(newItem)
         fileMenu.addItem(NSMenuItem(title: "Close window", action: NSSelectorFromString("performClose:"), keyEquivalent: "w"))
@@ -118,13 +118,13 @@ final class FloatingPanel: NSPanel {
         }
         NSApp.mainMenu = main
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Mythos")
-        statusItem.button?.toolTip = "Mythos · Control–Option–Space"
+        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vale")
+        statusItem.button?.toolTip = "Vale · Control–Option–Space"
         let menu = NSMenu()
         for (title, action) in [("Open assistant", #selector(menuCoach)), ("Chat history", #selector(menuLibrary)), ("Pause chat", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item)
         }
-        menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Mythos", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit); statusItem.menu = menu
+        menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit); statusItem.menu = menu
     }
     private func registerHotKey() {
         var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -137,7 +137,7 @@ final class FloatingPanel: NSPanel {
         InstallEventHandler(GetApplicationEventTarget(), handler, 1, &event, pointer, &hotHandler)
         let id = EventHotKeyID(signature: 0x4C696C74, id: 1)
         let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), id, GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { model.shortcutWarning = "The shortcut is already in use. Open Mythos from the menu bar." }
+        if status != noErr { model.shortcutWarning = "The shortcut is already in use. Open Vale from the menu bar." }
     }
     func point(_ point: PointTarget, snapshot: ContextSnapshot) {
         clearAnnotation()

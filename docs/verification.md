@@ -1,6 +1,10 @@
-# Verification — Mythos 1.2.1
+# Verification
 
-The release is built and exercised on the Intel development Mac, macOS 15.7.9, Swift 6.1.2 Command Line Tools, and official Codex CLI 0.160.0 using its existing ChatGPT sign-in. Credentials were not read, copied, or logged. Final results: 28/28 core, 5/5 updater configuration, 61/61 native, 61/61 repeated native, and 67/67 provider/fixture integration assertions pass. The 67 include the 61 native assertions; three requests use the genuine provider. See the generated release manifest for artifact hashes.
+## Vale 1.2.2 branding release
+
+Version 1.2.2 (build 5) updates the app name, menus, permission descriptions, V icon, build/install/package filenames, and public agent documentation. Legacy storage/bundle identifiers, Swift targets and the Lilt persona are preserved. Intel and Apple Silicon slices build. All 28 core, 5 updater configuration, 61 native, repeated 61 native, and 67 integration assertions pass, including three genuine provider requests. Native chat, compact capsule, settings and icon visuals were inspected. The [public result snapshot](verification-results.json) includes each assertion without chat stores or private files. Physical hardware and distribution limits below still apply.
+
+The 1.2.1 release was built and exercised on the Intel development Mac, macOS 15.7.9, Swift 6.1.2 Command Line Tools, and official Codex CLI 0.160.0 using its existing ChatGPT sign-in. Credentials were not read, copied, or logged. Recorded 1.2.1 results: 28/28 core, 5/5 updater configuration, 61/61 native, 61/61 repeated native, and 67/67 provider/fixture integration assertions pass. The 67 include the 61 native assertions; three requests use the genuine provider. See the generated release manifest for artifact hashes.
 
 ## What the checks establish
 
@@ -30,8 +34,8 @@ These are app-owned view captures inspected by Codex, not whole-desktop captures
 - Login/logout/expiry/quota/offline account recovery, real file picker/drop/clipboard gestures, scanned/locked/corrupt/large document matrices, cold-process restart, multi-display/Spaces/fullscreen, large-library performance, and accessibility/contrast/large-text testing remain pending.
 - The universal executable and Sparkle framework contain arm64 and x86_64. Only Intel runtime is verified here. Apple Silicon runtime is not inferred from compilation.
 - The app is ad-hoc signed with no Developer ID/TeamIdentifier and is not notarized. No existing production feed or Ed25519 public configuration is supplied. Authentic signed feed/archive retrieval, tamper rejection, version/architecture update selection, install and recovery require existing trusted signing assets and an authorized private source.
-- Laptop screenshot transfer/delivery and installation remain paused until parent confirmation. No denied Codex UI action was retried or bypassed and no alternate access credentials or publishing mechanism were created.
+- Laptop installation and first-use hardware checks remain pending. Native consent must be granted by the person testing; never bypass OS privacy or Gatekeeper protections.
 
 ## Reproduce
 
-Run `MYTHOS_ARCH=universal scripts/verify.sh --integration --repeat`, then `python3 scripts/package-release.py`. Result JSON, logs, public fixtures, privacy proofs, and PNGs are under artifacts/; source/evidence packaging includes curated reviewed PNGs and result/proof files, not test-library user stores or authentication data. The extracted release app is also checked for signature integrity and native behavior before handoff.
+Run `VALE_ARCH=universal scripts/verify.sh --integration --repeat`, then `python3 scripts/package-release.py`. Result JSON, logs, public fixtures, privacy proofs, and PNGs are under artifacts/; source/evidence packaging includes curated reviewed PNGs and result/proof files, not test-library user stores or authentication data. The extracted release app is also checked for signature integrity and native behavior before handoff.

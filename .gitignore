@@ -5,3 +5,12 @@ dist/
 artifacts/*
 !artifacts/.gitkeep
 .DS_Store
+
+# Local credentials and editor state
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+.swiftpm/

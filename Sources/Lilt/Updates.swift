@@ -30,7 +30,7 @@ import LiltCore
     }
     nonisolated func updater(_ updater:SPUUpdater,shouldProceedWithUpdate updateItem:SUAppcastItem,updateCheck:SPUUpdateCheck) throws {
         let permitted=MainActor.assumeIsolated { updateItem.fileURL.map {configuration?.permitsRelease($0) == true} ?? false }
-        guard permitted else {throw NSError(domain:"MythosUpdates",code:1,userInfo:[NSLocalizedDescriptionKey:"The update archive is outside the configured HTTPS release source."])}
+        guard permitted else {throw NSError(domain:"ValeUpdates",code:1,userInfo:[NSLocalizedDescriptionKey:"The update archive is outside the configured HTTPS release source."])}
     }
     nonisolated func feedURLString(for updater:SPUUpdater)->String?{MainActor.assumeIsolated{configuration?.feed.absoluteString}}
 }

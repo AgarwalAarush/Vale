@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib,json,plistlib,platform,subprocess,zipfile
 root=Path(__file__).resolve().parent.parent
-app=root/'dist/Mythos.app'
+app=root/'dist/Vale.app'
 info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
 version=info['CFBundleShortVersionString']
 series=version
@@ -33,13 +33,13 @@ if not update_checks or not all(value is True for value in update_checks.values(
 command('codesign','--verify','--deep','--strict',str(app))
 architectures=command('lipo','-archs',str(app/'Contents/MacOS/Lilt')).split()
 if set(architectures)!={'x86_64','arm64'}:
-    raise SystemExit('Build MYTHOS_ARCH=universal before packaging.')
-release=root/'dist'/f'Mythos-{version}-macOS-universal.zip'
+    raise SystemExit('Build VALE_ARCH=universal before packaging.')
+release=root/'dist'/f'Vale-{version}-macOS-universal.zip'
 if release.exists(): release.unlink()
 command('ditto','-c','-k','--sequesterRsrc','--keepParent',str(app),str(release))
-source=root/'dist'/f'Mythos-{version}-source-and-evidence.zip'
+source=root/'dist'/f'Vale-{version}-source-and-evidence.zip'
 paths=command('git','ls-files','--cached','--others','--exclude-standard').splitlines()
-prefix=f'Mythos-{version}-source/'
+prefix=f'Vale-{version}-source/'
 selected={
     f'native-ui-{series}-final':['01-new-chat.png','02-capsule.png','03-attachments.png','04-PDF-preview.png','05-paused.png','06-optional-learn-mode.png','08-chat-history.png','09-settings-updates.png','09b-update-controls.png','12-live-context.png','12b-live-capsule.png','13-loading.png','14-window-changed.png','15-error-retry.png','17-conversation.png','17b-conversation-capsule.png','19-step-guide.png','20-occluded-highlight.png','21-context-limit.png','22-deletion-error.png','23-forget-recovered.png'],
     f'integration-{series}-final':['07-real-general-reply.png','11-live-web-search.png','24-real-guide-synthetic-screen.png']
@@ -68,8 +68,8 @@ manifest={
     'files':[{ 'name':path.name,'bytes':path.stat().st_size,'sha256':digest(path)} for path in [release,source]],
     'remaining':['Screenshot delivery and laptop runtime verification','Existing private feed and trusted signing assets for live updates','Developer ID signing and notarization for distribution','Native microphone/window consent and real hardware flow testing','VoiceOver, real picker/drop/clipboard and multi-display checks']
 }
-manifest_path=root/'dist'/f'Mythos-{version}-release-manifest.json'
+manifest_path=root/'dist'/f'Vale-{version}-release-manifest.json'
 manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
-sums=root/'dist'/f'Mythos-{version}-SHA256SUMS.txt'
+sums=root/'dist'/f'Vale-{version}-SHA256SUMS.txt'
 sums.write_text(''.join(f'{digest(path)}  {path.name}\n' for path in [release,source,manifest_path]))
 print(json.dumps({'manifest':str(manifest_path),'archives':[str(release),str(source)],'checksums':str(sums)},indent=2))

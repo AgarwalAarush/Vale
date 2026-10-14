@@ -10,7 +10,7 @@ struct CapsuleView: View {
             Button(action: openCoach) {
                 HStack(spacing: 12) {
                     if let chat=model.active,chat.duration>0 { Text(chat.timerText).font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit() }
-                    Text(model.active?.title == "New chat" ? "Mythos" : model.active?.title ?? "Mythos").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
+                    Text(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
                 }
             }.buttonStyle(.plain).help("Type a question")
             Spacer(minLength: 0)
@@ -22,7 +22,7 @@ struct CapsuleView: View {
                 if model.active != nil { Button("Close chat") { model.complete() } }
                 Divider()
                 Button("Settings…") { model.settings = true; model.showLibrary?() }
-                Button("Quit Mythos") { NSApplication.shared.terminate(nil) }
+                Button("Quit Vale") { NSApplication.shared.terminate(nil) }
             } label: { Image(systemName: "ellipsis").font(.system(size: 15)).frame(width: 20, height: 28) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("More options")
         }.padding(.horizontal, 20).frame(height: 62).modifier(GlassSurface(radius: 20))
     }
@@ -35,7 +35,7 @@ struct CoachView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                LogoMark(); Text("Mythos").font(.system(size: 15, weight: .semibold))
+                LogoMark(); Text("Vale").font(.system(size: 15, weight: .semibold))
                 Spacer()
                 Menu {
                     Button("Assistant") {model.setMode(.assistant)}

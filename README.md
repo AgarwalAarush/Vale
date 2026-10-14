@@ -1,6 +1,17 @@
-# Mythos
+# Vale
 
 A native Mac companion for writing, coding, documents, and talking through what is on your screen. Open it and type. General chat is the default; Learn and step-by-step help are optional. The app keeps the compact dark floating interface and can expand for a longer conversation.
+
+<img src="docs/images/vale-capsule.png" alt="Vale compact floating interface" width="430">
+
+<details>
+<summary>Open conversation view</summary>
+
+<img src="docs/images/vale-chat.png" alt="Vale general chat with typed input and optional window sharing" width="410">
+
+</details>
+
+Screenshots show native app views from an isolated generated test session.
 
 ## Work with your screen
 
@@ -30,10 +41,16 @@ macOS 14+, Command Line Tools with a macOS 15.2+ SDK (verified with Swift 6.1.2)
 
 ```sh
 scripts/build.sh
-MYTHOS_ARCH=universal scripts/verify.sh --integration --repeat
+VALE_ARCH=universal scripts/verify.sh --integration --repeat
 python3 scripts/package-release.py
 ```
 
 Tests use isolated generated files and labeled synthetic capture/voice adapters. The provider integration also asks the real signed-in service using public image/PDF/text fixtures and a synthetic selected-window image. It does not request hardware consent or alter real chats. See [verification](docs/verification.md) for exactly what is exercised and still pending.
 
-The local app is ad-hoc signed, not notarized. Production updates are implemented but inactive until trusted existing signing/feed assets are supplied. Laptop screenshot delivery, installation, Apple Silicon runtime, and real hardware QA remain pending. No notch integration, persistent agents, routines, connectors, or autonomous computer actions are included.
+The local app is ad-hoc signed, not notarized. Production updates are implemented but inactive until trusted existing signing/feed assets are supplied. Laptop installation, Apple Silicon runtime, and real hardware QA remain pending. No notch integration, persistent agents, routines, connectors, or autonomous computer actions are included.
+
+## Working on Vale
+
+Start with [AGENTS.md](AGENTS.md), [architecture](docs/architecture.md), and the [development roadmap](docs/roadmap.md). Public source lives at [AgarwalAarush/Vale](https://github.com/AgarwalAarush/Vale).
+
+The app bundle is `Vale.app`. Swift targets/executable (`Lilt`, `LiltCore`, `LiltCoreChecks`), bundle ID (`local.lilt.companion`), saved preference keys, and `Application Support/Lilt` intentionally retain their legacy names so existing chats and permissions stay compatible. Lilt remains the assistant persona.

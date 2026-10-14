@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Embed only explicitly supplied existing public updater configuration. Never generate keys."""
 import base64,os,plistlib,sys,urllib.parse
-feed=os.environ.get('MYTHOS_UPDATE_FEED_URL','')
-key=os.environ.get('MYTHOS_UPDATE_PUBLIC_KEY','')
+feed=os.environ.get('VALE_UPDATE_FEED_URL','')
+key=os.environ.get('VALE_UPDATE_PUBLIC_KEY','')
 if not feed and not key:
     sys.exit(0)
 if not feed or not key:

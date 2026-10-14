@@ -10,9 +10,9 @@ results={}
 with tempfile.TemporaryDirectory(dir=root/'artifacts') as directory:
     for name,feed,public,expected in cases:
         path=Path(directory)/'Info.plist';path.write_bytes(plistlib.dumps({'CFBundleName':'Fixture'}));original=path.read_bytes()
-        env=os.environ.copy();env.pop('MYTHOS_UPDATE_FEED_URL',None);env.pop('MYTHOS_UPDATE_PUBLIC_KEY',None)
-        if feed is not None:env['MYTHOS_UPDATE_FEED_URL']=feed
-        if public is not None:env['MYTHOS_UPDATE_PUBLIC_KEY']=public
+        env=os.environ.copy();env.pop('VALE_UPDATE_FEED_URL',None);env.pop('VALE_UPDATE_PUBLIC_KEY',None)
+        if feed is not None:env['VALE_UPDATE_FEED_URL']=feed
+        if public is not None:env['VALE_UPDATE_PUBLIC_KEY']=public
         process=subprocess.run([sys.executable,str(root/'scripts/configure-updates.py'),str(path)],env=env,capture_output=True)
         results[name]=(process.returncode==0)==expected
         if not expected or name=='inactive':results[name]=results[name] and path.read_bytes()==original
