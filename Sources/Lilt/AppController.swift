@@ -60,7 +60,7 @@ final class FloatingPanel: NSPanel {
         coach.setFrameOrigin(NSPoint(x: visible.maxX - 430, y: visible.minY + 24))
         library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         library.title = "Vale"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
-        library.backgroundColor = NSColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1); library.appearance = NSAppearance(named: .darkAqua)
+        library.backgroundColor = Theme.windowBackground; library.appearance = NSAppearance(named: .darkAqua)
         let libraryHost = NSHostingView(rootView: LibraryView(model: model))
         libraryHost.sizingOptions = []
         libraryHost.frame = NSRect(x: 0, y: 0, width: 900, height: 650)
@@ -171,7 +171,7 @@ final class FloatingPanel: NSPanel {
     func clearAnnotation() { annotationTimer?.invalidate(); annotationTimer = nil; annotation?.orderOut(nil); annotation = nil }
     private func preview(_ image: NSImage) {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 520), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        window.title = "Shared context preview"; window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .darkAqua)
+        window.title = "Shared context preview"; window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .darkAqua); window.backgroundColor = Theme.windowBackground
         let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self;contextPreviews.append(window)
         window.center(); auxiliary.append(window); window.makeKeyAndOrderFront(nil)
         if auxiliary.count > 3 { auxiliary.removeFirst().close() }
@@ -179,7 +179,7 @@ final class FloatingPanel: NSPanel {
     private func previewFile(_ record:AttachmentRecord) {
         guard let files=model.fileStore else{return}
         let window=NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:550),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
-        window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua)
+        window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua);window.backgroundColor=Theme.windowBackground
         let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550));window.center()
         auxiliary.append(window);window.makeKeyAndOrderFront(nil);if auxiliary.count>3{auxiliary.removeFirst().close()}
     }

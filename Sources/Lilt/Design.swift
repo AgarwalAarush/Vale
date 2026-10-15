@@ -6,7 +6,11 @@ enum Theme {
     static let muted = Color(red: 0.61, green: 0.64, blue: 0.68)
     static let accent = Color(red: 0.57, green: 0.67, blue: 1)
     static let line = Color.white.opacity(0.09)
-    static let background = Color(red: 0.10, green: 0.11, blue: 0.12)
+    /// Opaque history and preview windows. Neutral, and close to the floating panels' composited tone.
+    static let windowBackground = NSColor(srgbRed: 0.12, green: 0.12, blue: 0.125, alpha: 1)
+    static let background = Color(nsColor: windowBackground)
+    /// Capsule and coach glass tint. Unchanged so those panels keep their current fill.
+    private static let glassTint = Color(red: 0.10, green: 0.11, blue: 0.12)
 }
 struct GlassMaterial: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
@@ -18,7 +22,7 @@ struct GlassMaterial: NSViewRepresentable {
 struct GlassSurface: ViewModifier {
     var radius: CGFloat = 20
     func body(content: Content) -> some View {
-        content.background(GlassMaterial().overlay(Theme.background.opacity(0.86)))
+        content.background(GlassMaterial().overlay(Theme.glassTint.opacity(0.86)))
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.7))
             .foregroundStyle(Theme.ink).preferredColorScheme(.dark)
