@@ -1,0 +1,36 @@
+---
+description: Enforces Vale's locked visual system for native SwiftUI and AppKit UI. Dark floating capsule, one accent, hairline surfaces, and inspection of real rendered panels.
+globs: ["Sources/Lilt/**/*.swift", "DESIGN.md"]
+alwaysApply: true
+---
+
+# Frontend Design Engineering Standards
+
+Follow `DESIGN.md`. It already locks mode, accent, layout, type, density, motion, and the screens. If a visual choice is still missing, pick the quieter option, record it in `DESIGN.md`, and keep building. Ask nothing.
+
+This is a native macOS app. UI is SwiftUI hosted in AppKit panels. Reuse `Theme`, `GlassSurface`, `QuietButton`, `IconButton`, `LogoMark`, `AudioMark`, and `DraftEditor` in `Sources/Lilt/Design.swift`. Do not add Next.js, Tailwind, shadcn/ui, Magic UI, Motion, Spline, or Three.js.
+
+## Product surface
+
+1. The summoned surface is the dark floating capsule (`430×62`) and the compact coach card (`410×480`, expanded `560×700`).
+2. History is a separate library window (`900×650`) with the existing `194`pt rail. Do not turn the coach into a full-height chat sidebar or a metrics dashboard.
+3. Typing is the primary action. Voice, window sharing, and Learn mode stay explicit opt-ins.
+4. Keep the Lilt assistant persona and the legacy bundle, preference, and storage names.
+
+## Visual polish
+
+1. Dark only. Surfaces stay on `Theme.background` (`#1A1C1F`) with ink `#F0F2F5` and muted `#9CA3AD`.
+2. One accent, `#91ABFF`. Use it for the caret, live and listening indicators, guide labels, text actions, and the send button. Do not fill large regions with it.
+3. The only gradient is the small `LogoMark`. No page gradients, neon blobs, emoji feature cards, or symmetrical three-column feature rows.
+4. Depth comes from HUD glass, a luminance step, and a `0.7`pt hairline at about 14% white. Do not add heavy drop shadows on cards inside the panel.
+5. Type is SF Pro for UI and SF Mono for timers, IDs, and counts. Headings are medium or semibold with tight tracking. Eyebrows are 9pt, tracked, muted. Body stays short. Numbers use `monospacedDigit()`.
+6. Spacing stays on the existing 4pt scale (4, 8, 12, 16, 20, 24) plus the locked 15 and 18pt insets already in the capsule and coach. Do not restyle those panels onto a new grid.
+7. Every control needs a hover or pressed state, an accessibility label, and a disabled state when the action is unavailable. Ship empty, loading, error, and populated states. Errors use system orange and offer a recovery action.
+
+## Motion
+
+Micro-interactions stay under 200ms. Panel resize may use the existing window frame animation. Do not add looping equalizer motion, marquees, blur-fade headlines, number tickers, or border beams. 3D and shaders are off.
+
+## Visual QA
+
+After a UI change, render the real AppKit and SwiftUI views with `scripts/verify.sh`. Inspect the capsule, coach, and library screenshots for truncation, overlap, cramped hit targets, and muted text that disappears into `#1A1C1F`. Do not sign off from a browser reconstruction.
