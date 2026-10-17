@@ -73,6 +73,23 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testHistoryShowsAnUnsentDraft() {
+        var chat = LearningSession(title: "New chat")
+        chat.draft = "  How does this loop end?\nSecond line"
+        XCTAssertEqual(chat.listPreview, "How does this loop end?")
+        XCTAssertEqual(chat.unsentDraft, "How does this loop end?\nSecond line")
+        XCTAssertTrue(chat.matches("loop"))
+        XCTAssertFalse(chat.matches("missing"))
+        chat.messages = [Message(role: "user", text: "Sent question")]
+        XCTAssertEqual(chat.listPreview, "Sent question")
+        chat.messages = []
+        chat.draft = "  \n"
+        chat.pendingAttachments = [AttachmentRecord(name: "Notes.md", kind: .text, byteCount: 12)]
+        XCTAssertEqual(chat.listPreview, "1 files attached")
+        chat.pendingAttachments = []
+        XCTAssertEqual(chat.listPreview, "Ready when you are.")
+        XCTAssertNil(chat.unsentDraft)
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +272,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("History shows an unsent draft",tests.testHistoryShowsAnUnsentDraft),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),

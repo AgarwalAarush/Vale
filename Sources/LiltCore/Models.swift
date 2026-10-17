@@ -78,7 +78,20 @@ public struct LearningSession: Codable, Identifiable, Equatable {
         var seen=Set<UUID>()
         return (messages.flatMap(\.attachments)+pendingAttachments).filter { seen.insert($0.id).inserted }
     }
-    public func matches(_ query:String)->Bool { let q=query.trimmingCharacters(in:.whitespacesAndNewlines); return q.isEmpty || ([title,takeaway] + messages.map(\.text) + files.map(\.name)).contains{$0.localizedCaseInsensitiveContains(q)} }
+    public var unsentDraft: String? {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+    /// History row. A chat with no messages still shows an unsent draft instead of an empty state.
+    public var listPreview: String {
+        if let last = messages.last { return last.text }
+        if let draft = unsentDraft, let line = draft.split(whereSeparator: \.isNewline).first {
+            return String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if !pendingAttachments.isEmpty { return "\(pendingAttachments.count) files attached" }
+        return "Ready when you are."
+    }
+    public func matches(_ query:String)->Bool { let q=query.trimmingCharacters(in:.whitespacesAndNewlines); return q.isEmpty || ([title,takeaway,draft] + messages.map(\.text) + files.map(\.name)).contains{$0.localizedCaseInsensitiveContains(q)} }
     public var contextLimited:Bool{ConversationWindow(messages:messages).limited}
     public var remaining: Int { max(0, duration - elapsed) }
     public var timerText: String { Self.formatTime(remaining) }
