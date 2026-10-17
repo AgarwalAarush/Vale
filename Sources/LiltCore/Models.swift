@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ComposerPrompt {
+    /// The empty field’s invitation stays readable and sits on the caret.
+    public static let words = "Ask quietly…"
+    public static let opacity: Double = 1
+    public static let usesMediumWeight = true
+    public static let topInset: CGFloat = 5
+    public static let leadingInset: CGFloat = 7
+}
