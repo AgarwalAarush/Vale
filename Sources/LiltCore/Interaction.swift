@@ -67,3 +67,16 @@ public enum PointVisibility {
         return false
     }
 }
+
+public enum DroppedLink {
+    /// A web address dropped on the coach. File URLs stay on the file import path.
+    public static func text(from urls: [URL]) -> String? {
+        let links=urls.compactMap{url->String? in
+            guard !url.isFileURL, let scheme=url.scheme?.lowercased(), scheme=="http" || scheme=="https" else { return nil }
+            let text=url.absoluteString
+            return text.isEmpty ? nil : text
+        }
+        guard !links.isEmpty else { return nil }
+        return links.joined(separator: "\n")
+    }
+}

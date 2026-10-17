@@ -156,7 +156,15 @@ struct CoachView: View {
                 Button{model.setConversation(!model.conversation)}label:{Label(model.conversation ? "End conversation" : "Conversation",systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 14)
         }.modifier(GlassSurface(radius: 20))
-            .dropDestination(for:URL.self){urls,_ in Task{await model.importFiles(urls)};return urls.contains(where:{$0.isFileURL})}
+            .dropDestination(for:URL.self){urls,_ in
+                if let links=DroppedLink.text(from:urls) {
+                    if model.active == nil { model.prepareChat() }
+                    let base=model.draft
+                    model.editDraft(base.isEmpty ? links : base+"\n"+links)
+                }
+                Task{await model.importFiles(urls)}
+                return urls.contains(where:{$0.isFileURL}) || DroppedLink.text(from:urls) != nil
+            }
             .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}
