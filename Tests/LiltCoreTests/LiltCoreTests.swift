@@ -240,6 +240,17 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSentFilesAreListedInFull() {
+        XCTAssertTrue(SentFiles.listedInFull)
+        let picture = AttachmentRecord(name: "Pasted image.png", kind: .image, byteCount: 12, detail: "image")
+        let note = AttachmentRecord(name: "notes.txt", kind: .text, byteCount: 20, detail: "text")
+        XCTAssertEqual(SentFiles.names([picture, note]), ["Pasted image.png", "notes.txt"])
+        XCTAssertEqual(SentFiles.names([picture, note]).count, 2)
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +287,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Sent files are listed in full",tests.testSentFilesAreListedInFull)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
