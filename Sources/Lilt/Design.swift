@@ -98,8 +98,10 @@ struct DraftEditor: NSViewRepresentable {
         guard let editor = nsView.documentView as? ComposerTextView else { return }
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
         if editor.string != text {
-            let selection = editor.selectedRange(); editor.string = text
-            editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
+            let previous=editor.string.utf16.count
+            let caret=editor.selectedRange().location
+            editor.string = text
+            editor.setSelectedRange(NSRange(location: DraftCaret.location(previousUTF16: previous, nextUTF16: text.utf16.count, caret: caret), length: 0))
         }
     }
     final class Coordinator: NSObject, NSTextViewDelegate {
