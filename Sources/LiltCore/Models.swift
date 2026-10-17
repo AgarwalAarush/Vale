@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ComposerMarks {
+    /// The field does not flag grammar or turn a date, address, or link into a control.
+    public static let grammar = false
+    public static let dataDetectors = false
+}
