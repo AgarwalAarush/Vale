@@ -83,7 +83,8 @@ struct DraftEditor: NSViewRepresentable {
     var pasteImage: ((Data) -> Void)? = nil
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
+        let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
+        keepFieldClear(scroll)
         let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false
         editor.font = .systemFont(ofSize: 14); editor.textColor = NSColor(white: 0.93, alpha: 1); editor.insertionPointColor = NSColor(red: 0.57, green: 0.67, blue: 1, alpha: 1)
         editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
@@ -95,6 +96,7 @@ struct DraftEditor: NSViewRepresentable {
     }
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.parent = self
+        keepFieldClear(nsView)
         guard let editor = nsView.documentView as? ComposerTextView else { return }
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
         if editor.string != text {
@@ -107,4 +109,12 @@ struct DraftEditor: NSViewRepresentable {
         init(_ parent: DraftEditor) { self.parent = parent }
         func textDidChange(_ notification: Notification) { if let editor = notification.object as? NSTextView { parent.text = editor.string } }
     }
+}
+
+private func keepFieldClear(_ scroll: NSScrollView) {
+    guard FieldSurface.staysClear else { return }
+    scroll.drawsBackground = false
+    scroll.backgroundColor = .clear
+    scroll.contentView.drawsBackground = false
+    scroll.contentView.backgroundColor = .clear
 }
