@@ -102,10 +102,9 @@ private final class SearchEventProbe: @unchecked Sendable {
                 DispatchQueue.main.async {
                     guard let self, let process, self.process === process else { return }
                     self.usedWebSearch=searchEvents.usedSearch
-                    if finished.terminationStatus == 0 {
-                        do { self.finish(.success(try TutorReply.decode(Data(contentsOf: output)))) }
-                        catch { self.finish(.failure(AppError("The assistant returned an unreadable reply. Your question is saved; try again."))) }
-                    } else { self.finish(.failure(AppError("The connection stopped. Check your Codex sign-in or plan usage in Settings, then retry.", offersSettings: true))) }
+                    if let reply = FinishedReply.decoded(try? Data(contentsOf: output)) { self.finish(.success(reply)) }
+                    else if finished.terminationStatus == 0 { self.finish(.failure(AppError("The assistant returned an unreadable reply. Your question is saved; try again."))) }
+                    else { self.finish(.failure(AppError("The connection stopped. Check your Codex sign-in or plan usage in Settings, then retry.", offersSettings: true))) }
                 }
             }
             try process.run()
@@ -114,6 +113,9 @@ private final class SearchEventProbe: @unchecked Sendable {
             }
             let timeout = DispatchWorkItem { [weak self] in
                 guard let self, self.process === process else { return }
+                if let reply = FinishedReply.decoded(try? Data(contentsOf: output)) {
+                    process.terminate(); self.finish(.success(reply)); return
+                }
                 process.terminate(); self.finish(.failure(AppError("The response took too long. Your question is saved; try again.")))
             }
             self.timeout = timeout; DispatchQueue.main.asyncAfter(deadline: .now() + 150, execute: timeout)

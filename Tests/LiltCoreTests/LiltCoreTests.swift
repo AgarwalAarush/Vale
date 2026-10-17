@@ -240,6 +240,13 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFinishedReplyFileIsKeptWhenTheProcessReportsFailure() {
+        let ready=Data(#"{"text":"Use the menu.","point":null,"guide":null}"#.utf8)
+        XCTAssertEqual(FinishedReply.decoded(ready)?.text,"Use the menu.")
+        XCTAssertNil(FinishedReply.decoded(nil))
+        XCTAssertNil(FinishedReply.decoded(Data("broken".utf8)))
+        XCTAssertNil(FinishedReply.decoded(Data(#"{"text":"  ","point":null}"#.utf8)))
+    }
 
 }
 
@@ -276,7 +283,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Finished reply file is kept when the process reports failure",tests.testFinishedReplyFileIsKeptWhenTheProcessReportsFailure)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

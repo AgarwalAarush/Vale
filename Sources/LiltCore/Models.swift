@@ -114,6 +114,14 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+/// A reply file that decodes is the answer, even when the process did not exit cleanly.
+public enum FinishedReply {
+    public static func decoded(_ file: Data?) -> TutorReply? {
+        guard let file else { return nil }
+        return try? TutorReply.decode(file)
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL
