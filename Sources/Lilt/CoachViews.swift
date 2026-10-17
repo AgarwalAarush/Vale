@@ -35,8 +35,7 @@ struct CoachView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                LogoMark(); Text("Vale").font(.system(size: 15, weight: .semibold))
-                Spacer()
+                LogoMark(); Text(CoachHeading.title(for: model.active?.title)).font(.system(size: 15, weight: .semibold)).lineLimit(1).frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 Menu {
                     Button("Assistant") {model.setMode(.assistant)}
                     Button("Learn with hints") {model.setMode(.learn)}

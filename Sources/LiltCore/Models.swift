@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CoachHeading {
+    /// A new chat shows Vale. After the first question, the coach shows that chat's name.
+    public static let product = "Vale"
+    public static func title(for chatTitle: String?) -> String {
+        let trimmed = chatTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmed.isEmpty || trimmed == "New chat" { return product }
+        return trimmed
+    }
+}
