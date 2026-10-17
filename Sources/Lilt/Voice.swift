@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import Speech
+import LiltCore
 
 @MainActor final class VoiceController:NSObject,ObservableObject,AVSpeechSynthesizerDelegate {
     @Published private(set) var listening=false
@@ -53,6 +54,9 @@ import Speech
         let node=engine.inputNode;let format=node.outputFormat(forBus:0)
         guard format.sampleRate>0,format.channelCount>0 else{failed?("No microphone is available. You can still type.");return}
         node.installTap(onBus:0,bufferSize:1024,format:format){buffer,_ in request.append(buffer)};hasTap=true
+        do{engine.prepare();try engine.start()}catch{stopListening();failed?("Couldn’t start the microphone. You can still type.");return}
+        guard RecognitionStart.canListen(engineRunning:engine.isRunning) else{stopListening();failed?("Couldn’t start the microphone. You can still type.");return}
+        listening=true
         recognition=recognizer.recognitionTask(with:request){result,error in DispatchQueue.main.async{
             guard self.generation==id,self.listening else{return}
             if let result{
@@ -62,7 +66,6 @@ import Speech
                 if result.isFinal{self.finishUtterance()}
             }else if error != nil{self.stopListening();self.failed?("Dictation stopped. Your draft is preserved; send it or try again.")}
         }}
-        do{engine.prepare();try engine.start();listening=true}catch{stopListening();failed?("Couldn’t start the microphone. You can still type.")}
     }
     func finishUtterance(){
         guard listening else{return};let text=finalText.trimmingCharacters(in:.whitespacesAndNewlines);stopListening()

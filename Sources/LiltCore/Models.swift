@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum RecognitionStart {
+    /// The recognition task is created only after the engine is running. Earlier, the first words are missed.
+    public static func canListen(engineRunning: Bool) -> Bool { engineRunning }
+}
