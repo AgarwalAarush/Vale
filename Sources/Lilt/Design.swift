@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import LiltCore
 
 enum Theme {
     static let ink = Color(red: 0.94, green: 0.95, blue: 0.96)
@@ -89,6 +90,7 @@ struct DraftEditor: NSViewRepresentable {
         editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
         editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false; editor.isAutomaticTextReplacementEnabled = false
+        editor.smartInsertDeleteEnabled = PasteSpacing.adjustsAutomatically
         editor.delegate = context.coordinator; editor.identifier = NSUserInterfaceItemIdentifier("lilt.composer")
         editor.setAccessibilityLabel("Message Lilt"); editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
         scroll.documentView = editor; return scroll
@@ -97,6 +99,7 @@ struct DraftEditor: NSViewRepresentable {
         context.coordinator.parent = self
         guard let editor = nsView.documentView as? ComposerTextView else { return }
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
+        editor.smartInsertDeleteEnabled = PasteSpacing.adjustsAutomatically
         if editor.string != text {
             let selection = editor.selectedRange(); editor.string = text
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
