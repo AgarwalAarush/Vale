@@ -27,6 +27,8 @@ private final class SearchEventProbe: @unchecked Sendable {
     private var work: URL?
     private var shellResolved: String?
     var located:(()->Void)?
+    var lookupEnded:(()->Void)?
+    private(set) var lookupFinished=false
     var executable: String? {
         let custom = UserDefaults.standard.string(forKey: "codexPath")
         let candidates = CodexLocator.candidatePaths(home: FileManager.default.homeDirectoryForCurrentUser, customPath: custom, environmentPath: ProcessInfo.processInfo.environment["PATH"])
@@ -36,7 +38,10 @@ private final class SearchEventProbe: @unchecked Sendable {
     }
     func locateWithLoginShell() {
         let args = CommandLine.arguments
-        guard !args.contains("--self-test"), !args.contains("--integration-test"), executable == nil else { return }
+        if args.contains("--self-test") || args.contains("--integration-test") || executable != nil {
+            lookupFinished=true
+            return
+        }
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/zsh")
@@ -44,20 +49,26 @@ private final class SearchEventProbe: @unchecked Sendable {
             let output = Pipe()
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
-            do { try process.run() } catch { return }
+            do { try process.run() } catch {
+                Task { @MainActor [weak self] in self?.finishLookup(nil) }
+                return
+            }
             let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3, execute: timeout)
             process.waitUntilExit()
             timeout.cancel()
             let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
             let path = CodexLocator.shellExecutable(from: text)
-            guard let resolved = path, FileManager.default.isExecutableFile(atPath: resolved) else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.shellResolved = resolved
-                self.located?()
-            }
+            Task { @MainActor [weak self] in self?.finishLookup(path) }
         }
+    }
+    private func finishLookup(_ path: String?) {
+        if let path, FileManager.default.isExecutableFile(atPath: path) {
+            shellResolved=path
+            located?()
+        }
+        lookupFinished=true
+        lookupEnded?()
     }
     var resources: URL {
         let bundled = Bundle.main.resourceURL!

@@ -114,6 +114,13 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum CodexNotice {
+    /// The install line is for a lookup that finished without finding Codex.
+    public static func shows(executableKnown: Bool, lookupFinished: Bool) -> Bool {
+        lookupFinished && !executableKnown
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL
