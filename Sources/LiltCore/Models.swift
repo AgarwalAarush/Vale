@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum DroppedPath {
+    /// A symbolic link is read from the file it points to. A normal path stays itself.
+    public static func pathToRead(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+    }
+}

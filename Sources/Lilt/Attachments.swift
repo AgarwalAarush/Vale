@@ -21,10 +21,11 @@ final class AttachmentStore: Sendable {
     }
     func url(for record: AttachmentRecord) -> URL { directory.appendingPathComponent(record.storageName) }
     func importFile(_ url: URL) throws -> AttachmentRecord {
-        let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+        let resolved=URL(fileURLWithPath:DroppedPath.pathToRead(url.path))
+        let attributes=try FileManager.default.attributesOfItem(atPath:resolved.path)
         guard (attributes[.type] as? FileAttributeType) == .typeRegular, let bytes=attributes[.size] as? NSNumber, bytes.intValue <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
-        let data=try Data(contentsOf:url,options:.mappedIfSafe)
-        return try importData(data,name:url.lastPathComponent,fileExtension:url.pathExtension.lowercased())
+        let data=try Data(contentsOf:resolved,options:.mappedIfSafe)
+        return try importData(data,name:resolved.lastPathComponent,fileExtension:resolved.pathExtension.lowercased())
     }
     func importData(_ data: Data, name: String, fileExtension ext: String) throws -> AttachmentRecord {
         guard data.count <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
