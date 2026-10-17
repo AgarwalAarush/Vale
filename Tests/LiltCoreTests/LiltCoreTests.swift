@@ -240,6 +240,21 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSharedWindowUsesPlainBitmapWhenPNGFails() {
+        let png=Data([0x89,0x50,0x4E,0x47])
+        let plain=Data([1,2,3,4])
+        XCTAssertEqual(WindowImage.png(primary:png,flattened:plain),png)
+        XCTAssertEqual(WindowImage.png(primary:nil,flattened:plain),plain)
+        XCTAssertEqual(WindowImage.png(primary:Data(),flattened:plain),plain)
+        XCTAssertNil(WindowImage.png(primary:nil,flattened:nil))
+        XCTAssertNil(WindowImage.png(primary:Data(),flattened:Data()))
+        let chat=LearningSession(title:"New chat")
+        XCTAssertFalse(chat.webEnabled)
+        let prompt=TutorPrompt.build(session:chat,question:"What is this?",hasImage:true,pointing:false,reveal:false,hasWindow:true)
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("No. Return null for point."))
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +291,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Shared window uses a plain bitmap when PNG fails",tests.testSharedWindowUsesPlainBitmapWhenPNGFails)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
