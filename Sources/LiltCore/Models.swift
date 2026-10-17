@@ -114,6 +114,15 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum DoubleSpace {
+    /// A second space stays a space. The field does not turn it into a period.
+    public static let insertsPeriod = false
+    public static func shown(_ text: String) -> String {
+        guard insertsPeriod else { return text }
+        return text.replacingOccurrences(of: "  ", with: ". ")
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL
