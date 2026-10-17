@@ -40,6 +40,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var observerTokens: [AnyCancellable] = []
     private var failedQuestion: String?
     private var spokenDraftPrefix = ""
+    private var sentAt: Date?
     private var conversationTask:Task<Void,Never>?
     @Published var shortcutWarning:String?
     var showCoach: (() -> Void)?
@@ -125,7 +126,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard !importing else{error="Wait for your files to finish attaching.";return}
         guard !paused else{error="Resume the chat before sending a message.";return}
         guard question.count<=32_000 else{error="That message is too long. Attach it as a text file or send a smaller excerpt.";return}
-        cancel();voice.stopListening();error=nil;busy=true
+        cancel();voice.stopListening();error=nil;busy=true;sentAt=Date()
         let id=UUID();requestID=id;let chatID=chat.id
         if !retry {
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
@@ -209,6 +210,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func editDraft(_ text:String){conversation=false;conversationTask?.cancel();if voice.listening || voice.starting{voice.stopListening()};draft=text}
     func stopResponse(){conversation=false;conversationTask?.cancel();voice.stop();cancel()}
+    func stopIfSeparate() {
+        let elapsed = sentAt.map { Date().timeIntervalSince($0) } ?? .greatestFiniteMagnitude
+        if SendGesture.stops(elapsed: elapsed) { stopResponse() }
+    }
     func stopInteraction(){stopResponse();context.stop();hideOverlay?()}
     func startGuide(){
         guard !paused,!busy else{return}
