@@ -240,6 +240,23 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFinderAliasReadsTheTargetFile() {
+        let original=URL(fileURLWithPath:"/Users/vale/Desktop/Notes alias")
+        let resolved=URL(fileURLWithPath:"/Users/vale/Notes.txt")
+        XCTAssertEqual(AliasFile.urlToRead(original:original,resolved:resolved,isAlias:true),resolved)
+        XCTAssertEqual(AliasFile.urlToRead(original:original,resolved:resolved,isAlias:false),original)
+        XCTAssertEqual(AliasFile.urlToRead(original:original,resolved:nil,isAlias:true),original)
+        XCTAssertFalse(AliasFile.shouldResolve(isAlias:false))
+        var chat=LearningSession(title:"New chat")
+        chat.draft="secret draft"
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertFalse(chat.matches("secret"))
+        XCTAssertFalse(chat.matches("missing"))
+        let prompt=TutorPrompt.build(session:chat,question:"What is this?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("No. Return null for point."))
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +293,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Finder alias reads the target file",tests.testFinderAliasReadsTheTargetFile)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
