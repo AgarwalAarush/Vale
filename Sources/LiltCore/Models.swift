@@ -5,6 +5,18 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum ChatListLine {
+    /// The row uses the first line that has words, so a blank opening line does not hide the answer.
+    public static func text(from message: String?) -> String? {
+        guard let message else { return nil }
+        for line in message.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
+            let words = line.trimmingCharacters(in: .whitespaces)
+            if !words.isEmpty { return words }
+        }
+        return nil
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID
