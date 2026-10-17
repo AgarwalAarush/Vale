@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ScopedRead {
+    /// A dropped file URL stays readable only while access is held. A web address is not a file read.
+    public static func needsAccess(isFileURL: Bool) -> Bool { isFileURL }
+}

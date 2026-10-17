@@ -237,7 +237,14 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let panel=NSOpenPanel();panel.canChooseDirectories=false;panel.allowsMultipleSelection=true
         panel.message="Add images, PDFs, text, or code files"
         guard panel.runModal() == .OK else{return};let urls=panel.urls
-        Task{await importFiles(urls)}
+        importDroppedFiles(urls)
+    }
+    func importDroppedFiles(_ urls:[URL]) {
+        let held=urls.filter{ScopedRead.needsAccess(isFileURL:$0.isFileURL) && $0.startAccessingSecurityScopedResource()}
+        Task{
+            await importFiles(urls)
+            for url in held { url.stopAccessingSecurityScopedResource() }
+        }
     }
     func importFiles(_ urls:[URL]) async {
         guard !importing,let chatID=activeID,let files=fileStore else{return}
