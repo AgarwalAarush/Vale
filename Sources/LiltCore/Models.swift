@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyPlayback {
+    /// The reply being read is the one whose control can stop playback.
+    public static func reading(message: String, spoken: String?, speaking: Bool) -> Bool {
+        speaking && !message.isEmpty && spoken == message
+    }
+}
