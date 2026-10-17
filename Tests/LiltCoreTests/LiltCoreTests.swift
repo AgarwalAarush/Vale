@@ -221,6 +221,10 @@ final class LiltCoreTests {
         XCTAssertEqual(LaunchSelection.resumeID(in:[done,newer,older]),newer.id)
         XCTAssertNil(LaunchSelection.resumeID(in:[done]))
     }
+    func testWebSearchControlIsNamed() {
+        XCTAssertEqual(WebSearchLabel.title(enabled:false),"Web search")
+        XCTAssertEqual(WebSearchLabel.title(enabled:true),"Web search on")
+    }
     func testCodexLookupIncludesUserInstallAndParsesShellPath() {
         let home=URL(fileURLWithPath:"/Users/vale",isDirectory:true)
         let paths=CodexLocator.candidatePaths(home:home,customPath:" /custom/codex ",environmentPath:"/usr/bin:/Users/vale/.local/bin")
@@ -262,6 +266,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
+ ("Web search control is named",tests.testWebSearchControlIsNamed),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
