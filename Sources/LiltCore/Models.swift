@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FileRowWidth {
+    /// A file row uses the coach width and scrolls inside it.
+    public static let staysWithinTheCoach = true
+}
