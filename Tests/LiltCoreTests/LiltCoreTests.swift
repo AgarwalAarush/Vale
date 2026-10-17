@@ -234,6 +234,12 @@ final class LiltCoreTests {
         XCTAssertNil(CodexLocator.shellExecutable(from:"codex not found\n"))
         XCTAssertNil(CodexLocator.shellExecutable(from:""))
     }
+    func testFirstQuestionWaitsForCodexLookup() {
+        XCTAssertEqual(CodexStartup.next(executableFound: true, lookupPending: true), .start)
+        XCTAssertEqual(CodexStartup.next(executableFound: true, lookupPending: false), .start)
+        XCTAssertEqual(CodexStartup.next(executableFound: false, lookupPending: true), .wait)
+        XCTAssertEqual(CodexStartup.next(executableFound: false, lookupPending: false), .missing)
+    }
     func testGuideRequiresExplicitRequest(){
         let chat=LearningSession(title:"Explain this")
         let ordinary=TutorPrompt.build(session:chat,question:"What is it?",hasImage:false,pointing:false,reveal:false)
@@ -276,7 +282,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("First question waits for Codex lookup",tests.testFirstQuestionWaitsForCodexLookup)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

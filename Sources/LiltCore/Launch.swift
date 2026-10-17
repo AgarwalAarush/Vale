@@ -37,3 +37,13 @@ public enum CodexLocator {
         return line
     }
 }
+
+public enum CodexStartup {
+    public enum Next: Equatable { case start, wait, missing }
+    /// A launch that has not found Codex yet should wait for the lookup already in flight.
+    /// Starting immediately reports that Codex is missing and never asks for the answer.
+    public static func next(executableFound: Bool, lookupPending: Bool) -> Next {
+        if executableFound { return .start }
+        return lookupPending ? .wait : .missing
+    }
+}

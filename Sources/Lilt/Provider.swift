@@ -26,6 +26,8 @@ private final class SearchEventProbe: @unchecked Sendable {
     private var completion: ((Result<TutorReply, Error>) -> Void)?
     private var work: URL?
     private var shellResolved: String?
+    private var lookupPending = false
+    private var deferredAsk: (prompt: String, images: [Data], search: Bool, completion: (Result<TutorReply, Error>) -> Void)?
     var located:(()->Void)?
     var executable: String? {
         let custom = UserDefaults.standard.string(forKey: "codexPath")
@@ -37,26 +39,32 @@ private final class SearchEventProbe: @unchecked Sendable {
     func locateWithLoginShell() {
         let args = CommandLine.arguments
         guard !args.contains("--self-test"), !args.contains("--integration-test"), executable == nil else { return }
+        lookupPending = true
         DispatchQueue.global(qos: .utility).async { [weak self] in
+            let finish: (String?) -> Void = { path in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if let path { self.shellResolved = path }
+                    self.lookupPending = false
+                    self.located?()
+                    self.resumeDeferredAsk()
+                }
+            }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/zsh")
             process.arguments = ["-lc", "command -v codex"]
             let output = Pipe()
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
-            do { try process.run() } catch { return }
+            do { try process.run() } catch { finish(nil); return }
             let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3, execute: timeout)
             process.waitUntilExit()
             timeout.cancel()
             let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
             let path = CodexLocator.shellExecutable(from: text)
-            guard let resolved = path, FileManager.default.isExecutableFile(atPath: resolved) else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.shellResolved = resolved
-                self.located?()
-            }
+            if let resolved = path, FileManager.default.isExecutableFile(atPath: resolved) { finish(resolved) }
+            else { finish(nil) }
         }
     }
     var resources: URL {
@@ -68,7 +76,26 @@ private final class SearchEventProbe: @unchecked Sendable {
         cancel()
         usedWebSearch=false
         if let fixtureReply,(CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")){fixtureReply(prompt,images,search,completion);return}
-        guard let executable else { completion(.failure(AppError("Codex wasn’t found. Choose it in Settings, or install the Codex CLI and run codex login in Terminal.", offersSettings: true))); return }
+        switch CodexStartup.next(executableFound: executable != nil, lookupPending: lookupPending) {
+        case .start: begin(prompt: prompt, images: images, search: search, completion: completion)
+        case .wait: deferredAsk = (prompt, images, search, completion)
+        case .missing: reportMissingCodex(completion)
+        }
+    }
+    private func resumeDeferredAsk() {
+        guard let deferred = deferredAsk else { return }
+        deferredAsk = nil
+        switch CodexStartup.next(executableFound: executable != nil, lookupPending: false) {
+        case .start: begin(prompt: deferred.prompt, images: deferred.images, search: deferred.search, completion: deferred.completion)
+        case .wait: deferredAsk = deferred
+        case .missing: reportMissingCodex(deferred.completion)
+        }
+    }
+    private func reportMissingCodex(_ completion: @escaping (Result<TutorReply, Error>) -> Void) {
+        completion(.failure(AppError("Codex wasn’t found. Choose it in Settings, or install the Codex CLI and run codex login in Terminal.", offersSettings: true)))
+    }
+    private func begin(prompt: String, images: [Data], search: Bool, completion: @escaping (Result<TutorReply, Error>) -> Void) {
+        guard let executable else { reportMissingCodex(completion); return }
         self.completion = completion
         do {
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("lilt-\(UUID().uuidString)")
@@ -123,6 +150,7 @@ private final class SearchEventProbe: @unchecked Sendable {
     func cancel() {
         timeout?.cancel(); timeout = nil
         let old = process; process = nil; completion = nil
+        deferredAsk = nil
         if old?.isRunning == true { old?.terminate() }
         cleanup()
     }
