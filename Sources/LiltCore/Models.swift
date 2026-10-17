@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ComposerUndo {
+    /// Replacing the composer from the saved draft must not restore a question that already went out.
+    public static let dropsSentText = true
+    public static func restoresSentText() -> Bool { !dropsSentText }
+}

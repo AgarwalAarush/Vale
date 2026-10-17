@@ -98,7 +98,15 @@ struct DraftEditor: NSViewRepresentable {
         guard let editor = nsView.documentView as? ComposerTextView else { return }
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
         if editor.string != text {
-            let selection = editor.selectedRange(); editor.string = text
+            let selection = editor.selectedRange()
+            if ComposerUndo.dropsSentText {
+                editor.undoManager?.disableUndoRegistration()
+                editor.string = text
+                editor.undoManager?.enableUndoRegistration()
+                editor.undoManager?.removeAllActions()
+            } else {
+                editor.string = text
+            }
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
         }
     }
