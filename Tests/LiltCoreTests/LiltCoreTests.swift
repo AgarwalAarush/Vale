@@ -240,6 +240,14 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testLongPointLabelKeepsTheHighlight() throws {
+        let label=String(repeating:"A",count:180)
+        let kept=try TutorReply.decode(Data(#"{"text":"Look here.","point":{"x":0.2,"y":0.3,"width":0.4,"height":0.05,"label":"\#(label)"}}"#.utf8))
+        XCTAssertEqual(kept.point?.label,label)
+        XCTAssertEqual(kept.point?.width,0.4)
+        let outside=try TutorReply.decode(Data(#"{"text":"No box.","point":{"x":1.2,"y":0.1,"width":0.3,"height":0.1,"label":"\#(label)"}}"#.utf8))
+        XCTAssertNil(outside.point)
+    }
 
 }
 
@@ -276,7 +284,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Long point label keeps the highlight",tests.testLongPointLabelKeepsTheHighlight)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
