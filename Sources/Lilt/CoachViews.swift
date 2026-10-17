@@ -52,7 +52,7 @@ struct CoachView: View {
                     Divider(); Button("Settings…") { model.settings = true; model.showLibrary?() }
                 } label: { Image(systemName: "ellipsis").font(.system(size: 14)).frame(width: 24, height: 30) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 IconButton(symbol:model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",label:model.expanded ? "Compact assistant" : "Expand assistant"){model.expandCoach?()}
-                IconButton(symbol: "xmark", label: "Collapse coach", action: close)
+                IconButton(symbol: CoachDismiss.symbol, label: CoachDismiss.label, action: close)
             }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11)
             ContextStrip(model:model)
             if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}

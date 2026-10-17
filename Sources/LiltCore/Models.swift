@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CoachDismiss {
+    /// Hiding the coach is not quitting. The corner control must not use a quit mark.
+    public static let symbol = "chevron.down"
+    public static let label = "Collapse coach"
+}
