@@ -1,6 +1,15 @@
 import Foundation
 import CoreGraphics
 
+/// A shortcut failure should stay readable. Blank warnings are not shown.
+public enum ShortcutNotice {
+    public static func text(_ warning: String?) -> String? {
+        guard let warning else { return nil }
+        let trimmed = warning.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]
