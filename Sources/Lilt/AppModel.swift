@@ -265,7 +265,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         for i in sessions[index].messages.indices{sessions[index].messages[i].attachments.removeAll{ids.contains($0.id)}}
     }
     func removeFile(_ record:AttachmentRecord){
-        guard let chatID=activeID else{return};if busy{cancel()}
+        guard let chatID=activeID, let chat=sessions.first(where:{$0.id==chatID}) else{return}
+        guard SentFile.canRemove(id:record.id,session:chat) else { return }
+        if busy{cancel()}
         do{
             if !sessions.contains(where:{$0.id != chatID && $0.files.contains(where:{$0.id==record.id})}){try fileStore?.remove(record)}
             removeReferences([record.id],from:chatID);filesRemoved?([record.id]);persist()
