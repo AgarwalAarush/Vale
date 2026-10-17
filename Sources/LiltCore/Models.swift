@@ -190,3 +190,15 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsuleFace {
+    /// The name is the first thing on the capsule, and the bars belong to that control.
+    public static let nameLeads = true
+
+    public static func order(hasTimer: Bool, hasWindow: Bool) -> [String] {
+        if nameLeads {
+            return ["name"] + (hasTimer ? ["timer"] : []) + ["bars"] + (hasWindow ? ["window"] : [])
+        }
+        return ["bars"] + (hasWindow ? ["window"] : []) + (hasTimer ? ["timer"] : []) + ["name"]
+    }
+}

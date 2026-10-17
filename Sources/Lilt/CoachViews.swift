@@ -6,13 +6,23 @@ struct CapsuleView: View {
     var openCoach: () -> Void
     var body: some View {
         HStack(spacing: 15) {
-            Button(action: openCoach) {HStack(spacing:5){AudioMark(active: model.voice.listening || model.voice.speaking);if model.context.hasSelection{Image(systemName:model.context.live ? "record.circle.fill" : "macwindow").font(.system(size:10)).foregroundStyle(Theme.accent)}}}.buttonStyle(.plain).help(model.context.live ? "Live window context is on" : "Open assistant").accessibilityLabel(model.context.live ? "Open assistant. Live window context is on" : "Open assistant")
-            Button(action: openCoach) {
-                HStack(spacing: 12) {
-                    if let chat=model.active,chat.duration>0 { Text(chat.timerText).font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit() }
-                    Text(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
-                }
-            }.buttonStyle(.plain).help("Type a question")
+            if CapsuleFace.nameLeads {
+                Button(action: openCoach) {
+                    HStack(spacing: 12) {
+                        ForEach(CapsuleFace.order(hasTimer: (model.active?.duration ?? 0) > 0, hasWindow: model.context.hasSelection), id: \.self) { part in
+                            capsulePart(part)
+                        }
+                    }
+                }.buttonStyle(.plain).help(model.context.live ? "Live window context is on" : "Type a question").accessibilityLabel(model.context.live ? "Type a question. Live window context is on" : "Type a question")
+            } else {
+                Button(action: openCoach) {HStack(spacing:5){AudioMark(active: model.voice.listening || model.voice.speaking);if model.context.hasSelection{Image(systemName:model.context.live ? "record.circle.fill" : "macwindow").font(.system(size:10)).foregroundStyle(Theme.accent)}}}.buttonStyle(.plain).help(model.context.live ? "Live window context is on" : "Open assistant").accessibilityLabel(model.context.live ? "Open assistant. Live window context is on" : "Open assistant")
+                Button(action: openCoach) {
+                    HStack(spacing: 12) {
+                        if let chat=model.active,chat.duration>0 { Text(chat.timerText).font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit() }
+                        Text(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
+                    }
+                }.buttonStyle(.plain).help("Type a question")
+            }
             Spacer(minLength: 0)
             IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.ink) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
             Button { model.togglePause() } label: { Label(model.paused ? "Resume" : "Pause", systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)
@@ -25,6 +35,18 @@ struct CapsuleView: View {
                 Button("Quit Vale") { NSApplication.shared.terminate(nil) }
             } label: { Image(systemName: "ellipsis").font(.system(size: 15)).frame(width: 20, height: 28) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("More options")
         }.padding(.horizontal, 20).frame(height: 62).modifier(GlassSurface(radius: 20))
+    }
+    @ViewBuilder private func capsulePart(_ part: String) -> some View {
+        switch part {
+        case "name":
+            Text(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
+        case "timer":
+            Text(model.active?.timerText ?? "").font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit()
+        case "bars":
+            AudioMark(active: model.voice.listening || model.voice.speaking)
+        default:
+            Image(systemName:model.context.live ? "record.circle.fill" : "macwindow").font(.system(size:10)).foregroundStyle(Theme.accent)
+        }
     }
 }
 
