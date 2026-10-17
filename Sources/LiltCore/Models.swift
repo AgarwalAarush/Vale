@@ -190,3 +190,18 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum TextFile {
+    /// UTF-8 text, or UTF-16 when a byte-order mark says so. A null byte is binary and is refused.
+    public static func decode(_ data: Data) -> String? {
+        if data.starts(with: [0xFF, 0xFE]) { return plain(Data(data.dropFirst(2)), .utf16LittleEndian) }
+        if data.starts(with: [0xFE, 0xFF]) { return plain(Data(data.dropFirst(2)), .utf16BigEndian) }
+        guard var text=plain(data, .utf8) else { return nil }
+        if text.hasPrefix("\u{FEFF}") { text.removeFirst() }
+        return text
+    }
+    private static func plain(_ data: Data, _ encoding: String.Encoding) -> String? {
+        guard let text=String(data: data, encoding: encoding), !text.contains("\0") else { return nil }
+        return text
+    }
+}
