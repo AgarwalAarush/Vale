@@ -5,6 +5,13 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum PromptDelivery {
+    /// The question is closed only after every byte was written.
+    public static func canClose(afterWriting written: Int, of total: Int) -> Bool {
+        total > 0 && written == total
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID
