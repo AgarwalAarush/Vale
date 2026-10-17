@@ -156,6 +156,18 @@ public final class SessionStore {
     }
 }
 
+public enum ExportFile {
+    /// The save panel treats ":" as a folder separator, the same way it treats "/".
+    public static func suggestedName(for title: String) -> String {
+        let cleaned = title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = cleaned.isEmpty ? "chat" : String(cleaned.prefix(100))
+        return base + "-notes.md"
+    }
+}
+
 public enum StorageError:Error{case unreadableBackup}
 
 public enum TutorPrompt {

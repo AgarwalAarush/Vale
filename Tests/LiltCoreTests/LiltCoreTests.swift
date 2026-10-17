@@ -240,6 +240,14 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testExportNameKeepsAColonFromSplittingTheFile() {
+        XCTAssertEqual(ExportFile.suggestedName(for:"Fix: the login"),"Fix- the login-notes.md")
+        XCTAssertEqual(ExportFile.suggestedName(for:"a/b"),"a-b-notes.md")
+        XCTAssertEqual(ExportFile.suggestedName(for:"New chat"),"New chat-notes.md")
+        XCTAssertEqual(ExportFile.suggestedName(for:"  "),"chat-notes.md")
+        XCTAssertFalse(ExportFile.suggestedName(for:"Notes: a/b").contains(":"))
+        XCTAssertFalse(ExportFile.suggestedName(for:"Notes: a/b").contains("/"))
+    }
 
 }
 
@@ -276,7 +284,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Export name keeps a colon from splitting the file",tests.testExportNameKeepsAColonFromSplittingTheFile)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

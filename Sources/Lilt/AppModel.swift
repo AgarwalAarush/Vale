@@ -296,7 +296,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
     }
     func export(_ chat:LearningSession){
-        let panel=NSSavePanel();panel.allowedContentTypes=[UTType(filenameExtension:"md") ?? .plainText];panel.nameFieldStringValue="\(chat.title.replacingOccurrences(of:"/",with:"-"))-notes.md"
+        let panel=NSSavePanel();panel.allowedContentTypes=[UTType(filenameExtension:"md") ?? .plainText];panel.nameFieldStringValue=ExportFile.suggestedName(for: chat.title)
         guard panel.runModal() == .OK,let url=panel.url else{return}
         do{try SessionStore.export(chat).write(to:url,atomically:true,encoding:.utf8)}catch{self.error="Couldn’t export your chat."}
     }
