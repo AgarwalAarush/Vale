@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testReplyShowsTheAddress() {
+        XCTAssertEqual(ReplyAddress.forDisplay("See [the guide](https://example.com/guide)."), "See [the guide (https://example.com/guide)](https://example.com/guide).")
+        XCTAssertEqual(ReplyAddress.forDisplay("See [https://example.com](https://example.com)."), "See [https://example.com](https://example.com).")
+        XCTAssertEqual(ReplyAddress.forDisplay("Write [me](mailto:a@b.com)."), "Write [me (a@b.com)](mailto:a@b.com).")
+        XCTAssertEqual(ReplyAddress.forDisplay("Line one.\n[docs](https://ex.com)\n"), "Line one.\n[docs (https://ex.com)](https://ex.com)\n")
+        let fenced = "```\n[the guide](https://example.com)\n```"
+        XCTAssertEqual(ReplyAddress.forDisplay(fenced), fenced)
+        XCTAssertEqual(ReplyAddress.forDisplay("Use `[the guide](https://example.com)` here."), "Use `[the guide](https://example.com)` here.")
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Reply shows the address",tests.testReplyShowsTheAddress)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
