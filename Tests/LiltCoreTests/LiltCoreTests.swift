@@ -240,6 +240,18 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFollowUpKeepsTheWholeGuidePlan() {
+        var chat=LearningSession(title:"Install")
+        chat.guide=GuideProgress(plan:GuidePlan(title:"Install the tool",steps:["Download the package","Open the disk image","Move it to Applications"]),index:1)
+        let prompt=TutorPrompt.build(session:chat,question:"I finished the first step",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("1. Download the package"))
+        XCTAssertTrue(prompt.contains("2. Open the disk image (current)"))
+        XCTAssertTrue(prompt.contains("3. Move it to Applications"))
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        let none=TutorPrompt.build(session:LearningSession(title:"Install"),question:"Hi",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(none.contains("Current guide: None"))
+        XCTAssertFalse(SessionStore.export(chat).contains("Open the disk image"))
+    }
 
 }
 
@@ -276,7 +288,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Follow-up keeps the whole guide plan",tests.testFollowUpKeepsTheWholeGuidePlan)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
