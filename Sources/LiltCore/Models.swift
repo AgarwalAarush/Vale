@@ -114,6 +114,11 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum PausedTyping {
+    /// Pause stops the microphone and sharing. It does not hold a typed question.
+    public static func allowsQuestion(paused: Bool) -> Bool { paused || !paused }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL
