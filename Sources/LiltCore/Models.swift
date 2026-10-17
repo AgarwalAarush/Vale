@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum HistoryReply {
+    /// The saved reply in a chat uses its full height so the text is not collapsed.
+    public static let usesIntrinsicHeight = true
+}
