@@ -80,6 +80,7 @@ public struct LearningSession: Codable, Identifiable, Equatable {
     }
     public func matches(_ query:String)->Bool { let q=query.trimmingCharacters(in:.whitespacesAndNewlines); return q.isEmpty || ([title,takeaway] + messages.map(\.text) + files.map(\.name)).contains{$0.localizedCaseInsensitiveContains(q)} }
     public var contextLimited:Bool{ConversationWindow(messages:messages).limited}
+    public var showsEarlierContextNotice:Bool{EarlierContext.showsNotice(omitted:ConversationWindow(messages:messages).omitted)}
     public var remaining: Int { max(0, duration - elapsed) }
     public var timerText: String { Self.formatTime(remaining) }
     public static func formatTime(_ seconds: Int) -> String {
@@ -113,6 +114,11 @@ public struct TutorReply: Codable, Equatable {
     }
 }
 public enum CoreError: Error { case emptyReply }
+
+public enum EarlierContext {
+    /// The history note is for messages left out of the request. A long current message is still on screen.
+    public static func showsNotice(omitted: Int) -> Bool { omitted > 0 }
+}
 
 public final class SessionStore {
     public let directory: URL

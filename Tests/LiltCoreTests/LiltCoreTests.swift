@@ -209,6 +209,16 @@ final class LiltCoreTests {
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:nil)]))
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:target.bounds,opacity:0)]))
     }
+    func testEarlierContextNoticeIsNotTheCurrentMessage() {
+        XCTAssertFalse(EarlierContext.showsNotice(omitted: 0))
+        XCTAssertTrue(EarlierContext.showsNotice(omitted: 2))
+        var chat = LearningSession(title: "New chat")
+        chat.messages = [Message(role: "user", text: String(repeating: "a", count: 9_000))]
+        XCTAssertTrue(chat.contextLimited)
+        XCTAssertFalse(chat.showsEarlierContextNotice)
+        chat.messages = (0..<20).map { Message(role: "user", text: "Note \($0)") }
+        XCTAssertTrue(chat.showsEarlierContextNotice)
+    }
     func testPointVisibilityIgnoresFullyTransparentForegroundOnly(){
         let box=CGRect(x:200,y:200,width:80,height:60);let target=PointWindow(id:42,bounds:CGRect(x:100,y:100,width:400,height:300))
         XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil,opacity:0),target]))
@@ -276,7 +286,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("History note is for earlier messages",tests.testEarlierContextNoticeIsNotTheCurrentMessage)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
