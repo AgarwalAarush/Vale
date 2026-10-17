@@ -136,6 +136,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         var history=chat
         if history.messages.last?.role=="user",history.messages.last?.text==question{history.messages.removeLast()}
         let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled
+        let wantsGuide=guideRequested || GuideRequest.explicit(question)
         captureTask=Task { [weak self] in
             guard let self else{return};var snapshot:ContextSnapshot?
             do {
@@ -144,7 +145,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                 let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records) ?? FileContext()}.value
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
                 var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
-                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:guideRequested)
+                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:wantsGuide)
                 self.provider.ask(prompt:prompt,images:images,search:wantsSearch) { [weak self] result in
                     guard let self,self.requestID==id,self.activeID==chatID else{return}
                     Task{[weak self]in
@@ -160,9 +161,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             self.busy=false
                             self.updateActive{chat in
                                 chat.messages.append(Message(role:"assistant",text:reply.text,screenChanged:changed,highlightUnavailable:reply.point != nil && !changed && !canPoint));chat.updated=Date()
-                                if let plan=reply.guide,guideRequested,!changed{chat.guide=GuideProgress(plan:plan)}
+                                if let plan=reply.guide,wantsGuide,!changed{chat.guide=GuideProgress(plan:plan)}
                             }
-                            if guideRequested,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
+                            if wantsGuide,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
                             self.failedQuestion=nil
                             if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(reply.text)}
                             else if changed,(self.readAloud || spoken || self.conversation){self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
