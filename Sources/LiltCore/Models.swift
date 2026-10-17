@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ShareControl {
+    /// Before a window is chosen, the share control is a button the person can see.
+    public static let title = "Share a window"
+    public static let showsAsButton = true
+}

@@ -8,14 +8,18 @@ struct ContextStrip:View {
     var body:some View{
         VStack(alignment:.leading,spacing:7){
             HStack(spacing:8){
-                Image(systemName:model.context.hasSelection ? "record.circle" : "macwindow").font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
                 if model.context.hasSelection{
+                    Image(systemName:"record.circle").font(.system(size:12)).foregroundStyle(Theme.accent)
                     Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).help("Preview exactly what is shared")
                     Spacer(minLength:4)
                     Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
                     IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
+                }else if ShareControl.showsAsButton{
+                    Button{model.context.choose()}label:{Label(ShareControl.title,systemImage:"macwindow").font(.system(size:12,weight:.medium))}.buttonStyle(QuietButton()).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
+                    Spacer(minLength:8)
+                    Text("Optional").font(.system(size:12)).foregroundStyle(Theme.muted)
                 }else{
-                    Button("Share a window"){model.context.choose()}.buttonStyle(.plain).font(.system(size:11)).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
+                    Button(ShareControl.title){model.context.choose()}.buttonStyle(.plain).font(.system(size:11)).disabled(model.paused)
                     Spacer();Text("Optional").font(.system(size:10)).foregroundStyle(Theme.muted)
                 }
             }
