@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum PictureThumb {
+    /// The square shows the whole picture, not a cropped middle.
+    public static let wholePicture = true
+}
