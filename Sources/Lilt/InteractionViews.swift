@@ -10,7 +10,7 @@ struct ContextStrip:View {
             HStack(spacing:8){
                 Image(systemName:model.context.hasSelection ? "record.circle" : "macwindow").font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
                 if model.context.hasSelection{
-                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).help("Preview exactly what is shared")
+                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).disabled(!HeldPreview.canShow(held: model.context.preview != nil)).help(HeldPreview.canShow(held: model.context.preview != nil) ? "Preview exactly what is shared" : "No preview is held")
                     Spacer(minLength:4)
                     Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
                     IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
