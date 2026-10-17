@@ -81,6 +81,7 @@ struct DraftEditor: NSViewRepresentable {
     var cancel: () -> Void
     var pasteFiles: (([URL]) -> Void)? = nil
     var pasteImage: ((Data) -> Void)? = nil
+    var installCommit: (@escaping () -> Void) -> Void = { _ in }
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
@@ -97,6 +98,11 @@ struct DraftEditor: NSViewRepresentable {
         context.coordinator.parent = self
         guard let editor = nsView.documentView as? ComposerTextView else { return }
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
+        installCommit { [weak editor] in
+            guard let editor else { return }
+            if ComposerSubmit.commitsMarkedTextBeforeSend(hasMarkedText: editor.hasMarkedText()) { editor.unmarkText() }
+            if editor.string != context.coordinator.parent.text { context.coordinator.parent.text = editor.string }
+        }
         if editor.string != text {
             let selection = editor.selectedRange(); editor.string = text
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))

@@ -50,6 +50,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var filesRemoved:((Set<UUID>)->Void)?
     var showPreview: ((NSImage) -> Void)?
     var expandCoach:(()->Void)?
+    var commitComposer:(()->Void)?
     @Published var expanded=false
     var showFile: ((AttachmentRecord) -> Void)?
     var active: LearningSession? { sessions.first { $0.id == activeID } }
