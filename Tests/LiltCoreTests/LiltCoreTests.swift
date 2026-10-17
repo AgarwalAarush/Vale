@@ -73,6 +73,10 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testNoteTypingIsNotReplacedByTheStoredValue() {
+        XCTAssertEqual(NoteEdit.next(local:"Keep this",stored:"Keep",sameSession:true),"Keep this")
+        XCTAssertEqual(NoteEdit.next(local:"stale",stored:"Saved note",sameSession:false),"Saved note")
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +259,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Note typing is not replaced by the stored value",tests.testNoteTypingIsNotReplacedByTheStoredValue),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),

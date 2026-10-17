@@ -81,6 +81,8 @@ struct SessionDetail: View {
     let session:LearningSession
     let deleteAction:()->Void
     let renameAction:()->Void
+    @State private var note=""
+    @State private var noteID:UUID?
     var body:some View{
         ScrollView{
             VStack(alignment:.leading,spacing:22){
@@ -95,7 +97,10 @@ struct SessionDetail: View {
                 Divider().overlay(Theme.line)
                 VStack(alignment:.leading,spacing:10){
                     Text(session.mode == .learn ? "WHAT CLICKED?" : "NOTES").font(.system(size:10,weight:.medium)).tracking(1.1).foregroundStyle(Theme.muted)
-                    TextEditor(text:Binding(get:{model.sessions.first{$0.id == session.id}?.takeaway ?? ""},set:{model.setTakeaway($0,for:session.id)})).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line)).accessibilityLabel("Chat notes")
+                    TextEditor(text:$note).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line)).accessibilityLabel("Chat notes")
+                        .onAppear{note=NoteEdit.next(local:note,stored:session.takeaway,sameSession:noteID==session.id);noteID=session.id}
+                        .onChange(of:session.id){note=session.takeaway;noteID=session.id}
+                        .onChange(of:note){model.setTakeaway(note,for:session.id)}
                 }
                 if !session.messages.isEmpty{Divider().overlay(Theme.line)}
                 ForEach(session.messages){message in
