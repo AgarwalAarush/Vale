@@ -240,6 +240,14 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSignInCheckFinishes() {
+        XCTAssertFalse(SignInCheck.timedOut(elapsed: 14))
+        XCTAssertTrue(SignInCheck.timedOut(elapsed: 15))
+        XCTAssertEqual(SignInCheck.result(status: 0, output: "Logged in using ChatGPT", timedOut: false), "Signed in with ChatGPT.")
+        XCTAssertEqual(SignInCheck.result(status: 0, output: "Logged in", timedOut: false), "Codex is signed in.")
+        XCTAssertEqual(SignInCheck.result(status: 1, output: "", timedOut: false), "Not signed in. Run codex login in Terminal.")
+        XCTAssertEqual(SignInCheck.result(status: 15, output: "ChatGPT", timedOut: true), "Couldn’t check sign-in. Try again.")
+    }
 
 }
 
@@ -276,7 +284,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Sign-in check finishes",tests.testSignInCheckFinishes)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

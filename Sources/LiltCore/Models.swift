@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SignInCheck {
+    public static let limit: TimeInterval = 15
+    public static func timedOut(elapsed: TimeInterval) -> Bool { elapsed >= limit }
+    public static func result(status: Int32, output: String, timedOut: Bool) -> String {
+        if timedOut { return "Couldn’t check sign-in. Try again." }
+        if status == 0 { return output.contains("ChatGPT") ? "Signed in with ChatGPT." : "Codex is signed in." }
+        return "Not signed in. Run codex login in Terminal."
+    }
+}
