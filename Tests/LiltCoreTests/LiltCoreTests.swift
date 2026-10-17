@@ -240,6 +240,12 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testModelChoiceIgnoresSurroundingSpace() {
+        XCTAssertEqual(ModelChoice.argument("  gpt-5.4 \n"),"gpt-5.4")
+        XCTAssertEqual(ModelChoice.argument("\n  local-model"),"local-model")
+        XCTAssertNil(ModelChoice.argument("  \n"))
+        XCTAssertNil(ModelChoice.argument(""))
+    }
 
 }
 
@@ -276,7 +282,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Model choice ignores surrounding space",tests.testModelChoiceIgnoresSurroundingSpace)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
