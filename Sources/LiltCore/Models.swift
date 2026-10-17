@@ -190,3 +190,14 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum TextFileRoute {
+    /// A file named as text or code is read as text, not passed through the image importer.
+    public static func readBeforeImage(fileExtension ext: String, isTextExtension: Bool) -> Bool {
+        isTextExtension && !ext.isEmpty
+    }
+    /// A text or code file that contains a null byte is not stored.
+    public static func stored(_ text: String) -> String? {
+        text.contains("\0") ? nil : text
+    }
+}
