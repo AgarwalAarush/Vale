@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsuleTitle {
+    /// The capsule name uses the same size and weight as the coach wordmark.
+    public static let size: CGFloat = 15
+    public static let usesSemibold = true
+}
