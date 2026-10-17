@@ -109,8 +109,18 @@ private final class SearchEventProbe: @unchecked Sendable {
                 }
             }
             try process.run()
-            DispatchQueue.global(qos: .userInitiated).async {
-                try? input.fileHandleForWriting.write(contentsOf: Data(prompt.utf8)); try? input.fileHandleForWriting.close()
+            let bytes=Data(prompt.utf8)
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                do {
+                    try input.fileHandleForWriting.write(contentsOf: bytes)
+                    guard PromptDelivery.canClose(afterWriting: bytes.count, of: bytes.count) else { throw CocoaError(.fileWriteUnknown) }
+                    try input.fileHandleForWriting.close()
+                } catch {
+                    DispatchQueue.main.async {
+                        guard let self, self.process === process else { return }
+                        process.terminate()
+                    }
+                }
             }
             let timeout = DispatchWorkItem { [weak self] in
                 guard let self, self.process === process else { return }
