@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyActions {
+    /// The controls under a reply say what they do.
+    public static let read = "Read"
+    public static let copy = "Copy"
+    public static func titles() -> [String] { [read, copy] }
+}

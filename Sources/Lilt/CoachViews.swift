@@ -90,10 +90,17 @@ struct CoachView: View {
                                         HStack{Image(systemName:"arrow.clockwise");Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:10)).foregroundStyle(Theme.muted)
                                     }
                                     if message.role == "assistant" {
-                                        HStack(spacing: 8) {
-                                            IconButton(symbol: "speaker.wave.2", label: "Read this reply") { model.voice.speak(message.text) }
-                                            IconButton(symbol: "doc.on.doc", label: "Copy reply") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) }
-                                        }.padding(.leading, -7)
+                                        HStack(spacing: 16) {
+                                            Button { model.voice.speak(message.text) } label: {
+                                                Label(ReplyActions.read, systemImage: "speaker.wave.2")
+                                            }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted).help("Read this reply").accessibilityLabel("Read this reply")
+                                            Button {
+                                                NSPasteboard.general.clearContents()
+                                                NSPasteboard.general.setString(message.text, forType: .string)
+                                            } label: {
+                                                Label(ReplyActions.copy, systemImage: "doc.on.doc")
+                                            }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted).help("Copy reply").accessibilityLabel("Copy reply")
+                                        }
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(message.role == "user" ? 12 : 0)
