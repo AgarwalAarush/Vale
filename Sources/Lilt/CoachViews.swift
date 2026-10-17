@@ -110,9 +110,16 @@ struct CoachView: View {
                         if model.busy { HStack(spacing: 8) { ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 5).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
-                }.scrollIndicators(.hidden)
-                .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
-                .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
+                }.scrollIndicators(.automatic)
+                .onChange(of: model.active?.messages.count) {
+                    if TranscriptReveal.showsStartOfNewestMessage, let id = model.active?.messages.last?.id { proxy.scrollTo(id, anchor: .top) }
+                    else { proxy.scrollTo("bottom", anchor: .bottom) }
+                }
+                .onChange(of: model.busy) {
+                    if model.busy { proxy.scrollTo("thinking", anchor: .bottom) }
+                    else if TranscriptReveal.showsStartOfNewestMessage, let id = model.active?.messages.last?.id { proxy.scrollTo(id, anchor: .top) }
+                    else { proxy.scrollTo("bottom", anchor: .bottom) }
+                }
             }.frame(maxHeight: .infinity)
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
