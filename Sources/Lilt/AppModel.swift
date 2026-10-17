@@ -83,7 +83,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func showError(_ message: String, settings: Bool = false) { settingsForNextError = settings; error = message }
     func prepareChat() {
         guard active == nil else { showCoach?(); return }
-        if let recent=LaunchSelection.resumeID(in: sessions) { resume(recent.id) }
+        if let recent=LaunchSelection.target(in: sessions) { resume(recent.chatID) }
         else { newSession() }
     }
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
