@@ -190,3 +190,23 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ClipboardHTML {
+    /// Words from HTML when the clipboard has no plain text. Plain text stays on the existing paste path.
+    public static func text(html: String?, plain: String?) -> String? {
+        if let plain, !plain.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty { return nil }
+        guard let html, !html.isEmpty else { return nil }
+        var source=html
+        for pattern in ["(?is)<script\\b[^>]*>.*?</script>","(?is)<style\\b[^>]*>.*?</style>"] {
+            source=source.replacingOccurrences(of:pattern,with:" ",options:.regularExpression)
+        }
+        source=source.replacingOccurrences(of:"(?i)<br\\s*/?>",with:"\n",options:.regularExpression)
+        source=source.replacingOccurrences(of:"(?i)</p>",with:"\n",options:.regularExpression)
+        source=source.replacingOccurrences(of:"<[^>]+>",with:"",options:.regularExpression)
+        for (entity, value) in [("&amp;","&"),("&nbsp;"," "),("&lt;","<"),("&gt;",">"),("&quot;","\""),("&#39;","'")] {
+            source=source.replacingOccurrences(of:entity,with:value)
+        }
+        let joined=source.components(separatedBy:.newlines).map{$0.trimmingCharacters(in:.whitespaces)}.joined(separator:"\n").trimmingCharacters(in:.whitespacesAndNewlines)
+        return joined.isEmpty ? nil : joined
+    }
+}
