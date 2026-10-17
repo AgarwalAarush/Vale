@@ -214,6 +214,11 @@ final class LiltCoreTests {
         XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil,opacity:0),target]))
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:.zero,frontToBack:[target]))
     }
+    func testCaptureAgeShowsOnlyWhileLive() {
+        XCTAssertTrue(CaptureAge.shows(live:true,hasCapture:true))
+        XCTAssertFalse(CaptureAge.shows(live:false,hasCapture:true))
+        XCTAssertFalse(CaptureAge.shows(live:true,hasCapture:false))
+    }
     func testLaunchResumesNewestUnfinishedChat() {
         var older=LearningSession(title:"Older ask",mode:.assistant); older.updated=Date(timeIntervalSince1970:10); older.completed=false
         var newer=LearningSession(title:"Newer learn",mode:.learn); newer.updated=Date(timeIntervalSince1970:20); newer.completed=false
@@ -276,7 +281,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Capture age shows only while live",tests.testCaptureAgeShowsOnlyWhileLive)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

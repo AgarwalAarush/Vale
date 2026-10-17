@@ -67,3 +67,8 @@ public enum PointVisibility {
         return false
     }
 }
+
+/// The age is the live preview. A one-time capture is not kept, so a growing age misstates the next question.
+public enum CaptureAge {
+    public static func shows(live: Bool, hasCapture: Bool) -> Bool { live && hasCapture }
+}
