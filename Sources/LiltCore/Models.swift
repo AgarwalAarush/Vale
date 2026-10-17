@@ -190,3 +190,14 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SpeechLocale {
+    /// Language and region only. A locale suffix such as `@rg=` makes speech recognition unavailable.
+    public static func identifier(preferred: String, current: String) -> String {
+        let chosen=preferred.trimmingCharacters(in:.whitespacesAndNewlines)
+        let raw=chosen.isEmpty ? current : chosen
+        let base=raw.split(separator:"@").first.map(String.init) ?? raw
+        let normalized=base.replacingOccurrences(of:"_",with:"-")
+        return normalized.isEmpty ? "en-US" : normalized
+    }
+}

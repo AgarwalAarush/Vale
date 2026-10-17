@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import Speech
+import LiltCore
 
 @MainActor final class VoiceController:NSObject,ObservableObject,AVSpeechSynthesizerDelegate {
     @Published private(set) var listening=false
@@ -24,7 +25,7 @@ import Speech
     var failed:((String)->Void)?
     var playbackFinished:(()->Void)?
     var playbackInterrupted:(()->Void)?
-    var language:String{let value=UserDefaults.standard.string(forKey:"speechLocale") ?? "";return value.isEmpty ? Locale.current.identifier : value}
+    var language:String{SpeechLocale.identifier(preferred:UserDefaults.standard.string(forKey:"speechLocale") ?? "",current:Locale.current.identifier)}
     var silenceSeconds:Double{let value=UserDefaults.standard.double(forKey:"speechPause");return value==0 ? 2.2 : max(1.2,min(4,value))}
     override init(){super.init();synth.delegate=self}
     func start(){

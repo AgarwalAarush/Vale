@@ -240,6 +240,22 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSpeechLocaleDropsTheExtraSuffix() {
+        XCTAssertEqual(SpeechLocale.identifier(preferred:"",current:"en_US@rg=uszzzz"),"en-US")
+        XCTAssertEqual(SpeechLocale.identifier(preferred:"  ",current:"fr_FR@calendar=gregorian"),"fr-FR")
+        XCTAssertEqual(SpeechLocale.identifier(preferred:"fr_CA",current:"en_US"),"fr-CA")
+        XCTAssertEqual(SpeechLocale.identifier(preferred:"en-US",current:"de_DE"),"en-US")
+        XCTAssertEqual(SpeechLocale.identifier(preferred:"",current:""),"en-US")
+        var chat=LearningSession(title:"New chat")
+        chat.draft="secret draft"
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertFalse(chat.matches("secret"))
+        XCTAssertFalse(chat.matches("missing"))
+        let prompt=TutorPrompt.build(session:chat,question:"What is this?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("No. Return null for point."))
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +292,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Speech locale drops the extra suffix",tests.testSpeechLocaleDropsTheExtraSuffix)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
