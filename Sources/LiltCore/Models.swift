@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum HistoryMark {
+    /// The control that opens chats uses a conversation mark, not a stack of windows.
+    public static let symbol = "bubble.left.and.bubble.right"
+    public static let label = "Chat history"
+}
