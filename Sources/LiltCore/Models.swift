@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum PdfText {
+    /// Page bodies are readable text when they contain letters or digits.
+    /// Empty scans and a stray mark stay under the per-page minimum and are sent as images.
+    public static func hasReadableText(pageBodies:[String])->Bool {
+        guard !pageBodies.isEmpty else { return false }
+        let visible=pageBodies.joined().filter{$0.isLetter || $0.isNumber}.count
+        return visible > pageBodies.count * 2
+    }
+}
