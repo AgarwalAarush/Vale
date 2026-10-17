@@ -137,7 +137,15 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if history.messages.last?.role=="user",history.messages.last?.text==question{history.messages.removeLast()}
         let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled
         captureTask=Task { [weak self] in
-            guard let self else{return};var snapshot:ContextSnapshot?
+            guard let self else{return}
+            var handedOff=false
+            defer {
+                if QuestionSend.shouldClearWaiting(request:id, current:self.requestID, handedOff:handedOff) {
+                    self.busy=false
+                    if self.error==nil { self.error="That question didn’t go out. It’s saved; try again." }
+                }
+            }
+            var snapshot:ContextSnapshot?
             do {
                 if self.context.hasSelection {snapshot=try await self.context.capture()}
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
@@ -176,7 +184,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                         }
                     }
                 }
-
+                handedOff=true
             } catch {
                 guard self.requestID==id else{return};self.busy=false
                 self.conversation=false
