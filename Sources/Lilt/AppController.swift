@@ -22,6 +22,8 @@ final class FloatingPanel: NSPanel {
     private var auxiliary: [NSWindow] = []
     private var contextPreviews:[NSWindow]=[]
     private var filePreviews:[ObjectIdentifier:UUID]=[:]
+    private var statusMenu: NSMenu?
+    private var showingStatusMenu = false
     private var testing = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -119,12 +121,16 @@ final class FloatingPanel: NSPanel {
         NSApp.mainMenu = main
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vale")
-        statusItem.button?.toolTip = "Vale · Control–Option–Space"
+        statusItem.button?.toolTip = "Vale · click to type · Control–Option–Space"
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(statusItemClicked)
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         let menu = NSMenu()
         for (title, action) in [("Open assistant", #selector(menuCoach)), ("Chat history", #selector(menuLibrary)), ("Pause chat", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item)
         }
-        menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit); statusItem.menu = menu
+        menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit)
+        statusMenu = menu
     }
     private func registerHotKey() {
         var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -190,12 +196,30 @@ final class FloatingPanel: NSPanel {
     @objc func systemSuspend() { model.suspend() }
     @objc private func menuNew() { model.newSession() }
     @objc private func menuUpdates() { model.updates.check() }
-    func validateMenuItem(_ item:NSMenuItem)->Bool { item.action == #selector(menuUpdates) ? model.updates.canCheck : true }
+    func validateMenuItem(_ item:NSMenuItem)->Bool {
+        if item.action == #selector(menuUpdates) { return model.updates.canCheck }
+        if item.action == #selector(menuPause) { item.title = model.paused && model.active != nil ? "Resume" : "Pause chat"; return model.active != nil }
+        return true
+    }
+    @objc private func statusItemClicked() {
+        let event = NSApp.currentEvent
+        let wantsMenu = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
+        if wantsMenu, !showingStatusMenu, let menu = statusMenu, let button = statusItem.button {
+            showingStatusMenu = true
+            statusItem.menu = menu
+            button.performClick(nil)
+            statusItem.menu = nil
+            showingStatusMenu = false
+            return
+        }
+        if showingStatusMenu { return }
+        openCoach()
+    }
     @objc private func menuCoach() { openCoach() }
     @objc private func menuLibrary() { openLibrary() }
     @objc private func menuPause() { if model.active != nil { model.togglePause() } }
     @objc private func menuSettings() { model.settings = true; openLibrary() }
     @objc private func menuQuit() { NSApp.terminate(nil) }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { openLibrary(); return true }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { openCoach(); return true }
     func applicationWillTerminate(_ notification: Notification) { model.suspend(); if let hotKey { UnregisterEventHotKey(hotKey) }; if let monitor { NSEvent.removeMonitor(monitor) } }
 }
