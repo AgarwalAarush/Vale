@@ -209,6 +209,10 @@ final class LiltCoreTests {
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:nil)]))
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:target.bounds,opacity:0)]))
     }
+    func testPauseDoesNotHoldATypedQuestion() {
+        XCTAssertTrue(PausedTyping.allowsQuestion(paused: true))
+        XCTAssertTrue(PausedTyping.allowsQuestion(paused: false))
+    }
     func testPointVisibilityIgnoresFullyTransparentForegroundOnly(){
         let box=CGRect(x:200,y:200,width:80,height:60);let target=PointWindow(id:42,bounds:CGRect(x:100,y:100,width:400,height:300))
         XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil,opacity:0),target]))
@@ -276,7 +280,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Pause does not hold a typed question",tests.testPauseDoesNotHoldATypedQuestion)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

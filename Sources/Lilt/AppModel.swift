@@ -123,7 +123,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if question.isEmpty && !chat.pendingAttachments.isEmpty {question="Help me understand these attachments."}
         guard !question.isEmpty else{return}
         guard !importing else{error="Wait for your files to finish attaching.";return}
-        guard !paused else{error="Resume the chat before sending a message.";return}
+        if paused, !PausedTyping.allowsQuestion(paused: paused) { error="Resume the chat before sending a message."; return }
         guard question.count<=32_000 else{error="That message is too long. Attach it as a text file or send a smaller excerpt.";return}
         cancel();voice.stopListening();error=nil;busy=true
         let id=UUID();requestID=id;let chatID=chat.id
