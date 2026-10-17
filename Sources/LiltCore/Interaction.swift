@@ -1,6 +1,17 @@
 import Foundation
 import CoreGraphics
 
+/// The shared-window label. Prefer the window the person picked over the app name.
+public enum SharedWindowLabel {
+    public static func text(windowTitle: String?, applicationName: String?) -> String {
+        let title = windowTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !title.isEmpty { return String(title.prefix(120)) }
+        let app = applicationName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !app.isEmpty { return "\(app) window" }
+        return "Selected window"
+    }
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]

@@ -73,6 +73,13 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testSharedWindowLabelUsesThePickedTitle() {
+        XCTAssertEqual(SharedWindowLabel.text(windowTitle: "Notes — Plan", applicationName: "Notes"), "Notes — Plan")
+        XCTAssertEqual(SharedWindowLabel.text(windowTitle: "   ", applicationName: "Safari"), "Safari window")
+        XCTAssertEqual(SharedWindowLabel.text(windowTitle: nil, applicationName: nil), "Selected window")
+        XCTAssertEqual(SharedWindowLabel.text(windowTitle: nil, applicationName: "  "), "Selected window")
+        XCTAssertEqual(SharedWindowLabel.text(windowTitle: String(repeating: "A", count: 200), applicationName: "X").count, 120)
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +262,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Shared window label uses the picked title",tests.testSharedWindowLabelUsesThePickedTitle),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
