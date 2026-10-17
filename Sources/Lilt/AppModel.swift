@@ -127,12 +127,24 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard question.count<=32_000 else{error="That message is too long. Attach it as a text file or send a smaller excerpt.";return}
         cancel();voice.stopListening();error=nil;busy=true
         let id=UUID();requestID=id;let chatID=chat.id
+        let previousTitle=chat.title
+        let typed=draft
         if !retry {
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
             if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
             replace(chat);draft=""
         }
-        failedQuestion=question;persist()
+        failedQuestion=question
+        guard persist() else {
+            if !retry {
+                let restored=SendSave.restore(previousTitle:previousTitle, messages:active?.messages ?? [], pending:active?.pendingAttachments ?? [], question:question, draft:typed)
+                updateActive{$0.title=restored.title;$0.messages=restored.messages;$0.pendingAttachments=restored.pending}
+                draft=restored.draft
+                failedQuestion=nil
+            }
+            busy=false
+            return
+        }
         var history=chat
         if history.messages.last?.role=="user",history.messages.last?.text==question{history.messages.removeLast()}
         let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled
@@ -303,5 +315,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func updateActive(_ change:(inout LearningSession)->Void){guard let i=sessions.firstIndex(where:{$0.id==activeID})else{return};change(&sessions[i])}
     private func replace(_ chat:LearningSession){if let i=sessions.firstIndex(where:{$0.id==chat.id}){sessions[i]=chat}}
     private func scheduleSave(){saveWork?.cancel();let work=DispatchWorkItem{[weak self]in self?.persist()};saveWork=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.5,execute:work)}
-    func persist(){do{sessions.sort{$0.updated>$1.updated};try store?.save(sessions)}catch{self.error="Couldn’t save your chat. Check available disk space."}}
+    @discardableResult func persist()->Bool {
+        sessions.sort{$0.updated>$1.updated}
+        guard let store else { self.error="The chat library is unavailable. Restore the library folder before starting."; return false }
+        do { try store.save(sessions); return true }
+        catch { self.error="Couldn’t save your chat. Check available disk space."; return false }
+    }
 }
