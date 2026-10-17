@@ -190,3 +190,14 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsuleSpeech {
+    /// While the reply is spoken, the capsule says so. A named chat keeps its name when it is quiet.
+    public static func label(title: String?, busy: Bool, speaking: Bool) -> String {
+        if speaking { return "Speaking…" }
+        if busy { return "Thinking…" }
+        let name = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if name.isEmpty || name == "New chat" { return "Vale" }
+        return name
+    }
+}
