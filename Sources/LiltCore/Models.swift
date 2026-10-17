@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum PdfChip {
+    /// The chip says it is a PDF, not only a page count.
+    public static func detail(pages: Int) -> String {
+        "PDF · \(pages) \(pages == 1 ? "page" : "pages")"
+    }
+}
