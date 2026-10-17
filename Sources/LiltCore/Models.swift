@@ -190,3 +190,17 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsuleSeat {
+    /// The capsule sits on the coach so the two windows read as one companion.
+    public static let onTheCoach = true
+    public static let gap: CGFloat = 8
+
+    /// AppKit y of the capsule. A screen that cannot fit the stack keeps the capsule at the top.
+    public static func y(coachMaxY: CGFloat, capsuleHeight: CGFloat, visibleMaxY: CGFloat) -> CGFloat {
+        let atTheTop = visibleMaxY - 20 - capsuleHeight
+        let onCoach = coachMaxY + gap
+        guard onTheCoach, onCoach + capsuleHeight <= visibleMaxY - 20 else { return atTheTop }
+        return onCoach
+    }
+}

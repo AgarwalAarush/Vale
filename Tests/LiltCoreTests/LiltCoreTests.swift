@@ -240,6 +240,20 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testCapsuleSitsOnTheCoach() {
+        XCTAssertTrue(CapsuleSeat.onTheCoach)
+        XCTAssertEqual(CapsuleSeat.gap, 8)
+        let seated = CapsuleSeat.y(coachMaxY: 24 + 480, capsuleHeight: 62, visibleMaxY: 900)
+        XCTAssertEqual(seated, 24 + 480 + 8)
+        let grown = CapsuleSeat.y(coachMaxY: 24 + 700, capsuleHeight: 62, visibleMaxY: 900)
+        XCTAssertEqual(grown, 24 + 700 + 8)
+        let tight = CapsuleSeat.y(coachMaxY: 24 + 480, capsuleHeight: 62, visibleMaxY: 500)
+        XCTAssertEqual(tight, 500 - 82)
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +290,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Capsule sits on the coach",tests.testCapsuleSitsOnTheCoach)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

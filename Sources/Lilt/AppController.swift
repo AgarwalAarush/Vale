@@ -54,10 +54,11 @@ final class FloatingPanel: NSPanel {
         let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         capsule = makePanel(size: NSSize(width: 430, height: 62))
         capsule.contentView = NSHostingView(rootView: CapsuleView(model: model, openCoach: { [weak self] in self?.openCoach() }))
-        capsule.setFrameOrigin(NSPoint(x: visible.maxX - 450, y: visible.maxY - 82))
         coach = makePanel(size: NSSize(width: 410, height: 480))
         let coachHost=NSHostingView(rootView:CoachView(model:model,close:{[weak self]in self?.coach.orderOut(nil)}));coachHost.sizingOptions=[];coachHost.autoresizingMask=[.width,.height];coach.contentView=coachHost;coach.setContentSize(NSSize(width:410,height:480))
-        coach.setFrameOrigin(NSPoint(x: visible.maxX - 430, y: visible.minY + 24))
+        let coachOrigin = NSPoint(x: visible.maxX - 430, y: visible.minY + 24)
+        coach.setFrameOrigin(coachOrigin)
+        capsule.setFrameOrigin(NSPoint(x: visible.maxX - 450, y: CapsuleSeat.y(coachMaxY: coachOrigin.y + 480, capsuleHeight: 62, visibleMaxY: visible.maxY)))
         library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         library.title = "Vale"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
         library.backgroundColor = NSColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1); library.appearance = NSAppearance(named: .darkAqua)
@@ -100,6 +101,7 @@ final class FloatingPanel: NSPanel {
         let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
         let origin=NSPoint(x:max(visible.minX+16,min(coach.frame.maxX-size.width,visible.maxX-size.width-16)),y:max(visible.minY+20,min(coach.frame.minY,visible.maxY-size.height-20)))
         coach.setFrame(NSRect(origin:origin,size:size),display:true,animate:true)
+        capsule.setFrameOrigin(NSPoint(x: capsule.frame.origin.x, y: CapsuleSeat.y(coachMaxY: origin.y + size.height, capsuleHeight: capsule.frame.height, visibleMaxY: visible.maxY)))
     }
     private func setupMenu() {
         let main = NSMenu()
