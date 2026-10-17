@@ -63,10 +63,16 @@ final class ComposerTextView: NSTextView {
     var escape: (() -> Void)?
     var pasteFiles: (([URL]) -> Void)?
     var pasteImage: ((Data) -> Void)?
+    var pastePDF: ((Data) -> Void)?
     override func paste(_ sender: Any?) {
         let board=NSPasteboard.general
-        if let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL], !urls.isEmpty,let pasteFiles {pasteFiles(urls);return}
-        if let data=board.data(forType:.png) ?? board.data(forType:.tiff),let pasteImage {pasteImage(data);return}
+        let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL]
+        let hasFile=urls?.isEmpty==false
+        if hasFile,let urls,let pasteFiles {pasteFiles(urls);return}
+        let image=board.data(forType:.png) ?? board.data(forType:.tiff)
+        if let image,let pasteImage {pasteImage(image);return}
+        let pdf=board.data(forType:NSPasteboard.PasteboardType("com.adobe.pdf"))
+        if PasteChoice.usePDF(hasFile:hasFile,hasImage:image != nil,hasPDF:pdf != nil),let pdf,let pastePDF {pastePDF(pdf);return}
         super.paste(sender)
     }
     override func keyDown(with event: NSEvent) {
@@ -81,6 +87,7 @@ struct DraftEditor: NSViewRepresentable {
     var cancel: () -> Void
     var pasteFiles: (([URL]) -> Void)? = nil
     var pasteImage: ((Data) -> Void)? = nil
+    var pastePDF: ((Data) -> Void)? = nil
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
@@ -90,13 +97,13 @@ struct DraftEditor: NSViewRepresentable {
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
         editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false; editor.isAutomaticTextReplacementEnabled = false
         editor.delegate = context.coordinator; editor.identifier = NSUserInterfaceItemIdentifier("lilt.composer")
-        editor.setAccessibilityLabel("Message Lilt"); editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
+        editor.setAccessibilityLabel("Message Lilt"); editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         scroll.documentView = editor; return scroll
     }
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let editor = nsView.documentView as? ComposerTextView else { return }
-        editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
+        editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         if editor.string != text {
             let selection = editor.selectedRange(); editor.string = text
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))

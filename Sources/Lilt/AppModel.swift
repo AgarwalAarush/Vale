@@ -259,6 +259,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard (active?.files.count ?? 0)<8 else{error="Attach up to 8 files in a chat.";return}
         do{let record=try files.importData(data,name:"Pasted image.png",fileExtension:"png");updateActive{$0.pendingAttachments.append(record)};persist()}catch{self.error=error.localizedDescription}
     }
+    func pastePDF(_ data:Data){
+        guard let files=fileStore,active != nil else{return}
+        guard (active?.files.count ?? 0)<8 else{error="Attach up to 8 files in a chat.";return}
+        do{let record=try files.importData(data,name:"Pasted.pdf",fileExtension:"pdf");updateActive{$0.pendingAttachments.append(record)};persist()}catch{self.error=error.localizedDescription}
+    }
     private func removeReferences(_ ids:Set<UUID>,from id:UUID){
         guard let index=sessions.firstIndex(where:{$0.id==id}) else{return}
         sessions[index].pendingAttachments.removeAll{ids.contains($0.id)}

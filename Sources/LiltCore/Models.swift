@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum PasteChoice {
+    /// PDF bytes are kept only when the paste is not already a file or an image.
+    public static func usePDF(hasFile: Bool, hasImage: Bool, hasPDF: Bool) -> Bool {
+        !hasFile && !hasImage && hasPDF
+    }
+}
