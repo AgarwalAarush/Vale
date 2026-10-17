@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import Speech
+import LiltCore
 
 @MainActor final class VoiceController:NSObject,ObservableObject,AVSpeechSynthesizerDelegate {
     @Published private(set) var listening=false
@@ -50,8 +51,10 @@ import Speech
         self.recognizer=recognizer
         let request=SFSpeechAudioBufferRecognitionRequest();request.shouldReportPartialResults=true;request.requiresOnDeviceRecognition=recognizer.supportsOnDeviceRecognition
         self.request=request;finalText="";let id=UUID();generation=id
-        let node=engine.inputNode;let format=node.outputFormat(forBus:0)
-        guard format.sampleRate>0,format.channelCount>0 else{failed?("No microphone is available. You can still type.");return}
+        let node=engine.inputNode
+        do{try engine.prepare()}catch{stopListening();failed?("Couldn’t start the microphone. You can still type.");return}
+        let format=node.outputFormat(forBus:0)
+        guard MicFormat.canUse(sampleRate:format.sampleRate,channels:Int(format.channelCount)) else{stopListening();failed?("No microphone is available. You can still type.");return}
         node.installTap(onBus:0,bufferSize:1024,format:format){buffer,_ in request.append(buffer)};hasTap=true
         recognition=recognizer.recognitionTask(with:request){result,error in DispatchQueue.main.async{
             guard self.generation==id,self.listening else{return}
@@ -62,7 +65,7 @@ import Speech
                 if result.isFinal{self.finishUtterance()}
             }else if error != nil{self.stopListening();self.failed?("Dictation stopped. Your draft is preserved; send it or try again.")}
         }}
-        do{engine.prepare();try engine.start();listening=true}catch{stopListening();failed?("Couldn’t start the microphone. You can still type.")}
+        do{try engine.start();listening=true}catch{stopListening();failed?("Couldn’t start the microphone. You can still type.")}
     }
     func finishUtterance(){
         guard listening else{return};let text=finalText.trimmingCharacters(in:.whitespacesAndNewlines);stopListening()
