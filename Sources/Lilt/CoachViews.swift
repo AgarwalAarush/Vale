@@ -135,7 +135,7 @@ struct CoachView: View {
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text("Ask quietly…").font(.system(size: 14)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.top, 6).padding(.leading, 7).allowsHitTesting(false) }
-                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
+                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{model.importDroppedFiles($0)}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
                 }
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
@@ -156,7 +156,7 @@ struct CoachView: View {
                 Button{model.setConversation(!model.conversation)}label:{Label(model.conversation ? "End conversation" : "Conversation",systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 14)
         }.modifier(GlassSurface(radius: 20))
-            .dropDestination(for:URL.self){urls,_ in Task{await model.importFiles(urls)};return urls.contains(where:{$0.isFileURL})}
+            .dropDestination(for:URL.self){urls,_ in model.importDroppedFiles(urls);return urls.contains(where:{$0.isFileURL})}
             .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}
