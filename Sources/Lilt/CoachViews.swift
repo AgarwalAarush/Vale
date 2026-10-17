@@ -55,7 +55,9 @@ struct CoachView: View {
                 IconButton(symbol: "xmark", label: "Collapse coach", action: close)
             }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11)
             ContextStrip(model:model)
-            if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
+            if let warning = ShortcutNotice.text(model.shortcutWarning) {
+                Text(warning).font(.system(size: 12)).foregroundStyle(Color.orange).fixedSize(horizontal: false, vertical: true).padding(11).frame(maxWidth: .infinity, alignment: .leading).background(Color.orange.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 9)).padding(.horizontal, 18).padding(.top, 8)
+            }
             if model.active?.contextLimited == true{
                 HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
             }
