@@ -67,3 +67,33 @@ public enum PointVisibility {
         return false
     }
 }
+
+public struct SharedWindowSelection: Equatable, Sendable {
+    public var id: UInt32
+    public var title: String
+    public var live: Bool
+    public init(id: UInt32, title: String, live: Bool) {
+        self.id=id; self.title=title; self.live=live
+    }
+}
+
+public enum SharingPickerOutcome: Equatable, Sendable {
+    case cancelled
+    case failedToOpen
+    case chose(SharedWindowSelection)
+}
+
+/// The picker can be cancelled. The window already chosen stays until a new one is picked.
+public enum SharingPicker {
+    public static func selection(after outcome: SharingPickerOutcome, keeping current: SharedWindowSelection?) -> SharedWindowSelection? {
+        switch outcome {
+        case .cancelled, .failedToOpen: return current
+        case .chose(let chosen): return chosen
+        }
+    }
+    public static func failureMessage(keeping selection: SharedWindowSelection?) -> String {
+        selection == nil
+            ? "Couldn’t open window sharing. Keep typing or attach an image."
+            : "Couldn’t open window sharing. The window you already chose is still shared."
+    }
+}

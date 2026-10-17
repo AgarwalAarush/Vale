@@ -221,6 +221,16 @@ final class LiltCoreTests {
         XCTAssertEqual(LaunchSelection.resumeID(in:[done,newer,older]),newer.id)
         XCTAssertNil(LaunchSelection.resumeID(in:[done]))
     }
+    func testPickerCancelKeepsTheSelectedWindow() {
+        let current=SharedWindowSelection(id:7,title:"Notes window",live:true)
+        let replacement=SharedWindowSelection(id:8,title:"Browser window",live:false)
+        XCTAssertEqual(SharingPicker.selection(after:.cancelled,keeping:current),current)
+        XCTAssertEqual(SharingPicker.selection(after:.failedToOpen,keeping:current),current)
+        XCTAssertNil(SharingPicker.selection(after:.cancelled,keeping:nil))
+        XCTAssertEqual(SharingPicker.selection(after:.chose(replacement),keeping:current),replacement)
+        XCTAssertEqual(SharingPicker.failureMessage(keeping:nil),"Couldn’t open window sharing. Keep typing or attach an image.")
+        XCTAssertEqual(SharingPicker.failureMessage(keeping:current),"Couldn’t open window sharing. The window you already chose is still shared.")
+    }
     func testCodexLookupIncludesUserInstallAndParsesShellPath() {
         let home=URL(fileURLWithPath:"/Users/vale",isDirectory:true)
         let paths=CodexLocator.candidatePaths(home:home,customPath:" /custom/codex ",environmentPath:"/usr/bin:/Users/vale/.local/bin")
@@ -262,6 +272,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
+ ("Picker cancel keeps the selected window",tests.testPickerCancelKeepsTheSelectedWindow),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
