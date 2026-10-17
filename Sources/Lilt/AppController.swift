@@ -48,7 +48,7 @@ final class FloatingPanel: NSPanel {
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(systemSuspend), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
         model.expandCoach = { [weak self] in self?.toggleCoachSize() }
         model.showFile = { [weak self] record in self?.previewFile(record) }
-        if testing { Task { await runHarness() } } else { model.prepareChat() }
+        if testing { Task { await runHarness() } } else { model.prepareChat(); if model.active == nil { openCoach() } }
     }
     private func setupWindows() {
         let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -82,7 +82,8 @@ final class FloatingPanel: NSPanel {
         return panel
     }
     func openCoach() {
-        guard model.active != nil else { model.prepareChat(); return }
+        if model.active == nil { model.prepareChat() }
+        guard LaunchPresentation.presentsCoach(hasActiveChat: model.active != nil, hasError: model.error != nil) else { return }
         library?.orderOut(nil)
         capsule.orderFrontRegardless(); coach.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
