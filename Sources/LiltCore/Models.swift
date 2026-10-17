@@ -190,3 +190,16 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyClock {
+    /// A reply shows when it arrived. The question does not.
+    public static func shows(on role: String) -> Bool { role == "assistant" }
+    public static func label(for date: Date, now: Date, calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = calendar.isDate(date, inSameDayAs: now) ? "h:mm a" : "MMM d, h:mm a"
+        return formatter.string(from: date)
+    }
+}
