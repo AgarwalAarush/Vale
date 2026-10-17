@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsulePause {
+    /// Pause is in the capsule menu, not the loud control on the face.
+    public static let inTheMenu = true
+    public static func title(paused: Bool) -> String { paused ? "Resume" : "Pause" }
+}

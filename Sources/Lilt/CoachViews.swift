@@ -15,10 +15,13 @@ struct CapsuleView: View {
             }.buttonStyle(.plain).help("Type a question")
             Spacer(minLength: 0)
             IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.ink) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
-            Button { model.togglePause() } label: { Label(model.paused ? "Resume" : "Pause", systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)
+            if !CapsulePause.inTheMenu {
+                Button { model.togglePause() } label: { Label(CapsulePause.title(paused: model.paused), systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)
+            }
             Menu {
                 Button("Open coach", action: openCoach)
                 Button("Chat history") { model.showLibrary?() }
+                if CapsulePause.inTheMenu { Button(CapsulePause.title(paused: model.paused)) { model.togglePause() }.disabled(model.active == nil) }
                 if model.active != nil { Button("Close chat") { model.complete() } }
                 Divider()
                 Button("Settings…") { model.settings = true; model.showLibrary?() }
