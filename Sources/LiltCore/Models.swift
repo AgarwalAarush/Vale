@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyTurn {
+    /// The answer is its own turn. The question keeps its box.
+    public static let ruleWidth: CGFloat = 3
+    public static let inset: CGFloat = 11
+    public static func ruled(_ role: String) -> Bool { role == "assistant" }
+}

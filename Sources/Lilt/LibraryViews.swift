@@ -103,6 +103,8 @@ struct SessionDetail: View {
                         Text(message.role == "user" ? "YOU" : "LILT").font(.system(size:10,weight:.medium)).tracking(1).foregroundStyle(Theme.muted)
                         Text(.init(message.text)).font(.system(size:14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading)
                     }.padding(.vertical,5)
+                        .padding(.leading, ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0)
+                        .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { Capsule().fill(Theme.accent).frame(width: ReplyTurn.ruleWidth) } }
                 }
             }.padding(.horizontal,42).padding(.top,54).padding(.bottom,40)
         }.scrollIndicators(.hidden)

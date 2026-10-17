@@ -97,8 +97,10 @@ struct CoachView: View {
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(message.role == "user" ? 12 : 0)
+                                    .padding(.leading, ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0)
                                     .background(message.role == "user" ? Color.white.opacity(0.035) : .clear)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { Capsule().fill(Theme.accent).frame(width: ReplyTurn.ruleWidth) } }
                                     .id(message.id)
                             }
                         } else {
