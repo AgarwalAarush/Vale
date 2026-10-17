@@ -240,6 +240,20 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testReplyShowsWhenItArrived() {
+        XCTAssertTrue(ReplyClock.shows(on: "assistant"))
+        XCTAssertFalse(ReplyClock.shows(on: "user"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 17, hour: 20, minute: 5))!
+        XCTAssertEqual(ReplyClock.label(for: now, now: now, calendar: calendar), "8:05 PM")
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)!
+        XCTAssertEqual(ReplyClock.label(for: yesterday, now: now, calendar: calendar), "Oct 16, 8:05 PM")
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +290,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("A reply shows when it arrived",tests.testReplyShowsWhenItArrived)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
