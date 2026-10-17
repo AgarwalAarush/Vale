@@ -240,7 +240,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         Task{await importFiles(urls)}
     }
     func importFiles(_ urls:[URL]) async {
-        guard !importing,let chatID=activeID,let files=fileStore else{return}
+        if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: activeID != nil, importing: importing) { error = refusal; return }
+        guard let chatID=activeID,let files=fileStore else{return}
         let valid=urls.filter(\.isFileURL)
         guard (active?.files.count ?? 0)+valid.count<=8 else{error="Attach up to 8 files in a chat. Remove a file or start a new chat.";return}
         importing=true;defer{importing=false}
@@ -255,7 +256,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         persist()
     }
     func pasteImage(_ data:Data){
-        guard let files=fileStore,active != nil else{return}
+        if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: active != nil, importing: importing) { error = refusal; return }
+        guard let files=fileStore else{return}
         guard (active?.files.count ?? 0)<8 else{error="Attach up to 8 files in a chat.";return}
         do{let record=try files.importData(data,name:"Pasted image.png",fileExtension:"png");updateActive{$0.pendingAttachments.append(record)};persist()}catch{self.error=error.localizedDescription}
     }
