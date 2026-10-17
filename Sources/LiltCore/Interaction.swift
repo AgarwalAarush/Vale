@@ -1,6 +1,13 @@
 import Foundation
 import CoreGraphics
 
+/// Retry stays available after the error text is dismissed.
+public enum ReplyRetry {
+    public static func isAvailable(busy: Bool, hasFailedQuestion: Bool, lastRole: String?) -> Bool {
+        !busy && hasFailedQuestion && lastRole == "user"
+    }
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]

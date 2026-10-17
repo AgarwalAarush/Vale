@@ -39,6 +39,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var loading = false
     private var observerTokens: [AnyCancellable] = []
     private var failedQuestion: String?
+    var canRetry: Bool { ReplyRetry.isAvailable(busy: busy, hasFailedQuestion: failedQuestion != nil, lastRole: active?.messages.last?.role) }
     private var spokenDraftPrefix = ""
     private var conversationTask:Task<Void,Never>?
     @Published var shortcutWarning:String?
