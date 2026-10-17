@@ -135,7 +135,11 @@ struct CoachView: View {
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text("Ask quietly…").font(.system(size: 14)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.top, 6).padding(.leading, 7).allowsHitTesting(false) }
-                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
+                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: {
+                        if ComposerReturn.sends(whileWaiting: model.busy) {
+                            model.send()
+                        }
+                    }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
                 }
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
