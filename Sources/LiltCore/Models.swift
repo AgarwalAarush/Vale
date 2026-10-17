@@ -104,7 +104,11 @@ public struct TutorReply: Codable, Equatable {
     public init(text: String, point: PointTarget? = nil,guide:GuidePlan?=nil) { self.text=text; self.point=point;self.guide=guide }
     private enum CodingKeys:String,CodingKey{case text,point,guide}
     public init(from decoder:Decoder)throws{
-        let c=try decoder.container(keyedBy:CodingKeys.self);text=try c.decode(String.self,forKey:.text);point=try c.decodeIfPresent(PointTarget.self,forKey:.point);guide=try c.decodeIfPresent(GuidePlan.self,forKey:.guide)
+        let c=try decoder.container(keyedBy:CodingKeys.self)
+        text=try c.decode(String.self,forKey:.text)
+        // A malformed optional field must not discard the answer text.
+        point=(try? c.decodeIfPresent(PointTarget.self,forKey:.point)) ?? nil
+        guide=(try? c.decodeIfPresent(GuidePlan.self,forKey:.guide)) ?? nil
     }
     public static func decode(_ data: Data) throws -> TutorReply {
         let reply = try JSONDecoder().decode(TutorReply.self, from: data)

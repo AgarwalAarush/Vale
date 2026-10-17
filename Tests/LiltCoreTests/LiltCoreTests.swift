@@ -173,6 +173,12 @@ final class LiltCoreTests {
         try XCTAssertNil(TutorReply.decode(JSONEncoder().encode(invalid)).guide)
         try XCTAssertNil(TutorReply.decode(Data(#"{"text":"Old reply","point":null}"#.utf8)).guide)
     }
+    func testReplyTextSurvivesAMalformedOptionalField()throws{
+        let kept=try TutorReply.decode(Data(#"{"text":"Use the menu.","point":"nope","guide":{"title":1}}"#.utf8))
+        XCTAssertEqual(kept.text,"Use the menu.")
+        XCTAssertNil(kept.point)
+        XCTAssertNil(kept.guide)
+    }
     func testGuideProgressClampsPersistedIndex()throws{
         let plan=GuidePlan(title:"Plan",steps:["One","Two"])
         let data=try JSONEncoder().encode(GuideProgress(plan:plan,index:99));let result=try JSONDecoder().decode(GuideProgress.self,from:data)
@@ -269,6 +275,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Visible conversation limit",tests.testConversationLimitIsExplicit),
  ("Bounded message excerpts",tests.testConversationExcerptsHaveBoundedBudget),
  ("Guide validation and legacy replies",tests.testGuideValidationAndLegacyReplyCompatibility),
+ ("Reply text survives a malformed optional field",tests.testReplyTextSurvivesAMalformedOptionalField),
  ("Guide progress bounds",tests.testGuideProgressClampsPersistedIndex),
  ("Reject changed screen scope and pixels",tests.testScreenEvidenceRejectsChangedScopeAndPixels),
  ("Reject stale or moved screen geometry",tests.testScreenEvidenceRejectsStaleMovedOrUnknownGeometry),
