@@ -67,3 +67,12 @@ public enum PointVisibility {
         return false
     }
 }
+
+public enum CaptureSize {
+    /// A capture pixel size must be a positive even number. An odd size is refused and the window never arrives.
+    public static func even(_ length: Double) -> Int {
+        guard length.isFinite, length > 0 else { return 2 }
+        let raw = max(2, Int(length))
+        return raw.isMultiple(of: 2) ? raw : raw - 1
+    }
+}

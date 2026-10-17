@@ -105,7 +105,7 @@ struct ContextSnapshot {
                 guard let filter else{throw AppError("Choose a window to share first.")}
                 let rect=filter.contentRect;guard rect.width>1,rect.height>1 else{throw AppError("The selected window is unavailable.")}
                 let config=SCStreamConfiguration();let scale=min(2.0,1600.0/max(rect.width,rect.height))
-                config.width=max(2,Int(rect.width*scale));config.height=max(2,Int(rect.height*scale));config.showsCursor=false;config.ignoreShadowsSingleWindow=true
+                config.width=CaptureSize.even(rect.width*scale);config.height=CaptureSize.even(rect.height*scale);config.showsCursor=false;config.ignoreShadowsSingleWindow=true
                 let image=try await SCScreenshotManager.captureImage(contentFilter:filter,configuration:config)
                 guard let data=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else{throw AppError("Couldn’t read the selected window.")}
                 result=ContextSnapshot(data:data,image:NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height)),windowID:selectedID,frame:self.currentFrame(),generation:expected,capturedAt:Date())
