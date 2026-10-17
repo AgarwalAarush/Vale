@@ -190,3 +190,15 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum AssistantPath {
+    public static let locked = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    /// The folder of the program already found, then the locked system folders.
+    public static func value(executable: String, locked: String = AssistantPath.locked) -> String {
+        guard executable.hasPrefix("/"), !executable.contains(":"), !executable.contains("\0"), !executable.contains("\n") else { return locked }
+        let directory = URL(fileURLWithPath: executable).deletingLastPathComponent().path
+        let folders = locked.split(separator: ":").map(String.init)
+        guard directory.hasPrefix("/"), directory != "/", !folders.contains(directory) else { return locked }
+        return directory + ":" + locked
+    }
+}
