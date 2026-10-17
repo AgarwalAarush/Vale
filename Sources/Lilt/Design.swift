@@ -69,6 +69,22 @@ final class ComposerTextView: NSTextView {
         if let data=board.data(forType:.png) ?? board.data(forType:.tiff),let pasteImage {pasteImage(data);return}
         super.paste(sender)
     }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        FieldDrop.attaches(fileURLs(from: sender)).isEmpty ? super.draggingEntered(sender) : .copy
+    }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        FieldDrop.attaches(fileURLs(from: sender)).isEmpty ? super.draggingUpdated(sender) : .copy
+    }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let files = FieldDrop.attaches(fileURLs(from: sender))
+        guard !files.isEmpty, let pasteFiles else { return super.performDragOperation(sender) }
+        pasteFiles(files)
+        return true
+    }
+    private func fileURLs(from sender: NSDraggingInfo) -> [URL] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        return sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] ?? []
+    }
     override func keyDown(with event: NSEvent) {
         if (event.keyCode == 36 || event.keyCode == 76), !event.modifierFlags.contains(.shift), !hasMarkedText() { submit?(); return }
         if event.keyCode == 53 { escape?(); return }

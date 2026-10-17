@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FieldDrop {
+    /// A file dropped on the composer is attached. Its path is not the question.
+    public static func attaches(_ urls: [URL]) -> [URL] { urls.filter(\.isFileURL) }
+}
