@@ -240,6 +240,15 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testAttachedImageIsNumberedAfterTheWindow() {
+        XCTAssertEqual(ImageOrder.line(name:"photo.png",placedBefore:1,fileImagesSoFar:1),"\nImage 2 (after any shared-window image): photo.png.\n")
+        XCTAssertEqual(ImageOrder.line(name:"photo.png",placedBefore:0,fileImagesSoFar:1),"\nImage 1 (after any shared-window image): photo.png.\n")
+        XCTAssertEqual(ImageOrder.line(name:"second.png",placedBefore:1,fileImagesSoFar:2),"\nImage 3 (after any shared-window image): second.png.\n")
+        let prompt=TutorPrompt.build(session:LearningSession(title:"Window"),question:"What is this?",hasImage:true,pointing:false,reveal:false,hasWindow:true)
+        XCTAssertTrue(prompt.contains("Current guide: None"))
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("Return null for guide"))
+    }
 
 }
 
@@ -276,7 +285,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Attached image is numbered after the window",tests.testAttachedImageIsNumberedAfterTheWindow)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

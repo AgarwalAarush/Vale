@@ -52,7 +52,7 @@ final class AttachmentStore: Sendable {
         let file=url(for:record);guard FileManager.default.fileExists(atPath:file.path) else{return};try unlink(file)
     }
     func image(for record: AttachmentRecord) -> NSImage? { record.kind == .image ? NSImage(contentsOf:url(for:record)) : nil }
-    func context(for records: [AttachmentRecord]) throws -> FileContext {
+    func context(for records: [AttachmentRecord], leadingImages: Int = 0) throws -> FileContext {
         var result=FileContext()
         var textBudget=100_000
         for record in records {
@@ -61,7 +61,7 @@ final class AttachmentStore: Sendable {
             switch record.kind {
             case .image:
                 result.images.append(try Data(contentsOf:file))
-                result.text += "\nImage \(result.images.count) (after any shared-window image): \(record.name).\n"
+                result.text += ImageOrder.line(name:record.name, placedBefore:leadingImages, fileImagesSoFar:result.images.count)
             case .text:
                 let full=try String(contentsOf:file,encoding:.utf8)
                 let take=min(60_000,max(0,textBudget)); let excerpt=String(full.prefix(take)); textBudget-=excerpt.count
