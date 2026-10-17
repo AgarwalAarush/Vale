@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SpeechStart {
+    /// The same words the speaker would say. Empty means nothing is read.
+    public static func spoken(_ text: String) -> String {
+        text.replacingOccurrences(of:#"\[([^\]]+)\]\([^\)]+\)"#,with:"$1",options:.regularExpression).replacingOccurrences(of:"`",with:"").replacingOccurrences(of:"**",with:"")
+    }
+    public static func speaks(_ text: String) -> Bool {
+        !spoken(text).trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+    }
+}

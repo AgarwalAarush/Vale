@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import Speech
+import LiltCore
 
 @MainActor final class VoiceController:NSObject,ObservableObject,AVSpeechSynthesizerDelegate {
     @Published private(set) var listening=false
@@ -74,11 +75,13 @@ import Speech
         request?.endAudio();recognition?.cancel();recognition=nil;request=nil;recognizer=nil;listening=false
     }
     func speak(_ text:String){
+        let spoken=SpeechStart.spoken(text)
+        guard SpeechStart.speaks(text) else { return }
         stopListening();stopSpeaking();playbackGeneration=UUID();speaking=true
         if fixtures{return}
-        let spoken=text.replacingOccurrences(of:#"\[([^\]]+)\]\([^\)]+\)"#,with:"$1",options:.regularExpression).replacingOccurrences(of:"`",with:"").replacingOccurrences(of:"**",with:"")
         let utterance=AVSpeechUtterance(string:spoken);let selected=UserDefaults.standard.string(forKey:"speechVoice") ?? ""
         utterance.voice=AVSpeechSynthesisVoice(identifier:selected) ?? AVSpeechSynthesisVoice(language:language)
+        guard utterance.voice != nil else { speaking=false; return }
         let rate=UserDefaults.standard.double(forKey:"speechRate");utterance.rate=Float(rate==0 ? 0.49 : max(0.35,min(0.6,rate)))
         activeUtterance=utterance;synth.speak(utterance)
     }
