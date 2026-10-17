@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum TextKind {
+    public static let extensions: Set<String> = ["txt","md","markdown","csv","json","jsonl","yaml","yml","xml","html","css","js","jsx","ts","tsx","py","swift","rs","go","java","c","h","cpp","hpp","sql","sh","toml","log","tex","rtf","svg"]
+    /// A text or code file that contains a null byte is not stored.
+    public static func keeps(_ text: String) -> Bool { !text.contains("\0") }
+}
