@@ -18,7 +18,7 @@ struct CapsuleView: View {
             Button { model.togglePause() } label: { Label(model.paused ? "Resume" : "Pause", systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)
             Menu {
                 Button("Open coach", action: openCoach)
-                Button("Chat history") { model.showLibrary?() }
+                Button("Chat history") { model.showHistory() }
                 if model.active != nil { Button("Close chat") { model.complete() } }
                 Divider()
                 Button("Settings…") { model.settings = true; model.showLibrary?() }
@@ -41,7 +41,7 @@ struct CoachView: View {
                     Button("Assistant") {model.setMode(.assistant)}
                     Button("Learn with hints") {model.setMode(.learn)}
                 } label: {Text(model.active?.mode.label ?? "Ask").font(.system(size:11)).foregroundStyle(Theme.muted)}.menuStyle(.borderlessButton).fixedSize().help("Choose assistant or learning mode")
-                IconButton(symbol: "rectangle.stack", label: "Chat history") { model.showLibrary?() }
+                IconButton(symbol: "rectangle.stack", label: "Chat history") { model.showHistory() }
                 Menu {
                     Toggle("Read typed replies aloud", isOn: $model.readAloud)
                     Button("New chat") {model.newSession()}
@@ -57,7 +57,7 @@ struct CoachView: View {
             ContextStrip(model:model)
             if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
             if model.active?.contextLimited == true{
-                HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
+                HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showHistory()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
             }
             if let guide=model.active?.guide{GuideCard(model:model,guide:guide)}
             ScrollViewReader { proxy in

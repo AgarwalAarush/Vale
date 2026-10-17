@@ -80,6 +80,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
     func openSettings() { settings = true; showLibrary?() }
+    func showHistory() {
+        settings=HistoryFocus.showsSettings(openingHistory:true,settings:settings)
+        selectedID=HistoryFocus.selection(active:activeID,selected:selectedID,openingHistory:true)
+        showLibrary?()
+    }
     func showError(_ message: String, settings: Bool = false) { settingsForNextError = settings; error = message }
     func prepareChat() {
         guard active == nil else { showCoach?(); return }

@@ -192,7 +192,7 @@ final class FloatingPanel: NSPanel {
     @objc private func menuUpdates() { model.updates.check() }
     func validateMenuItem(_ item:NSMenuItem)->Bool { item.action == #selector(menuUpdates) ? model.updates.canCheck : true }
     @objc private func menuCoach() { openCoach() }
-    @objc private func menuLibrary() { openLibrary() }
+    @objc private func menuLibrary() { model.showHistory() }
     @objc private func menuPause() { if model.active != nil { model.togglePause() } }
     @objc private func menuSettings() { model.settings = true; openLibrary() }
     @objc private func menuQuit() { NSApp.terminate(nil) }
