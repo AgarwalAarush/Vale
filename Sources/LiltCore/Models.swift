@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// Search stays off until it is chosen. The composer has to show that choice, not only a globe.
+public enum WebSearchLabel {
+    public static func title(enabled: Bool) -> String {
+        enabled ? "Web search on" : "Web search"
+    }
+}

@@ -138,8 +138,12 @@ struct CoachView: View {
                     DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
                 }
                 HStack {
+                    let webTitle=WebSearchLabel.title(enabled:model.active?.webEnabled == true)
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
-                    IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}
+                    Button{model.setWeb(!(model.active?.webEnabled ?? false))}label:{
+                        HStack(spacing:4){Image(systemName:"globe").font(.system(size:12,weight:.medium));Text(webTitle).font(.system(size:11,weight:.medium))}
+                            .foregroundStyle(model.active?.webEnabled == true ? Theme.accent : Theme.muted)
+                    }.buttonStyle(.plain).accessibilityLabel(webTitle).help(webTitle)
                     IconButton(symbol:"list.number",label:"Start step-by-step help"){model.startGuide()}.disabled(model.busy || model.paused)
                     Spacer()
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
