@@ -240,6 +240,14 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testChatHistoryShowsTheChatYouWereJustIn() {
+        let active=UUID();let other=UUID()
+        XCTAssertEqual(HistoryFocus.selection(active:active,selected:other,openingHistory:true),active)
+        XCTAssertFalse(HistoryFocus.showsSettings(openingHistory:true,settings:true))
+        XCTAssertEqual(HistoryFocus.selection(active:nil,selected:other,openingHistory:true),other)
+        XCTAssertEqual(HistoryFocus.selection(active:active,selected:other,openingHistory:false),other)
+        XCTAssertTrue(HistoryFocus.showsSettings(openingHistory:false,settings:true))
+    }
 
 }
 
@@ -276,7 +284,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Chat history shows the chat you were just in",tests.testChatHistoryShowsTheChatYouWereJustIn)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

@@ -5,6 +5,17 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum HistoryFocus {
+    /// Chat history shows the chat you were just in, not a Settings screen left open earlier.
+    public static func selection(active: UUID?, selected: UUID?, openingHistory: Bool) -> UUID? {
+        if openingHistory, let active { return active }
+        return selected
+    }
+    public static func showsSettings(openingHistory: Bool, settings: Bool) -> Bool {
+        openingHistory ? false : settings
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID
