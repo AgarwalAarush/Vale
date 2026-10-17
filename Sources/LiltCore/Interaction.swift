@@ -67,3 +67,12 @@ public enum PointVisibility {
         return false
     }
 }
+
+public enum PreviewRoom {
+    public enum Kind: Equatable { case file, screen }
+    /// Older shared-window preview to close before opening another. An open file stays.
+    public static func indexToClose(existing: [Kind], adding: Kind, limit: Int = 3) -> Int? {
+        guard adding == .screen, existing.count >= limit else { return nil }
+        return existing.firstIndex(of: .screen)
+    }
+}

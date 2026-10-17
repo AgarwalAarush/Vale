@@ -172,16 +172,23 @@ final class FloatingPanel: NSPanel {
     private func preview(_ image: NSImage) {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 520), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Shared context preview"; window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .darkAqua)
-        let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self;contextPreviews.append(window)
+        let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self
+        closeOldestScreenPreviewIfNeeded(addingFile:false)
+        contextPreviews.append(window)
         window.center(); auxiliary.append(window); window.makeKeyAndOrderFront(nil)
-        if auxiliary.count > 3 { auxiliary.removeFirst().close() }
     }
     private func previewFile(_ record:AttachmentRecord) {
         guard let files=model.fileStore else{return}
         let window=NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:550),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
         window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua)
         let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550));window.center()
-        auxiliary.append(window);window.makeKeyAndOrderFront(nil);if auxiliary.count>3{auxiliary.removeFirst().close()}
+        closeOldestScreenPreviewIfNeeded(addingFile:true)
+        auxiliary.append(window);window.makeKeyAndOrderFront(nil)
+    }
+    private func closeOldestScreenPreviewIfNeeded(addingFile:Bool) {
+        let kinds=auxiliary.map{window in contextPreviews.contains{$0 === window} ? PreviewRoom.Kind.screen : PreviewRoom.Kind.file}
+        guard let index=PreviewRoom.indexToClose(existing:kinds, adding:addingFile ? .file : .screen) else{return}
+        auxiliary.remove(at:index).close()
     }
     func windowWillClose(_ notification:Notification){
         guard let window=notification.object as? NSWindow else{return}

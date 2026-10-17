@@ -240,6 +240,16 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testOpeningAPreviewKeepsTheFileYouAreReading() {
+        XCTAssertEqual(PreviewRoom.indexToClose(existing:[.screen,.screen,.screen],adding:.screen),0)
+        XCTAssertEqual(PreviewRoom.indexToClose(existing:[.file,.file,.screen],adding:.screen),2)
+        XCTAssertNil(PreviewRoom.indexToClose(existing:[.file,.file,.file],adding:.screen))
+        XCTAssertNil(PreviewRoom.indexToClose(existing:[.screen,.screen,.screen],adding:.file))
+        XCTAssertNil(PreviewRoom.indexToClose(existing:[.screen,.screen],adding:.screen))
+        let prompt=TutorPrompt.build(session:LearningSession(title:"Notes"),question:"Read this",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Current guide: None"))
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+    }
 
 }
 
@@ -276,7 +286,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Opening a preview keeps the file you are reading",tests.testOpeningAPreviewKeepsTheFileYouAreReading)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
