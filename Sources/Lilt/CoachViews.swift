@@ -41,7 +41,7 @@ struct CoachView: View {
                     Button("Assistant") {model.setMode(.assistant)}
                     Button("Learn with hints") {model.setMode(.learn)}
                 } label: {Text(model.active?.mode.label ?? "Ask").font(.system(size:11)).foregroundStyle(Theme.muted)}.menuStyle(.borderlessButton).fixedSize().help("Choose assistant or learning mode")
-                IconButton(symbol: "rectangle.stack", label: "Chat history") { model.showLibrary?() }
+                IconButton(symbol: HistoryMark.symbol, label: HistoryMark.label) { model.showLibrary?() }
                 Menu {
                     Toggle("Read typed replies aloud", isOn: $model.readAloud)
                     Button("New chat") {model.newSession()}
