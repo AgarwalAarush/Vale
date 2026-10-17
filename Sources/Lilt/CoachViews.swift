@@ -80,7 +80,7 @@ struct CoachView: View {
                             }
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 7) {
-                                    Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
+                                    Text(message.role == "user" ? "YOU" : ReplyWait.speaker).font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
                                     Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                                     if !message.attachments.isEmpty {
                                         ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
@@ -107,7 +107,12 @@ struct CoachView: View {
                                 Button("New chat") { model.prepareChat() }.buttonStyle(QuietButton(filled: true))
                             }.padding(.top, 24)
                         }
-                        if model.busy { HStack(spacing: 8) { ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 5).id("thinking") }
+                        if model.busy {
+                            VStack(alignment: .leading, spacing: 7) {
+                                if ReplyWait.inTheThread { Text(ReplyWait.speaker).font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted) }
+                                HStack(spacing: 8) { ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }
+                            }.padding(.vertical, 5).id("thinking")
+                        }
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
