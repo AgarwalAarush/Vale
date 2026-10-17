@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum PdfAccess {
+    /// A restriction-only PDF often opens with an empty password. A real password still does not.
+    public static func shouldAccept(wasLocked: Bool, unlockSucceeded: Bool) -> Bool {
+        !wasLocked || unlockSucceeded
+    }
+}
