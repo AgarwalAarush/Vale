@@ -36,7 +36,7 @@ struct PDFPreview: View {
             Divider().overlay(Theme.line)
             if let image{Image(nsImage:image).resizable().scaledToFit().padding(20).frame(maxWidth:.infinity,maxHeight:.infinity)}
             else{Text("This page couldn’t be previewed.").font(.system(size:13)).foregroundStyle(Theme.muted).frame(maxWidth:.infinity,maxHeight:.infinity)}
-        }.onAppear{document=PDFDocument(url:url);render()}
+        }.onAppear{if let opened=PDFDocument(url:url){document=AttachmentStore.readablePDF(opened)};render()}
     }
     private func render(){image=document?.page(at:pageIndex)?.thumbnail(of:NSSize(width:1600,height:2000),for:.mediaBox)}
 }
