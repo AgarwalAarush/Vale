@@ -5,6 +5,13 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum EmptyChat {
+    /// An untouched new chat can be replaced. A timer, Learn, or web search is work to keep.
+    public static func canDiscard(title: String, messageCount: Int, draft: String, fileCount: Int, duration: Int, mode: ChatMode, webEnabled: Bool) -> Bool {
+        title == "New chat" && messageCount == 0 && draft.isEmpty && fileCount == 0 && duration == 0 && mode == .assistant && !webEnabled
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID

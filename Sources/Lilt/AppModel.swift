@@ -89,7 +89,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
         guard store != nil else { error="The chat library is unavailable. Restore the library folder before starting."; return }
         suspend()
-        if !importing,let old=active, old.title == "New chat",old.messages.isEmpty,old.draft.isEmpty,old.files.isEmpty {sessions.removeAll{$0.id==old.id}}
+        if !importing,let old=active, EmptyChat.canDiscard(title:old.title,messageCount:old.messages.count,draft:old.draft,fileCount:old.files.count,duration:old.duration,mode:old.mode,webEnabled:old.webEnabled) {sessions.removeAll{$0.id==old.id}}
         let title=title.trimmingCharacters(in:.whitespacesAndNewlines)
         let chat=LearningSession(title:title.isEmpty ? "New chat" : String(title.prefix(100)),duration:minutes>0 ? max(5,min(180,minutes))*60 : 0,mode:mode)
         sessions.insert(chat,at:0); activeID=chat.id; selectedID=chat.id
