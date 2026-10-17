@@ -36,6 +36,8 @@ public struct Message: Codable, Identifiable, Equatable {
         text=try c.decode(String.self,forKey:.text); date=try c.decode(Date.self,forKey:.date)
         attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? [];screenChanged=try c.decodeIfPresent(Bool.self,forKey:.screenChanged) ?? false;highlightUnavailable=try c.decodeIfPresent(Bool.self,forKey:.highlightUnavailable) ?? false
     }
+    /// Assistant replies are markdown. The user's own text is shown literally so pasted code is not restyled.
+    public var showsMarkdown: Bool { role != "user" }
 }
 
 public struct LearningSession: Codable, Identifiable, Equatable {
