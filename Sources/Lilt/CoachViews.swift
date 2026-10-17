@@ -46,6 +46,7 @@ struct CoachView: View {
                     Toggle("Read typed replies aloud", isOn: $model.readAloud)
                     Button("New chat") {model.newSession()}
                     Button("Point it out") {model.pointItOut()}.disabled(!model.context.hasSelection || model.busy)
+                    if GuideControl.inTheMenu { Button(GuideControl.title) { model.startGuide() }.disabled(model.busy || model.paused) }
                     if model.active?.mode == .learn { Button("Show a full walkthrough…") { walkthrough = true }.disabled(model.active?.messages.isEmpty != false || model.busy) }
                     Menu("Focus timer") {Button("30 minutes"){model.setFocus(minutes:30)};Button("60 minutes"){model.setFocus(minutes:60)};Button("No timer"){model.setFocus(minutes:0)}}
                     Button("Close chat") { model.complete() }.disabled(model.active == nil)
@@ -140,7 +141,7 @@ struct CoachView: View {
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
                     IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}
-                    IconButton(symbol:"list.number",label:"Start step-by-step help"){model.startGuide()}.disabled(model.busy || model.paused)
+                    if !GuideControl.inTheMenu { IconButton(symbol:"list.number",label:GuideControl.title){model.startGuide()}.disabled(model.busy || model.paused) }
                     Spacer()
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
