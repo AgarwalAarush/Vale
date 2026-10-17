@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum MicFormat {
+    /// The input format is usable only after the engine is prepared. A zero rate means it was read too early.
+    public static func canUse(sampleRate: Double, channels: Int) -> Bool {
+        sampleRate.isFinite && sampleRate > 0 && channels > 0
+    }
+}
