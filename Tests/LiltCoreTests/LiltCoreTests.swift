@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testLinkedDropReadsTheTargetFile() throws {
+        let dir=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at:dir,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:dir) }
+        let target=dir.appendingPathComponent("notes.txt")
+        try "Bring a notebook.".write(to:target,atomically:true,encoding:.utf8)
+        let link=dir.appendingPathComponent("link.txt")
+        try FileManager.default.createSymbolicLink(at:link,withDestinationURL:target)
+        let readable=DroppedPath.pathToRead(link.path)
+        try XCTAssertEqual(String(contentsOfFile:readable,encoding:.utf8),"Bring a notebook.")
+        XCTAssertEqual(URL(fileURLWithPath:readable).lastPathComponent,"notes.txt")
+        try XCTAssertEqual(String(contentsOfFile:DroppedPath.pathToRead(target.path),encoding:.utf8),"Bring a notebook.")
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Linked drop reads the target file",tests.testLinkedDropReadsTheTargetFile)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
