@@ -240,6 +240,14 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testQuestionCanRunTheProgramBesideCodex() {
+        let locked=AssistantPath.locked
+        let nvm="/Users/me/.nvm/versions/node/v20/bin/codex"
+        XCTAssertEqual(AssistantPath.value(executable:nvm),"/Users/me/.nvm/versions/node/v20/bin:"+locked)
+        XCTAssertEqual(AssistantPath.value(executable:"/opt/homebrew/bin/codex"),locked)
+        XCTAssertEqual(AssistantPath.value(executable:"codex"),locked)
+        XCTAssertEqual(AssistantPath.value(executable:"/tmp/evil:/bin/codex"),locked)
+    }
 
 }
 
@@ -276,7 +284,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Question can run the program beside Codex",tests.testQuestionCanRunTheProgramBesideCodex)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

@@ -88,7 +88,7 @@ private final class SearchEventProbe: @unchecked Sendable {
             process.arguments = args
             var env: [String: String] = [:]
             for key in ["HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CODEX_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY"] { if let value = ProcessInfo.processInfo.environment[key] { env[key] = value } }
-            env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            env["PATH"] = AssistantPath.value(executable: executable)
             process.environment = env
             let input = Pipe(); let out = Pipe(); let err = Pipe()
             process.standardInput = input; process.standardOutput = out; process.standardError = err
