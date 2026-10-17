@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum HeldPreview {
+    /// A window preview opens only while a picture is actually held.
+    public static func canShow(held: Bool) -> Bool { held }
+}

@@ -225,12 +225,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true)}
     func stopSharing(){context.stop()}
     func previewContext(){
-        let chatID=activeID;let generation=context.generation
-        Task{[weak self]in
-            guard let self else{return}
-            do{let snapshot=try await self.context.capture();guard self.activeID==chatID,self.context.generation==generation else{return};self.showPreview?(snapshot.image)}
-            catch{guard self.activeID==chatID,self.context.generation==generation else{return};self.error="That window couldn’t be captured. Choose it again."}
-        }
+        guard HeldPreview.canShow(held: context.preview != nil), let image=context.preview else { return }
+        showPreview?(image)
     }
     func attachFiles(){
         if active == nil {prepareChat()}
