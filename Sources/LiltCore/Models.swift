@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum EmptyThread {
+    /// Before the first message, the empty coach says where the exchange will appear.
+    public static let showsPlace = true
+    public static let line = "Your question and the reply show here."
+}
