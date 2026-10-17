@@ -5,14 +5,15 @@ struct CapsuleView: View {
     @ObservedObject var model: AppModel
     var openCoach: () -> Void
     var body: some View {
+        let capsuleTitle=CapsuleAnswer.title(coachOpen:model.coachOpen,chatTitle:model.active?.title,lastRole:model.active?.messages.last?.role)
         HStack(spacing: 15) {
             Button(action: openCoach) {HStack(spacing:5){AudioMark(active: model.voice.listening || model.voice.speaking);if model.context.hasSelection{Image(systemName:model.context.live ? "record.circle.fill" : "macwindow").font(.system(size:10)).foregroundStyle(Theme.accent)}}}.buttonStyle(.plain).help(model.context.live ? "Live window context is on" : "Open assistant").accessibilityLabel(model.context.live ? "Open assistant. Live window context is on" : "Open assistant")
             Button(action: openCoach) {
                 HStack(spacing: 12) {
                     if let chat=model.active,chat.duration>0 { Text(chat.timerText).font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit() }
-                    Text(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
+                    Text(capsuleTitle).font(.system(size: 12, weight: .medium)).foregroundStyle(capsuleTitle == CapsuleAnswer.ready ? Theme.accent : Theme.ink).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
                 }
-            }.buttonStyle(.plain).help("Type a question")
+            }.buttonStyle(.plain).help(capsuleTitle == CapsuleAnswer.ready ? "Read the answer" : "Type a question")
             Spacer(minLength: 0)
             IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.ink) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
             Button { model.togglePause() } label: { Label(model.paused ? "Resume" : "Pause", systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)

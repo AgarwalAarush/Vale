@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// The collapsed capsule still shows the chat title after an answer arrives, so the result looks unchanged.
+public enum CapsuleAnswer {
+    public static let ready = "Answer ready"
+    public static func title(coachOpen: Bool, chatTitle: String?, lastRole: String?) -> String {
+        if !coachOpen, lastRole == "assistant" { return ready }
+        guard let chatTitle, chatTitle != "New chat" else { return "Vale" }
+        return chatTitle
+    }
+}

@@ -221,6 +221,13 @@ final class LiltCoreTests {
         XCTAssertEqual(LaunchSelection.resumeID(in:[done,newer,older]),newer.id)
         XCTAssertNil(LaunchSelection.resumeID(in:[done]))
     }
+    func testCollapsedCoachShowsThatAnAnswerIsReady() {
+        XCTAssertEqual(CapsuleAnswer.title(coachOpen:false,chatTitle:"How do I export",lastRole:"assistant"),CapsuleAnswer.ready)
+        XCTAssertEqual(CapsuleAnswer.title(coachOpen:true,chatTitle:"How do I export",lastRole:"assistant"),"How do I export")
+        XCTAssertEqual(CapsuleAnswer.title(coachOpen:false,chatTitle:"How do I export",lastRole:"user"),"How do I export")
+        XCTAssertEqual(CapsuleAnswer.title(coachOpen:false,chatTitle:"New chat",lastRole:nil),"Vale")
+        XCTAssertEqual(CapsuleAnswer.title(coachOpen:false,chatTitle:nil,lastRole:nil),"Vale")
+    }
     func testCodexLookupIncludesUserInstallAndParsesShellPath() {
         let home=URL(fileURLWithPath:"/Users/vale",isDirectory:true)
         let paths=CodexLocator.candidatePaths(home:home,customPath:" /custom/codex ",environmentPath:"/usr/bin:/Users/vale/.local/bin")
@@ -262,6 +269,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
+ ("Collapsed coach shows that an answer is ready",tests.testCollapsedCoachShowsThatAnAnswerIsReady),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
