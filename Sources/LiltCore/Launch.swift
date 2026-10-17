@@ -1,9 +1,19 @@
 import Foundation
 
+public struct ResumeTarget: Equatable, Sendable {
+    /// The chat to open. This is already the chat id.
+    public var chatID: UUID
+    public init(chatID: UUID) { self.chatID = chatID }
+}
+
 public enum LaunchSelection {
     /// Newest unfinished chat. `sessions` is ordered with the most recently updated chat first.
     public static func resumeID(in sessions:[LearningSession])->UUID? {
         sessions.first { !$0.completed }?.id
+    }
+    /// The value to open. It is the chat id itself.
+    public static func target(in sessions:[LearningSession]) -> ResumeTarget? {
+        resumeID(in: sessions).map { ResumeTarget(chatID: $0) }
     }
 }
 
