@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum MainThread {
+    /// PDFKit is only safe on the main thread. Hop when the caller is not already there.
+    public static func mustHop(isMainThread: Bool) -> Bool { !isMainThread }
+}

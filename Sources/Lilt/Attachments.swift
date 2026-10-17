@@ -31,8 +31,11 @@ final class AttachmentStore: Sendable {
         let kind: AttachmentRecord.Kind
         var stored=data; var detail=""
         if ext == "pdf" {
-            guard let pdf=PDFDocument(data:data), !pdf.isLocked, pdf.pageCount > 0 else { throw AppError("This PDF is locked or unreadable.") }
-            kind = .pdf; detail="\(pdf.pageCount) \(pdf.pageCount == 1 ? "page" : "pages")"
+            let pages=try onMain{
+                guard let pdf=PDFDocument(data:data), !pdf.isLocked, pdf.pageCount > 0 else { throw AppError("This PDF is locked or unreadable.") }
+                return pdf.pageCount
+            }
+            kind = .pdf; detail="\(pages) \(pages == 1 ? "page" : "pages")"
         } else if let source=CGImageSourceCreateWithData(data as CFData,nil),CGImageSourceGetType(source) != nil,CGImageSourceGetCount(source)>0 {
             let options: [CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
             guard let image=CGImageSourceCreateThumbnailAtIndex(source,0,options as CFDictionary),let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }
@@ -67,28 +70,42 @@ final class AttachmentStore: Sendable {
                 let take=min(60_000,max(0,textBudget)); let excerpt=String(full.prefix(take)); textBudget-=excerpt.count
                 result.text += "\n--- File: \(record.name) ---\n\(excerpt)\n" + (full.count>take ? "[File text truncated; not all content is included.]\n" : "")
             case .pdf:
-                guard let pdf=PDFDocument(url:file) else { throw AppError("Couldn’t open \(record.name).") }
-                let maximum=min(60_000,max(0,textBudget)); if maximum == 0 {result.text += "\n[PDF \(record.name) is not included because the text context limit was reached.]\n";continue}; var text=""; var pagesRead=0
-                for index in 0..<min(pdf.pageCount,300) {
-                    guard text.count < maximum else { break }
-                    if let page=pdf.page(at:index) { text += "\n[Page \(index+1)]\n" + String((page.string ?? "").prefix(maximum-text.count)); pagesRead=index+1 }
-                }
-                let extracted = text.replacingOccurrences(of:"[Page ",with:"").filter { $0.isLetter }.count > pagesRead * 2
-                if extracted {
-                    textBudget-=text.count
-                    result.text += "\n--- PDF: \(record.name) (\(pdf.pageCount) pages) ---\n\(text)\n"
-                    if pagesRead < pdf.pageCount || text.count >= maximum { result.text += "[PDF text truncated; only the preceding excerpt is available.]\n" }
-                } else {
-                    result.text += "\nScanned PDF: \(record.name). Only the first \(min(4,pdf.pageCount)) of \(pdf.pageCount) pages follow as images. Do not imply access to later pages.\n"
-                    for index in 0..<min(4,pdf.pageCount) {
-                        guard let page=pdf.page(at:index) else { continue }
-                        let image=page.thumbnail(of:NSSize(width:1200,height:1600),for:.mediaBox)
-                        if let tiff=image.tiffRepresentation,let rep=NSBitmapImageRep(data:tiff),let png=rep.representation(using:.png,properties:[:]) { result.images.append(png) }
-                    }
-                }
+                let piece=try onMain{try pdfPiece(file:file,name:record.name,textBudget:textBudget)}
+                result.text += piece.text
+                result.images += piece.images
+                textBudget -= piece.budgetUsed
             }
         }
         guard result.images.count <= 12 else { throw AppError("This chat includes too many visual pages. Remove a file or start a new chat; up to 12 images/pages fit in one request.") }
         return result
+    }
+    private func onMain<T>(_ body: () throws -> T) rethrows -> T {
+        if MainThread.mustHop(isMainThread:Thread.isMainThread) { return try DispatchQueue.main.sync(execute:body) }
+        return try body()
+    }
+    private struct PDFPiece { var text:String; var images:[Data]; var budgetUsed:Int }
+    private func pdfPiece(file:URL,name:String,textBudget:Int) throws -> PDFPiece {
+        guard let pdf=PDFDocument(url:file) else { throw AppError("Couldn’t open \(name).") }
+        let maximum=min(60_000,max(0,textBudget))
+        if maximum == 0 { return PDFPiece(text:"\n[PDF \(name) is not included because the text context limit was reached.]\n",images:[],budgetUsed:0) }
+        var text=""; var pagesRead=0
+        for index in 0..<min(pdf.pageCount,300) {
+            guard text.count < maximum else { break }
+            if let page=pdf.page(at:index) { text += "\n[Page \(index+1)]\n" + String((page.string ?? "").prefix(maximum-text.count)); pagesRead=index+1 }
+        }
+        let extracted = text.replacingOccurrences(of:"[Page ",with:"").filter { $0.isLetter }.count > pagesRead * 2
+        if extracted {
+            var note="\n--- PDF: \(name) (\(pdf.pageCount) pages) ---\n\(text)\n"
+            if pagesRead < pdf.pageCount || text.count >= maximum { note += "[PDF text truncated; only the preceding excerpt is available.]\n" }
+            return PDFPiece(text:note,images:[],budgetUsed:text.count)
+        }
+        var note="\nScanned PDF: \(name). Only the first \(min(4,pdf.pageCount)) of \(pdf.pageCount) pages follow as images. Do not imply access to later pages.\n"
+        var images:[Data]=[]
+        for index in 0..<min(4,pdf.pageCount) {
+            guard let page=pdf.page(at:index) else { continue }
+            let image=page.thumbnail(of:NSSize(width:1200,height:1600),for:.mediaBox)
+            if let tiff=image.tiffRepresentation,let rep=NSBitmapImageRep(data:tiff),let png=rep.representation(using:.png,properties:[:]) { images.append(png) }
+        }
+        return PDFPiece(text:note,images:images,budgetUsed:0)
     }
 }
