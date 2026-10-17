@@ -164,11 +164,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             }
                             if guideRequested,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
                             self.failedQuestion=nil
+                            self.persist()
                             if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(reply.text)}
                             else if changed,(self.readAloud || spoken || self.conversation){self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
                             if canPoint,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
-                            self.persist()
                         case .failure(let failure):
                             self.busy=false;self.conversation=false
                             let app=failure as? AppError
