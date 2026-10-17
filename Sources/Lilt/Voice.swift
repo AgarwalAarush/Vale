@@ -5,6 +5,7 @@ import Speech
 @MainActor final class VoiceController:NSObject,ObservableObject,AVSpeechSynthesizerDelegate {
     @Published private(set) var listening=false
     @Published private(set) var speaking=false
+    @Published private(set) var spokenText:String?
     @Published private(set) var starting=false
     private let engine=AVAudioEngine()
     private let synth=AVSpeechSynthesizer()
@@ -74,7 +75,7 @@ import Speech
         request?.endAudio();recognition?.cancel();recognition=nil;request=nil;recognizer=nil;listening=false
     }
     func speak(_ text:String){
-        stopListening();stopSpeaking();playbackGeneration=UUID();speaking=true
+        stopListening();stopSpeaking();playbackGeneration=UUID();spokenText=text;speaking=true
         if fixtures{return}
         let spoken=text.replacingOccurrences(of:#"\[([^\]]+)\]\([^\)]+\)"#,with:"$1",options:.regularExpression).replacingOccurrences(of:"`",with:"").replacingOccurrences(of:"**",with:"")
         let utterance=AVSpeechUtterance(string:spoken);let selected=UserDefaults.standard.string(forKey:"speechVoice") ?? ""
@@ -82,13 +83,13 @@ import Speech
         let rate=UserDefaults.standard.double(forKey:"speechRate");utterance.rate=Float(rate==0 ? 0.49 : max(0.35,min(0.6,rate)))
         activeUtterance=utterance;synth.speak(utterance)
     }
-    func stopSpeaking(){playbackGeneration=UUID();activeUtterance=nil;if !fixtures{synth.stopSpeaking(at:.immediate)};speaking=false}
+    func stopSpeaking(){playbackGeneration=UUID();activeUtterance=nil;spokenText=nil;if !fixtures{synth.stopSpeaking(at:.immediate)};speaking=false}
     func stop(){stopListening();stopSpeaking()}
     nonisolated private func playbackEnded(_ utterance:AVSpeechUtterance,completed:Bool){
         let identity=ObjectIdentifier(utterance)
         DispatchQueue.main.async{[weak self]in
             guard let self,let active=self.activeUtterance,ObjectIdentifier(active)==identity else{return}
-            self.activeUtterance=nil;self.speaking=false
+            self.activeUtterance=nil;self.spokenText=nil;self.speaking=false
             if completed{self.playbackFinished?()}else{self.playbackInterrupted?()}
         }
     }
@@ -98,5 +99,5 @@ import Speech
     var fixtureRecognitionToken:UUID{generation}
     var fixturePlaybackToken:UUID{playbackGeneration}
     func simulateUtterance(_ text:String,token:UUID){guard fixtures,listening,generation==token else{return};finalText=text;partial?(text);finishUtterance()}
-    func simulatePlaybackFinished(token:UUID){guard fixtures,speaking,playbackGeneration==token else{return};speaking=false;playbackFinished?()}
+    func simulatePlaybackFinished(token:UUID){guard fixtures,speaking,playbackGeneration==token else{return};spokenText=nil;speaking=false;playbackFinished?()}
 }

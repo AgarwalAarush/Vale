@@ -91,7 +91,7 @@ struct CoachView: View {
                                     }
                                     if message.role == "assistant" {
                                         HStack(spacing: 8) {
-                                            IconButton(symbol: "speaker.wave.2", label: "Read this reply") { model.voice.speak(message.text) }
+                                            IconButton(symbol: "speaker.wave.2", label: ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking) ? "Stop playback" : "Read this reply", tint: ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking) ? Theme.accent : Theme.muted) { if ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking) { model.voice.stopSpeaking() } else { model.voice.speak(message.text) } }
                                             IconButton(symbol: "doc.on.doc", label: "Copy reply") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) }
                                         }.padding(.leading, -7)
                                     }
