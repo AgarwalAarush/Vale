@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFollowUpHearsWhenTheHighlightWasHidden() {
+        let hidden=Message(role:"assistant",text:"The control is in the toolbar.",highlightUnavailable:true)
+        let shown=Message(role:"assistant",text:"The control is in the toolbar.",screenChanged:true)
+        XCTAssertTrue(ConversationWindow(messages:[hidden]).text.contains("Highlight unavailable. The place could not be shown on the selected window."))
+        XCTAssertFalse(ConversationWindow(messages:[shown]).text.contains("Highlight unavailable"))
+        var chat=LearningSession(title:"Toolbar")
+        chat.messages=[hidden]
+        let prompt=TutorPrompt.build(session:chat,question:"Where is it?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Highlight unavailable. The place could not be shown on the selected window."))
+        XCTAssertTrue(prompt.contains("Current guide: None"))
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertFalse(SessionStore.export(chat).contains("Highlight unavailable"))
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Follow-up hears when the highlight was hidden",tests.testFollowUpHearsWhenTheHighlightWasHidden)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
