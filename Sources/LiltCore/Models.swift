@@ -5,6 +5,11 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum QuestionPreview {
+    /// An opened window preview is closed once the question is actually sent.
+    public static func shouldCloseOpenedPreview(questionWasSent: Bool) -> Bool { questionWasSent }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID
