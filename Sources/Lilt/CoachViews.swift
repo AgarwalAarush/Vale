@@ -111,8 +111,8 @@ struct CoachView: View {
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
-                .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
-                .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
+                .onChange(of: model.active?.messages.count) { revealLatest(proxy) }
+                .onChange(of: model.busy) { revealLatest(proxy) }
             }.frame(maxHeight: .infinity)
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
@@ -162,5 +162,15 @@ struct CoachView: View {
                 Button("Keep thinking", role: .cancel) {}
                 Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
             } message: { Text("This will reveal the method. Your current hints stay in the conversation.") }
+    }
+
+    private func revealLatest(_ proxy: ScrollViewProxy) {
+        if QuestionScroll.opensAtTheStart(role: model.active?.messages.last?.role) {
+            if let id = model.active?.messages.last?.id {
+                proxy.scrollTo(id, anchor: .top)
+            }
+        } else {
+            proxy.scrollTo("bottom", anchor: .bottom)
+        }
     }
 }

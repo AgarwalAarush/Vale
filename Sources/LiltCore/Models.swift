@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum QuestionScroll {
+    /// A question that was just sent opens at its first line.
+    public static func opensAtTheStart(role: String?) -> Bool { role == "user" }
+}
