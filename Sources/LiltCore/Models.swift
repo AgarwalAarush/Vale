@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum WordCompletion {
+    /// The composer must not finish a word the person did not type.
+    public static let insertsSuggestions = false
+}
