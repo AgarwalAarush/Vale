@@ -10,7 +10,11 @@ struct CapsuleView: View {
             Button(action: openCoach) {
                 HStack(spacing: 12) {
                     if let chat=model.active,chat.duration>0 { Text(chat.timerText).font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit() }
-                    Text(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
+                    ViewThatFits(in: .horizontal) {
+                        ForEach(Array(CapsuleTitle.candidates(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").enumerated()), id: \.offset) { _, name in
+                            Text(name).lineLimit(1)
+                        }
+                    }.font(.system(size: 12, weight: .medium)).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
                 }
             }.buttonStyle(.plain).help("Type a question")
             Spacer(minLength: 0)
