@@ -69,7 +69,7 @@ struct CoachView: View {
                                     Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: 9, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
                                     Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
                                     Text(session.mode == .learn ? "Think it through with a little guidance." : "Ask anything, drop a file, or share a window.").font(.system(size: 13)).foregroundStyle(Theme.muted).lineSpacing(3)
-                                    if model.provider.executable == nil {
+                                    if CodexNotice.shows(executableKnown: model.provider.executable != nil, lookupFinished: model.provider.lookupFinished) {
                                         HStack(alignment: .top, spacing: 8) {
                                             Text("Codex isn’t available yet. Install the CLI and run codex login, or choose it in Settings.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                                             Spacer(minLength: 0)

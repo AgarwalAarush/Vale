@@ -76,6 +76,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         voice.partial = { [weak self] text in guard let self else{return}; self.draft=self.spokenDraftPrefix+text }
         voice.finished = { [weak self] _ in self?.send(spoken:true) }
         provider.located = { [weak self] in self?.objectWillChange.send() }
+        provider.lookupEnded = { [weak self] in self?.objectWillChange.send() }
         provider.locateWithLoginShell()
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
