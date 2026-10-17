@@ -190,3 +190,24 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum QuestionLine {
+    /// A long word in the question can wrap. A web address stays one token.
+    public static func shown(_ text: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+            line.split(separator: " ", omittingEmptySubsequences: false).map { breakToken(String($0)) }.joined(separator: " ")
+        }.joined(separator: "\n")
+    }
+    private static func breakToken(_ token: String) -> String {
+        let limit = 24
+        guard token.count > limit, !token.contains("://") else { return token }
+        var parts: [String] = []
+        var index = token.startIndex
+        while index < token.endIndex {
+            let end = token.index(index, offsetBy: limit, limitedBy: token.endIndex) ?? token.endIndex
+            parts.append(String(token[index..<end]))
+            index = end
+        }
+        return parts.joined(separator: "\u{200B}")
+    }
+}
