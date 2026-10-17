@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum RequestCapture {
+    public static let maxWaits = 3
+    /// A question does not send a frame that was already being taken. After several waits, it uses the capture that is still running.
+    public static func useFrame(joinedExisting: Bool, waitsSoFar: Int) -> Bool {
+        !joinedExisting || waitsSoFar >= maxWaits
+    }
+}

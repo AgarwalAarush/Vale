@@ -122,6 +122,15 @@ struct ContextSnapshot {
         if fixtureSource != nil{fixtureFrame=result.frame}
         return result
     }
+    func captureForQuestion() async throws -> ContextSnapshot {
+        var waits=0
+        while let existing=inFlight, !RequestCapture.useFrame(joinedExisting:true, waitsSoFar:waits) {
+            _ = try? await existing.value
+            if inFlight == existing { inFlight=nil; capturing=false }
+            waits+=1
+        }
+        return try await capture()
+    }
     func currentFrame()->CGRect?{
         if fixtureSource != nil{return fixtureOnScreen ? fixtureFrame : nil}
         guard let windowID,let entries=CGWindowListCopyWindowInfo(.optionIncludingWindow,windowID) as? [[String:Any]],let row=entries.first,row[kCGWindowIsOnscreen as String] as? Bool == true,let bounds=row[kCGWindowBounds as String] as? [String:Any],let frame=CGRect(dictionaryRepresentation:bounds as CFDictionary),frame.width>0,frame.height>0 else{return nil};return frame
