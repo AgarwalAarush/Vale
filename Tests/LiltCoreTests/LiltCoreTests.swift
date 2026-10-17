@@ -240,6 +240,23 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testChatHeadingUsesTheFirstLine() {
+        XCTAssertEqual(ChatHeading.from("Summary\r\nThe rest of the question"),"Summary")
+        XCTAssertEqual(ChatHeading.from("Hello\rWorld"),"Hello")
+        XCTAssertEqual(ChatHeading.from("One\nTwo"),"One")
+        XCTAssertEqual(ChatHeading.from("Hello\u{2028}there"),"Hello")
+        XCTAssertEqual(ChatHeading.from("Hello world"),"Hello world")
+        XCTAssertEqual(ChatHeading.from(String(repeating:"A",count:70)),String(repeating:"A",count:60))
+        var chat=LearningSession(title:"New chat")
+        chat.draft="secret draft"
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertFalse(chat.matches("secret"))
+        XCTAssertFalse(chat.matches("missing"))
+        let prompt=TutorPrompt.build(session:chat,question:"What is this?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("No. Return null for point."))
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +293,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Chat heading uses the first line",tests.testChatHeadingUsesTheFirstLine)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
