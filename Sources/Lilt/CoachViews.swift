@@ -160,7 +160,7 @@ struct CoachView: View {
             .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}
-                Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
+                Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true, preserveDraft: true) }
             } message: { Text("This will reveal the method. Your current hints stay in the conversation.") }
     }
 }

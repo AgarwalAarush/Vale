@@ -1,6 +1,11 @@
 import Foundation
 import CoreGraphics
 
+/// A command that sends its own prompt must leave the composer draft in place.
+public enum CommandPrompt {
+    public static func keepsComposerDraft(sendsOwnPrompt: Bool) -> Bool { sendsOwnPrompt }
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]

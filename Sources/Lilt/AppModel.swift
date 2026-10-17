@@ -117,7 +117,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         loading=true;draft="";loading=false;persist();showLibrary?()
     }
     func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
-    func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false) {
+    func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false,preserveDraft:Bool=false) {
         guard var chat=active else{return}
         var question=(override ?? draft).trimmingCharacters(in:.whitespacesAndNewlines)
         if question.isEmpty && !chat.pendingAttachments.isEmpty {question="Help me understand these attachments."}
@@ -130,7 +130,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if !retry {
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
             if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
-            replace(chat);draft=""
+            replace(chat);if !CommandPrompt.keepsComposerDraft(sendsOwnPrompt:preserveDraft){draft=""}
         }
         failedQuestion=question;persist()
         var history=chat
@@ -185,8 +185,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
     }
     func retry(){if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
-    func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send("Give me one slightly more concrete hint, without revealing the full solution.")}
-    func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send("Point out the relevant part of the shared window, with one short explanation.",pointing:true)}
+    func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send("Give me one slightly more concrete hint, without revealing the full solution.",preserveDraft:true)}
+    func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send("Point out the relevant part of the shared window, with one short explanation.",pointing:true,preserveDraft:true)}
     func toggleVoice(){
         guard !paused,active != nil else{return}
         if voice.listening{voice.finishUtterance()}
@@ -219,7 +219,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func moveGuide(_ delta:Int){
         guard let guide=active?.guide,!busy,!paused else{return}
         let index=max(0,min(guide.plan.steps.count-1,guide.index+delta));updateActive{$0.guide?.index=index};persist()
-        send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true)
+        send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true,preserveDraft:true)
     }
     func endGuide(){updateActive{$0.guide=nil};persist()}
     func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true)}

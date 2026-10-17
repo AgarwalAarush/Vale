@@ -73,6 +73,10 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testCommandPromptKeepsTheComposerDraft() {
+        XCTAssertTrue(CommandPrompt.keepsComposerDraft(sendsOwnPrompt: true))
+        XCTAssertFalse(CommandPrompt.keepsComposerDraft(sendsOwnPrompt: false))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +259,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Command prompt keeps the composer draft",tests.testCommandPromptKeepsTheComposerDraft),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
