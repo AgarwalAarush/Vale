@@ -57,17 +57,22 @@ final class AttachmentStore: Sendable {
         var textBudget=100_000
         for record in records {
             let file=url(for:record)
-            guard FileManager.default.fileExists(atPath:file.path) else { throw AppError("An attachment is unavailable: \(record.name). Remove it or attach it again.") }
+            guard FileManager.default.fileExists(atPath:file.path) else { result.text += AttachmentRead.omission(record.name); continue }
             switch record.kind {
             case .image:
-                result.images.append(try Data(contentsOf:file))
-                result.text += "\nImage \(result.images.count) (after any shared-window image): \(record.name).\n"
+                do {
+                    result.images.append(try Data(contentsOf:file))
+                    result.text += "\nImage \(result.images.count) (after any shared-window image): \(record.name).\n"
+                } catch { result.text += AttachmentRead.omission(record.name) }
             case .text:
-                let full=try String(contentsOf:file,encoding:.utf8)
-                let take=min(60_000,max(0,textBudget)); let excerpt=String(full.prefix(take)); textBudget-=excerpt.count
-                result.text += "\n--- File: \(record.name) ---\n\(excerpt)\n" + (full.count>take ? "[File text truncated; not all content is included.]\n" : "")
+                do {
+                    let full=try String(contentsOf:file,encoding:.utf8)
+                    if full.contains("\0") { result.text += AttachmentRead.omission(record.name); continue }
+                    let take=min(60_000,max(0,textBudget)); let excerpt=String(full.prefix(take)); textBudget-=excerpt.count
+                    result.text += "\n--- File: \(record.name) ---\n\(excerpt)\n" + (full.count>take ? "[File text truncated; not all content is included.]\n" : "")
+                } catch { result.text += AttachmentRead.omission(record.name) }
             case .pdf:
-                guard let pdf=PDFDocument(url:file) else { throw AppError("Couldn’t open \(record.name).") }
+                guard let pdf=PDFDocument(url:file) else { result.text += AttachmentRead.omission(record.name); continue }
                 let maximum=min(60_000,max(0,textBudget)); if maximum == 0 {result.text += "\n[PDF \(record.name) is not included because the text context limit was reached.]\n";continue}; var text=""; var pagesRead=0
                 for index in 0..<min(pdf.pageCount,300) {
                     guard text.count < maximum else { break }

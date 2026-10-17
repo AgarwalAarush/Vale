@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum AttachmentRead {
+    /// The file is named and left out so the question can still be asked.
+    public static func omission(_ name: String) -> String {
+        "[\(name) could not be read and is not included in this request.]\n"
+    }
+}

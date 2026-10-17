@@ -240,6 +240,15 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testQuestionStillSendsWhenAFileCannotBeRead() {
+        let note=AttachmentRead.omission("notes.txt")
+        XCTAssertTrue(note.contains("notes.txt"))
+        XCTAssertTrue(note.contains("not included"))
+        let prompt=TutorPrompt.build(session:LearningSession(title:"Notes"),question:"What does the file say?",hasImage:false,pointing:false,reveal:false,fileContext:note,hasWindow:false)
+        XCTAssertTrue(prompt.contains("What does the file say?"))
+        XCTAssertTrue(prompt.contains("not included"))
+        XCTAssertTrue(prompt.contains("Disabled"))
+    }
 
 }
 
@@ -276,7 +285,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Question still sends when a file cannot be read",tests.testQuestionStillSendsWhenAFileCannotBeRead)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
