@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum RichText {
+    /// Words from a rich-text note. A null byte is not stored.
+    public static func textToStore(_ plain: String?) -> String? {
+        guard let plain, !plain.contains("\0") else { return nil }
+        return plain
+    }
+}

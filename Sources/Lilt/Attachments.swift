@@ -33,13 +33,16 @@ final class AttachmentStore: Sendable {
         if ext == "pdf" {
             guard let pdf=PDFDocument(data:data), !pdf.isLocked, pdf.pageCount > 0 else { throw AppError("This PDF is locked or unreadable.") }
             kind = .pdf; detail="\(pdf.pageCount) \(pdf.pageCount == 1 ? "page" : "pages")"
+        } else if ext == "rtf" {
+            let plain=NSAttributedString(rtf:data,documentAttributes:nil)?.string
+            guard let text=RichText.textToStore(plain), let encoded=text.data(using:.utf8) else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
+            kind = .text; stored=encoded; detail="RTF"
         } else if let source=CGImageSourceCreateWithData(data as CFData,nil),CGImageSourceGetType(source) != nil,CGImageSourceGetCount(source)>0 {
             let options: [CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
             guard let image=CGImageSourceCreateThumbnailAtIndex(source,0,options as CFDictionary),let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }
             kind = .image; stored=png; detail="Image"
         } else if Self.textExtensions.contains(ext) || ext.isEmpty {
-            guard var text=String(data:data,encoding:.utf8), !text.contains("\0") else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
-            if ext == "rtf", let attributed=NSAttributedString(rtf:data,documentAttributes:nil) { text=attributed.string }
+            guard let text=String(data:data,encoding:.utf8), !text.contains("\0") else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
             guard let encoded=text.data(using:.utf8) else { throw AppError("That text couldn’t be read.") }
             kind = .text; stored=encoded; detail=ext.isEmpty ? "Text" : ext.uppercased()
         } else { throw AppError("Supported files: images, PDFs, text, and code. This file type isn’t supported yet.") }
