@@ -1,6 +1,11 @@
 import Foundation
 import CoreGraphics
 
+/// Switching Assistant and Learn keeps an answer that is already on the way.
+public enum ModeChange {
+    public static let keepsInFlightReply = true
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]
