@@ -67,3 +67,10 @@ public enum PointVisibility {
         return false
     }
 }
+
+public enum DraftEcho {
+    /// The composer reports its own text again after dictation writes the draft. That is not typing.
+    public static func isTyping(_ edited: String, stored: String) -> Bool {
+        edited != stored
+    }
+}
