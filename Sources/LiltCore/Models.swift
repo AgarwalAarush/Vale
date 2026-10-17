@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ShareMark {
+    /// A record dot means a preview is held. A chosen window that is not held uses the window mark.
+    public static func symbol(selected: Bool, live: Bool, capturing: Bool) -> String {
+        selected && (live || capturing) ? "record.circle" : "macwindow"
+    }
+}
