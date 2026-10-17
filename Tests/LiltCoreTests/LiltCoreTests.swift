@@ -240,6 +240,16 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testConfiguredEmptyChatIsKept() {
+        XCTAssertTrue(EmptyChat.canDiscard(title:"New chat",messageCount:0,draft:"",fileCount:0,duration:0,mode:.assistant,webEnabled:false))
+        XCTAssertFalse(EmptyChat.canDiscard(title:"New chat",messageCount:0,draft:"",fileCount:0,duration:1800,mode:.assistant,webEnabled:false))
+        XCTAssertFalse(EmptyChat.canDiscard(title:"New chat",messageCount:0,draft:"",fileCount:0,duration:0,mode:.learn,webEnabled:false))
+        XCTAssertFalse(EmptyChat.canDiscard(title:"New chat",messageCount:0,draft:"",fileCount:0,duration:0,mode:.assistant,webEnabled:true))
+        XCTAssertFalse(EmptyChat.canDiscard(title:"Plan",messageCount:0,draft:"",fileCount:0,duration:0,mode:.assistant,webEnabled:false))
+        XCTAssertFalse(EmptyChat.canDiscard(title:"New chat",messageCount:1,draft:"",fileCount:0,duration:0,mode:.assistant,webEnabled:false))
+        XCTAssertFalse(EmptyChat.canDiscard(title:"New chat",messageCount:0,draft:"hello",fileCount:0,duration:0,mode:.assistant,webEnabled:false))
+        XCTAssertFalse(EmptyChat.canDiscard(title:"New chat",messageCount:0,draft:"",fileCount:1,duration:0,mode:.assistant,webEnabled:false))
+    }
 
 }
 
@@ -276,7 +286,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Configured empty chat is kept",tests.testConfiguredEmptyChatIsKept)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
