@@ -73,6 +73,17 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testSpokenReplyKeepsTheLinkAddress() {
+        let spoken=SpokenReply.text(from:"See [the docs](https://example.com/docs) and `code` plus **this**.")
+        XCTAssertTrue(spoken.contains("the docs"))
+        XCTAssertTrue(spoken.contains("https://example.com/docs"))
+        XCTAssertFalse(spoken.contains("]("))
+        XCTAssertFalse(spoken.contains("`"))
+        XCTAssertFalse(spoken.contains("**"))
+        let both=SpokenReply.text(from:"[One](https://one.example) and [Two](https://two.example)")
+        XCTAssertTrue(both.contains("https://one.example"))
+        XCTAssertTrue(both.contains("https://two.example"))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +266,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Spoken reply keeps the link address",tests.testSpokenReplyKeepsTheLinkAddress),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),

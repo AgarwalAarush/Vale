@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// A spoken reply keeps the address of a markdown link. Emphasis marks stay out of the speech.
+public enum SpokenReply {
+    public static func text(from reply: String) -> String {
+        reply.replacingOccurrences(of: #"\[([^\]]+)\]\(([^\)]+)\)"#, with: "$1, $2", options: .regularExpression)
+            .replacingOccurrences(of: "`", with: "")
+            .replacingOccurrences(of: "**", with: "")
+    }
+}
