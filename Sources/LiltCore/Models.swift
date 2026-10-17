@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum MicPlacement {
+    /// The microphone sits with the other tools, not beside send.
+    public static let withTheTools = true
+}
