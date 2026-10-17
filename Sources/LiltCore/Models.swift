@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ComposerReturn {
+    /// Return while a reply is on the way leaves that reply waiting.
+    public static func sends(whileWaiting waiting: Bool) -> Bool { !waiting }
+}
