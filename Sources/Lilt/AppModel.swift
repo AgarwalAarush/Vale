@@ -88,6 +88,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
         guard store != nil else { error="The chat library is unavailable. Restore the library folder before starting."; return }
+        let unsent = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !(active?.pendingAttachments.isEmpty ?? true)
+        if !NewChat.leaves(hasUnsentWork: unsent) { return }
         suspend()
         if !importing,let old=active, old.title == "New chat",old.messages.isEmpty,old.draft.isEmpty,old.files.isEmpty {sessions.removeAll{$0.id==old.id}}
         let title=title.trimmingCharacters(in:.whitespacesAndNewlines)

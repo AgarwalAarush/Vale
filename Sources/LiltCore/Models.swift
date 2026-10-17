@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum NewChat {
+    /// Starting another chat leaves the screen only when nothing is still being written.
+    public static func leaves(hasUnsentWork: Bool) -> Bool { !hasUnsentWork }
+}
