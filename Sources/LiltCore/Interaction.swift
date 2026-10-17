@@ -67,3 +67,10 @@ public enum PointVisibility {
         return false
     }
 }
+
+/// A highlight stays while the pointed window is unchanged and visible. Time alone does not remove it.
+public enum PointHighlight {
+    public static func shouldClear(windowUnchanged: Bool, visible: Bool) -> Bool {
+        !windowUnchanged || !visible
+    }
+}

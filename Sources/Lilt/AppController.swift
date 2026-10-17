@@ -149,12 +149,14 @@ final class FloatingPanel: NSPanel {
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]; window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: RoundedRectangle(cornerRadius: 7).stroke(Theme.accent, lineWidth: 2).padding(4).background(Theme.accent.opacity(0.06)).accessibilityLabel(point.label))
         annotation = window; window.orderFrontRegardless()
-        let created = Date(); let expectedGeneration = snapshot.generation; let expectedFrame = snapshot.frame; let expectedData = snapshot.data
+        let expectedGeneration = snapshot.generation; let expectedFrame = snapshot.frame; let expectedData = snapshot.data
         var checkingFrame = false
         annotationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if Date().timeIntervalSince(created) > 5 || self.model.context.generation != expectedGeneration || self.model.context.currentFrame() != expectedFrame || !self.model.context.pointIsVisible(point,frame:bounds,windowID:snapshot.windowID,ignoring:CGWindowID(window.windowNumber)) { self.clearAnnotation(); return }
+                let unchanged = self.model.context.generation == expectedGeneration && self.model.context.currentFrame() == expectedFrame
+                let visible = self.model.context.pointIsVisible(point,frame:bounds,windowID:snapshot.windowID,ignoring:CGWindowID(window.windowNumber))
+                if PointHighlight.shouldClear(windowUnchanged: unchanged, visible: visible) { self.clearAnnotation(); return }
                 if !checkingFrame {
                     checkingFrame = true
                     Task { [weak self, weak window] in
