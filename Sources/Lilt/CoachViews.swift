@@ -37,12 +37,19 @@ struct CoachView: View {
             HStack(spacing: 10) {
                 LogoMark(); Text("Vale").font(.system(size: 15, weight: .semibold))
                 Spacer()
-                Menu {
-                    Button("Assistant") {model.setMode(.assistant)}
-                    Button("Learn with hints") {model.setMode(.learn)}
-                } label: {Text(model.active?.mode.label ?? "Ask").font(.system(size:11)).foregroundStyle(Theme.muted)}.menuStyle(.borderlessButton).fixedSize().help("Choose assistant or learning mode")
+                if !ModePlace.inTheMenu {
+                    Menu {
+                        Button(ModePlace.assistantTitle) {model.setMode(.assistant)}
+                        Button(ModePlace.learnTitle) {model.setMode(.learn)}
+                    } label: {Text(model.active?.mode.label ?? "Ask").font(.system(size:11)).foregroundStyle(Theme.muted)}.menuStyle(.borderlessButton).fixedSize().help("Choose assistant or learning mode")
+                }
                 IconButton(symbol: "rectangle.stack", label: "Chat history") { model.showLibrary?() }
                 Menu {
+                    if ModePlace.inTheMenu {
+                        Button { model.setMode(.assistant) } label: { if (model.active?.mode ?? .assistant) == .assistant { Label(ModePlace.assistantTitle, systemImage: "checkmark") } else { Text(ModePlace.assistantTitle) } }
+                        Button { model.setMode(.learn) } label: { if model.active?.mode == .learn { Label(ModePlace.learnTitle, systemImage: "checkmark") } else { Text(ModePlace.learnTitle) } }
+                        Divider()
+                    }
                     Toggle("Read typed replies aloud", isOn: $model.readAloud)
                     Button("New chat") {model.newSession()}
                     Button("Point it out") {model.pointItOut()}.disabled(!model.context.hasSelection || model.busy)

@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ModePlace {
+    /// The mode choice sits in the coach menu, so the header does not show Ask as a control.
+    public static let inTheMenu = true
+    public static let assistantTitle = "Assistant"
+    public static let learnTitle = "Learn with hints"
+}
