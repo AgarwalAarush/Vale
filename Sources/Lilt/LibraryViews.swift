@@ -58,7 +58,7 @@ struct LibraryView: View {
                         HStack(spacing:15){
                             VStack(alignment:.leading,spacing:7){
                                 Text(chat.title).font(.system(size:15,weight:.medium)).lineLimit(1)
-                                Text(chat.messages.last?.text ?? (chat.pendingAttachments.isEmpty ? "Ready when you are." : "\(chat.pendingAttachments.count) files attached")).font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
+                                Text(verbatim: chat.listPreview).font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
                             }
                             Spacer(minLength:20);Text(chat.updated,style:.date).font(.system(size:11)).foregroundStyle(Theme.muted);Image(systemName:"chevron.right").font(.system(size:10)).foregroundStyle(Theme.muted)
                         }.padding(.vertical,18)
@@ -91,6 +91,12 @@ struct SessionDetail: View {
                 }
                 if let error=model.error{VStack(alignment:.leading,spacing:10){Text(error).font(.system(size:12)).foregroundStyle(.orange).textSelection(.enabled).fixedSize(horizontal:false,vertical:true);if model.errorOffersSettings{Button("Open Settings"){model.openSettings()}.buttonStyle(.plain).font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent)};if model.deletionToRetry==session.id{Button("Retry Forget"){model.delete(session.id)}.buttonStyle(QuietButton())}}}
                 Button(session.id == model.activeID ? "Return to chat" : "Continue chat"){if session.id == model.activeID{model.showCoach?()}else{model.resume(session.id)}}.buttonStyle(QuietButton(filled:true))
+                if let draft = session.unsentDraft {
+                    VStack(alignment:.leading,spacing:8){
+                        Text("UNSENT").font(.system(size:10,weight:.medium)).tracking(1.1).foregroundStyle(Theme.muted)
+                        Text(verbatim: draft).font(.system(size:14)).lineSpacing(4).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading)
+                    }
+                }
                 if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,model:model)}}}.scrollIndicators(.hidden)}
                 Divider().overlay(Theme.line)
                 VStack(alignment:.leading,spacing:10){
