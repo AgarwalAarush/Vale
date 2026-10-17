@@ -14,6 +14,11 @@ public struct GuideProgress:Codable,Equatable,Sendable {
     private enum CodingKeys:String,CodingKey{case plan,index}
     public init(from decoder:Decoder)throws{let c=try decoder.container(keyedBy:CodingKeys.self);self.init(plan:try c.decode(GuidePlan.self,forKey:.plan),index:try c.decode(Int.self,forKey:.index))}
     public var current:String{plan.steps.indices.contains(index) ? plan.steps[index] : ""}
+    /// The whole plan, for history and search. The coach card still shows only the current step.
+    public var savedSteps:String{
+        let lines=plan.steps.enumerated().map{offset,step in "\(offset+1). \(step)"+(offset==index ? " (current)" : "")}
+        return ([plan.title]+lines).joined(separator:"\n")
+    }
 }
 public struct ConversationWindow {
     public let text:String

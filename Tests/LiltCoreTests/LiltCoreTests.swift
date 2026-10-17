@@ -240,6 +240,16 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSavedGuideStepIsFoundInHistory() {
+        var chat=LearningSession(title:"Install")
+        chat.messages=[Message(role:"assistant",text:"Start with the first action.")]
+        chat.guide=GuideProgress(plan:GuidePlan(title:"Install the tool",steps:["Download the package","Open the disk image"]),index:0)
+        XCTAssertEqual(chat.guide?.savedSteps,"Install the tool\n1. Download the package (current)\n2. Open the disk image")
+        XCTAssertTrue(chat.matches("disk image"))
+        XCTAssertFalse(LearningSession(title:"Install").matches("disk image"))
+        let exported=SessionStore.export(chat)
+        XCTAssertFalse(exported.contains("Open the disk image"))
+    }
 
 }
 
@@ -276,7 +286,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Saved guide step is found in history",tests.testSavedGuideStepIsFoundInHistory)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
