@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FileScroll {
+    /// One file on a question should not sit in a scroller that eats the transcript drag.
+    public static func usesScroll(fileCount: Int) -> Bool { fileCount > 1 }
+}
