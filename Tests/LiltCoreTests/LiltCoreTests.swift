@@ -73,6 +73,13 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testComposerGrowsToShowAPasteAndThenStops() {
+        XCTAssertEqual(ComposerHeight.clamped(20), ComposerHeight.minimum)
+        XCTAssertEqual(ComposerHeight.clamped(61), 61)
+        XCTAssertEqual(ComposerHeight.clamped(96), 96)
+        XCTAssertEqual(ComposerHeight.clamped(400), ComposerHeight.maximum)
+        XCTAssertEqual(ComposerHeight.clamped(Double.nan), ComposerHeight.minimum)
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +262,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Composer grows to show a paste and then stops",tests.testComposerGrowsToShowAPasteAndThenStops),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),

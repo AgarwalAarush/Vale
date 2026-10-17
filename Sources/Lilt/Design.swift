@@ -81,6 +81,12 @@ struct DraftEditor: NSViewRepresentable {
     var cancel: () -> Void
     var pasteFiles: (([URL]) -> Void)? = nil
     var pasteImage: ((Data) -> Void)? = nil
+    var onMeasuredHeight: ((CGFloat) -> Void)? = nil
+    static func measuredHeight(_ editor: NSTextView) -> CGFloat {
+        guard let layout = editor.layoutManager, let container = editor.textContainer else { return 61 }
+        layout.ensureLayout(for: container)
+        return layout.usedRect(for: container).height + editor.textContainerInset.height * 2
+    }
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
@@ -101,10 +107,15 @@ struct DraftEditor: NSViewRepresentable {
             let selection = editor.selectedRange(); editor.string = text
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
         }
+        onMeasuredHeight?(Self.measuredHeight(editor))
     }
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: DraftEditor
         init(_ parent: DraftEditor) { self.parent = parent }
-        func textDidChange(_ notification: Notification) { if let editor = notification.object as? NSTextView { parent.text = editor.string } }
+        func textDidChange(_ notification: Notification) {
+            guard let editor = notification.object as? NSTextView else { return }
+            parent.text = editor.string
+            parent.onMeasuredHeight?(DraftEditor.measuredHeight(editor))
+        }
     }
 }
