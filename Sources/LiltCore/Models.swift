@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum WordFile {
+    public static func isDocument(_ ext: String) -> Bool { ext == "docx" }
+    /// Keep the words. A document that is only space is empty. A null byte is not stored.
+    public static func text(_ raw: String) -> String? {
+        let cleaned = raw.replacingOccurrences(of: "\u{0}", with: "")
+        if cleaned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
+        return cleaned
+    }
+}
