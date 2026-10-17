@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SendPlacement {
+    /// The send control sits on the typed line, not among the tool icons.
+    public static let onTheTypedLine = true
+}
