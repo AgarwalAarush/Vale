@@ -240,6 +240,12 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testLaterTiffPagesAreKeptWhenTheyFit() {
+        XCTAssertEqual(ImagePages.extraPages(pageCount:1, extraRoom:7), 0)
+        XCTAssertEqual(ImagePages.extraPages(pageCount:5, extraRoom:7), 4)
+        XCTAssertEqual(ImagePages.extraPages(pageCount:10, extraRoom:2), 2)
+        XCTAssertEqual(ImagePages.extraPages(pageCount:5, extraRoom:0), 0)
+    }
 
 }
 
@@ -276,7 +282,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Later TIFF pages are kept when they fit",tests.testLaterTiffPagesAreKeptWhenTheyFit)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

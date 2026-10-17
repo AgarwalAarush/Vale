@@ -26,6 +26,34 @@ final class AttachmentStore: Sendable {
         let data=try Data(contentsOf:url,options:.mappedIfSafe)
         return try importData(data,name:url.lastPathComponent,fileExtension:url.pathExtension.lowercased())
     }
+    func importDroppedFile(_ url: URL, extraRoom: Int) throws -> [AttachmentRecord] {
+        let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+        guard (attributes[.type] as? FileAttributeType) == .typeRegular, let bytes=attributes[.size] as? NSNumber, bytes.intValue <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
+        let data=try Data(contentsOf:url,options:.mappedIfSafe)
+        let ext=url.pathExtension.lowercased()
+        if ext=="tif" || ext=="tiff", let source=CGImageSourceCreateWithData(data as CFData,nil), CGImageSourceGetCount(source)>1 {
+            let pages=CGImageSourceGetCount(source)
+            let extras=ImagePages.extraPages(pageCount:pages, extraRoom:extraRoom)
+            var kept:[AttachmentRecord]=[]
+            do {
+                let options:[CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
+                for index in 0..<(1+extras) {
+                    guard let image=CGImageSourceCreateThumbnailAtIndex(source,index,options as CFDictionary),let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }
+                    let base=url.deletingPathExtension().lastPathComponent
+                    let name=extras==0 ? url.lastPathComponent : "\(base) \(index+1).\(ext)"
+                    let record=AttachmentRecord(name:String(name.prefix(180)),kind:.image,byteCount:png.count,detail:"Page \(index+1) of \(pages)")
+                    try png.write(to:url(for:record),options:.atomic)
+                    try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:url(for:record).path)
+                    kept.append(record)
+                }
+                return kept
+            } catch {
+                for record in kept { try? remove(record) }
+                throw error
+            }
+        }
+        return [try importData(data,name:url.lastPathComponent,fileExtension:ext)]
+    }
     func importData(_ data: Data, name: String, fileExtension ext: String) throws -> AttachmentRecord {
         guard data.count <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
         let kind: AttachmentRecord.Kind

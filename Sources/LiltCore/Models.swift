@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ImagePages {
+    /// Pages after the first that still fit in the chat. A single image adds none.
+    public static func extraPages(pageCount: Int, extraRoom: Int) -> Int {
+        guard pageCount > 1, extraRoom > 0 else { return 0 }
+        return min(pageCount - 1, extraRoom)
+    }
+}

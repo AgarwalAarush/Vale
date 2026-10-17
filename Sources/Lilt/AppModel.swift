@@ -242,9 +242,22 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func importFiles(_ urls:[URL]) async {
         guard !importing,let chatID=activeID,let files=fileStore else{return}
         let valid=urls.filter(\.isFileURL)
-        guard (active?.files.count ?? 0)+valid.count<=8 else{error="Attach up to 8 files in a chat. Remove a file or start a new chat.";return}
+        let existing=active?.files.count ?? 0
+        guard existing+valid.count<=8 else{error="Attach up to 8 files in a chat. Remove a file or start a new chat.";return}
+        let extraRoom=8-existing-valid.count
         importing=true;defer{importing=false}
-        let outcomes=await Task.detached(priority:.userInitiated){valid.map{url -> ImportOutcome in do{return ImportOutcome(record:try files.importFile(url))}catch{return ImportOutcome(error:"\(url.lastPathComponent): \(error.localizedDescription)")}}}.value
+        let outcomes=await Task.detached(priority:.userInitiated){ () -> [ImportOutcome] in
+            var room=extraRoom
+            var results:[ImportOutcome]=[]
+            for url in valid {
+                do {
+                    let records=try files.importDroppedFile(url, extraRoom:room)
+                    room-=max(0,records.count-1)
+                    for record in records { results.append(ImportOutcome(record:record, error:nil)) }
+                } catch { results.append(ImportOutcome(record:nil, error:"\(url.lastPathComponent): \(error.localizedDescription)")) }
+            }
+            return results
+        }.value
         guard let index=sessions.firstIndex(where:{$0.id==chatID}) else{
             var retained:[AttachmentRecord]=[]
             for item in outcomes{if let record=item.record{do{try files.remove(record)}catch{retained.append(record)}}}
