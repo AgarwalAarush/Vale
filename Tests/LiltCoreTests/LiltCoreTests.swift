@@ -221,6 +221,13 @@ final class LiltCoreTests {
         XCTAssertEqual(LaunchSelection.resumeID(in:[done,newer,older]),newer.id)
         XCTAssertNil(LaunchSelection.resumeID(in:[done]))
     }
+    func testPasteKeepsCopiedText() {
+        XCTAssertEqual(ComposerPaste.choice(text:"See the docs",hasFile:false,hasImage:true),.text)
+        XCTAssertEqual(ComposerPaste.choice(text:"/tmp/notes.pdf",hasFile:true,hasImage:false),.files)
+        XCTAssertEqual(ComposerPaste.choice(text:nil,hasFile:false,hasImage:true),.image)
+        XCTAssertEqual(ComposerPaste.choice(text:"  ",hasFile:false,hasImage:true),.image)
+        XCTAssertEqual(ComposerPaste.choice(text:nil,hasFile:false,hasImage:false),.text)
+    }
     func testCodexLookupIncludesUserInstallAndParsesShellPath() {
         let home=URL(fileURLWithPath:"/Users/vale",isDirectory:true)
         let paths=CodexLocator.candidatePaths(home:home,customPath:" /custom/codex ",environmentPath:"/usr/bin:/Users/vale/.local/bin")
@@ -262,6 +269,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
+ ("Paste keeps copied text",tests.testPasteKeepsCopiedText),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),

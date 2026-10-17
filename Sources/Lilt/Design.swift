@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import LiltCore
 
 enum Theme {
     static let ink = Color(red: 0.94, green: 0.95, blue: 0.96)
@@ -65,8 +66,17 @@ final class ComposerTextView: NSTextView {
     var pasteImage: ((Data) -> Void)?
     override func paste(_ sender: Any?) {
         let board=NSPasteboard.general
-        if let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL], !urls.isEmpty,let pasteFiles {pasteFiles(urls);return}
-        if let data=board.data(forType:.png) ?? board.data(forType:.tiff),let pasteImage {pasteImage(data);return}
+        let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL]
+        let hasFile=urls?.isEmpty==false
+        let image=board.data(forType:.png) ?? board.data(forType:.tiff)
+        switch ComposerPaste.choice(text:board.string(forType:.string),hasFile:hasFile,hasImage:image != nil) {
+        case .files:
+            if let urls,!urls.isEmpty,let pasteFiles {pasteFiles(urls);return}
+        case .image:
+            if let image,let pasteImage {pasteImage(image);return}
+        case .text:
+            break
+        }
         super.paste(sender)
     }
     override func keyDown(with event: NSEvent) {
