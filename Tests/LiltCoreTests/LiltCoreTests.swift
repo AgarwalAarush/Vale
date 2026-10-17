@@ -101,6 +101,15 @@ final class LiltCoreTests {
         let restored=try JSONDecoder().decode(LearningSession.self,from:JSONEncoder().encode(chat))
         XCTAssertEqual(restored.pendingAttachments,[file]);XCTAssertTrue(restored.matches("REPORT"));XCTAssertTrue(restored.matches("notebook"));XCTAssertFalse(restored.matches("unrelated"))
     }
+    func testSidebarUsesTheSearchWhileItIsVisible() {
+        var matched=LearningSession(title:"Export")
+        matched.messages=[Message(role:"user",text:"How do I export?")]
+        let other=LearningSession(title:"Weather")
+        let sessions=[matched,other]
+        XCTAssertEqual(HistoryLists.sidebar(sessions,query:"export",searchVisible:true).map(\.title),["Export"])
+        XCTAssertEqual(HistoryLists.sidebar(sessions,query:"export",searchVisible:false).map(\.title),["Export","Weather"])
+        XCTAssertEqual(HistoryLists.sidebar(sessions,query:"",searchVisible:true).map(\.title),["Export","Weather"])
+    }
     func testUploadedImageIsNotClaimedAsLiveScreen() {
         let prompt=TutorPrompt.build(session:LearningSession(title:"Images"),question:"Compare",hasImage:true,pointing:true,reveal:false,fileContext:"Two uploaded images",hasWindow:false)
         XCTAssertTrue(prompt.contains("No live window is shared"));XCTAssertTrue(prompt.contains("No. Return null for point"))
@@ -258,6 +267,7 @@ let cases: [(String, () throws -> Void)] = [
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
+ ("Sidebar uses the search while it is visible",tests.testSidebarUsesTheSearchWhileItIsVisible),
  ("Uploaded images distinguished from live sharing",tests.testUploadedImageIsNotClaimedAsLiveScreen),
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),

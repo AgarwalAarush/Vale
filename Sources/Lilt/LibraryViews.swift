@@ -7,7 +7,7 @@ struct LibraryView: View {
     @State private var deleteID: UUID?
     @State private var renameID: UUID?
     @State private var newTitle=""
-    var filtered:[LearningSession]{model.sessions.filter{$0.matches(query)}}
+    var filtered:[LearningSession]{HistoryLists.sidebar(model.sessions,query:query,searchVisible:true)}
     var body:some View{
         HStack(spacing:0){
             VStack(alignment:.leading,spacing:0){
@@ -16,7 +16,7 @@ struct LibraryView: View {
                 Button{model.selectedID=nil;model.settings=false}label:{Label("All chats",systemImage:"rectangle.stack").font(.system(size:12)).foregroundStyle(Theme.muted).padding(.horizontal,12).padding(.vertical,13)}.buttonStyle(.plain).padding(.horizontal,12)
                 Text("RECENT").font(.system(size:9,weight:.medium)).tracking(1.2).foregroundStyle(Theme.muted).padding(.horizontal,24).padding(.top,17).padding(.bottom,12)
                 ScrollView{
-                    VStack(spacing:4){ForEach(model.sessions){chat in
+                    VStack(spacing:4){ForEach(HistoryLists.sidebar(model.sessions,query:query,searchVisible:model.selectedID == nil && !model.settings)){chat in
                         Button{model.selectedID=chat.id;model.settings=false}label:{
                             HStack(spacing:9){Image(systemName:chat.mode == .learn ? "lightbulb" : "bubble.left").font(.system(size:12)).foregroundStyle(Theme.muted);Text(chat.title).font(.system(size:12)).lineLimit(1);Spacer(minLength:0)}.padding(.horizontal,12).padding(.vertical,10).background(model.selectedID == chat.id && !model.settings ? .white.opacity(0.065) : .clear).clipShape(RoundedRectangle(cornerRadius:8))
                         }.buttonStyle(.plain).contextMenu{Button("Rename…"){renameID=chat.id;newTitle=chat.title};Button("Export…"){model.export(chat)};Button("Forget chat…",role:.destructive){deleteID=chat.id}}
