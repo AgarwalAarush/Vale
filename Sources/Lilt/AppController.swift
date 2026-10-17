@@ -180,7 +180,11 @@ final class FloatingPanel: NSPanel {
         guard let files=model.fileStore else{return}
         let window=NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:550),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
         window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua)
-        let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550));window.center()
+        let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550))
+        let visible=window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
+        let coachFrame=coach?.frame ?? visible
+        let origin=FilePreviewPlace.origin(screenX:visible.minX,screenY:visible.minY,screenWidth:visible.width,screenHeight:visible.height,previewWidth:800,previewHeight:550,coachX:coachFrame.minX,coachWidth:coachFrame.width)
+        window.setFrameOrigin(NSPoint(x:origin.x,y:origin.y))
         auxiliary.append(window);window.makeKeyAndOrderFront(nil);if auxiliary.count>3{auxiliary.removeFirst().close()}
     }
     func windowWillClose(_ notification:Notification){
