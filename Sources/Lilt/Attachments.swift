@@ -13,7 +13,7 @@ final class AttachmentStore: Sendable {
     let directory: URL
     private let unlink:@Sendable(URL)throws->Void
     static let maxBytes = 25_000_000
-    static let textExtensions = Set(["txt","md","markdown","csv","json","jsonl","yaml","yml","xml","html","css","js","jsx","ts","tsx","py","swift","rs","go","java","c","h","cpp","hpp","sql","sh","toml","log","tex","rtf"])
+    static let textExtensions = SourceFile.extensions
     init(directory: URL,unlink:(@Sendable(URL)throws->Void)?=nil) throws {
         self.unlink=unlink ?? {try FileManager.default.removeItem(at:$0)}
         self.directory=directory.appendingPathComponent("Attachments")
@@ -38,7 +38,7 @@ final class AttachmentStore: Sendable {
             guard let image=CGImageSourceCreateThumbnailAtIndex(source,0,options as CFDictionary),let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }
             kind = .image; stored=png; detail="Image"
         } else if Self.textExtensions.contains(ext) || ext.isEmpty {
-            guard var text=String(data:data,encoding:.utf8), !text.contains("\0") else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
+            guard var text=String(data:data,encoding:.utf8), SourceFile.isReadable(text) else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
             if ext == "rtf", let attributed=NSAttributedString(rtf:data,documentAttributes:nil) { text=attributed.string }
             guard let encoded=text.data(using:.utf8) else { throw AppError("That text couldn’t be read.") }
             kind = .text; stored=encoded; detail=ext.isEmpty ? "Text" : ext.uppercased()
