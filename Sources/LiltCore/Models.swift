@@ -190,3 +190,14 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// Pasted words stay. A copied file still attaches. An image is used only when there is no text.
+public enum ComposerPaste {
+    public enum Choice: Equatable, Sendable { case text, files, image }
+    public static func choice(text: String?, hasFile: Bool, hasImage: Bool) -> Choice {
+        if hasFile { return .files }
+        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .text }
+        if hasImage { return .image }
+        return .text
+    }
+}
