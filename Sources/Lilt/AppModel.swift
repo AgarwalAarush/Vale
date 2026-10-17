@@ -131,6 +131,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
             if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
             replace(chat);draft=""
+        } else if let index=chat.messages.lastIndex(where:{$0.role=="user"}) {
+            chat.messages[index].replyStopped=false;replace(chat)
         }
         failedQuestion=question;persist()
         var history=chat
@@ -208,7 +210,16 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
     }
     func editDraft(_ text:String){conversation=false;conversationTask?.cancel();if voice.listening || voice.starting{voice.stopListening()};draft=text}
-    func stopResponse(){conversation=false;conversationTask?.cancel();voice.stop();cancel()}
+    func stopResponse(){
+        let stopping=busy
+        conversation=false;conversationTask?.cancel();voice.stop();cancel()
+        if stopping {
+            updateActive { chat in
+                if chat.messages.last?.role=="user", let index=chat.messages.indices.last { chat.messages[index].replyStopped=true }
+            }
+            persist()
+        }
+    }
     func stopInteraction(){stopResponse();context.stop();hideOverlay?()}
     func startGuide(){
         guard !paused,!busy else{return}

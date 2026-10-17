@@ -26,15 +26,16 @@ public struct Message: Codable, Identifiable, Equatable {
     public var attachments: [AttachmentRecord]
     public var screenChanged:Bool
     public var highlightUnavailable:Bool
-    public init(role: String, text: String, id: UUID = UUID(), date: Date = Date(), attachments: [AttachmentRecord] = [], screenChanged:Bool=false,highlightUnavailable:Bool=false) {
-        self.id = id; self.role = role; self.text = text; self.date = date; self.attachments = attachments;self.screenChanged=screenChanged;self.highlightUnavailable=highlightUnavailable
+    public var replyStopped:Bool
+    public init(role: String, text: String, id: UUID = UUID(), date: Date = Date(), attachments: [AttachmentRecord] = [], screenChanged:Bool=false,highlightUnavailable:Bool=false,replyStopped:Bool=false) {
+        self.id = id; self.role = role; self.text = text; self.date = date; self.attachments = attachments;self.screenChanged=screenChanged;self.highlightUnavailable=highlightUnavailable;self.replyStopped=replyStopped
     }
-    private enum CodingKeys: String, CodingKey { case id,role,text,date,attachments,screenChanged,highlightUnavailable }
+    private enum CodingKeys: String, CodingKey { case id,role,text,date,attachments,screenChanged,highlightUnavailable,replyStopped }
     public init(from decoder: Decoder) throws {
         let c=try decoder.container(keyedBy: CodingKeys.self)
         id=try c.decode(UUID.self,forKey:.id); role=try c.decode(String.self,forKey:.role)
         text=try c.decode(String.self,forKey:.text); date=try c.decode(Date.self,forKey:.date)
-        attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? [];screenChanged=try c.decodeIfPresent(Bool.self,forKey:.screenChanged) ?? false;highlightUnavailable=try c.decodeIfPresent(Bool.self,forKey:.highlightUnavailable) ?? false
+        attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? [];screenChanged=try c.decodeIfPresent(Bool.self,forKey:.screenChanged) ?? false;highlightUnavailable=try c.decodeIfPresent(Bool.self,forKey:.highlightUnavailable) ?? false;replyStopped=try c.decodeIfPresent(Bool.self,forKey:.replyStopped) ?? false
     }
 }
 
@@ -189,4 +190,10 @@ public enum TutorPrompt {
         Respond to the actual user request, without discussing wrapper labels.
         """
     }
+}
+
+public enum StoppedReply {
+    /// A question whose reply was stopped says so. A question still waiting does not.
+    public static let label = "Stopped"
+    public static func shows(role: String, stopped: Bool) -> Bool { stopped && role == "user" }
 }

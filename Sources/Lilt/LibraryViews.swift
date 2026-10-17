@@ -102,6 +102,7 @@ struct SessionDetail: View {
                     VStack(alignment:.leading,spacing:9){
                         Text(message.role == "user" ? "YOU" : "LILT").font(.system(size:10,weight:.medium)).tracking(1).foregroundStyle(Theme.muted)
                         Text(.init(message.text)).font(.system(size:14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading)
+                        if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 12)).foregroundStyle(Theme.muted) }
                     }.padding(.vertical,5)
                 }
             }.padding(.horizontal,42).padding(.top,54).padding(.bottom,40)
