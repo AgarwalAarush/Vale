@@ -101,6 +101,18 @@ final class LiltCoreTests {
         let restored=try JSONDecoder().decode(LearningSession.self,from:JSONEncoder().encode(chat))
         XCTAssertEqual(restored.pendingAttachments,[file]);XCTAssertTrue(restored.matches("REPORT"));XCTAssertTrue(restored.matches("notebook"));XCTAssertFalse(restored.matches("unrelated"))
     }
+    func testHistoryPreviewShowsTheMatchingMessage() {
+        var chat=LearningSession(title:"Notes")
+        chat.messages=[Message(role:"user",text:"How do I export a PDF?"),Message(role:"assistant",text:"Open the share menu and save.")]
+        chat.takeaway="Keep a copy"
+        chat.pendingAttachments=[AttachmentRecord(name:"report.pdf",kind:.pdf,byteCount:10)]
+        XCTAssertEqual(chat.historyPreview(matching:""),"Open the share menu and save.")
+        XCTAssertEqual(chat.historyPreview(matching:" export "),"How do I export a PDF?")
+        XCTAssertEqual(chat.historyPreview(matching:"SHARE"),"Open the share menu and save.")
+        XCTAssertEqual(chat.historyPreview(matching:"copy"),"Keep a copy")
+        XCTAssertEqual(chat.historyPreview(matching:"report.pdf"),"report.pdf")
+        XCTAssertEqual(LearningSession(title:"Empty").historyPreview(matching:""),"Ready when you are.")
+    }
     func testUploadedImageIsNotClaimedAsLiveScreen() {
         let prompt=TutorPrompt.build(session:LearningSession(title:"Images"),question:"Compare",hasImage:true,pointing:true,reveal:false,fileContext:"Two uploaded images",hasWindow:false)
         XCTAssertTrue(prompt.contains("No live window is shared"));XCTAssertTrue(prompt.contains("No. Return null for point"))
@@ -258,6 +270,7 @@ let cases: [(String, () throws -> Void)] = [
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
+ ("History preview shows the matching message",tests.testHistoryPreviewShowsTheMatchingMessage),
  ("Uploaded images distinguished from live sharing",tests.testUploadedImageIsNotClaimedAsLiveScreen),
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
