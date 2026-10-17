@@ -67,3 +67,38 @@ public enum PointVisibility {
         return false
     }
 }
+
+public enum ReadableLine {
+    /// Lets a long unbroken line wrap. Every original character stays, in order.
+    public static func display(_ text: String, limit: Int = 40) -> String {
+        guard limit > 0 else { return text }
+        var result = ""
+        var token = ""
+        func flush() {
+            if token.contains("://") || token.count <= limit {
+                result += token
+            } else {
+                var count = 0
+                for character in token {
+                    if count == limit {
+                        result.append("\u{200B}")
+                        count = 0
+                    }
+                    result.append(character)
+                    count += 1
+                }
+            }
+            token = ""
+        }
+        for character in text {
+            if character.isWhitespace {
+                flush()
+                result.append(character)
+            } else {
+                token.append(character)
+            }
+        }
+        flush()
+        return result
+    }
+}
