@@ -73,6 +73,13 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testAssistantReplyStaysVisibleWhenFormattingDropsIt() {
+        XCTAssertTrue(AssistantReplyDisplay.needsLiteral(source: "Use Array<Int>.", rendered: "Use Array."))
+        XCTAssertTrue(AssistantReplyDisplay.needsLiteral(source: "Print 50% done.", rendered: "Print 50 done."))
+        XCTAssertTrue(AssistantReplyDisplay.needsLiteral(source: "Answer", rendered: ""))
+        XCTAssertFalse(AssistantReplyDisplay.needsLiteral(source: "Use **bold**.", rendered: "Use bold."))
+        XCTAssertFalse(AssistantReplyDisplay.needsLiteral(source: "", rendered: ""))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +262,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Assistant reply stays visible when formatting drops it",tests.testAssistantReplyStaysVisibleWhenFormattingDropsIt),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
