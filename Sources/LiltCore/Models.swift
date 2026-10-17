@@ -169,7 +169,7 @@ public enum TutorPrompt {
         \(policy)
         Conversation context: \(window.limited ? "Only recent/excerpted messages are included. Earlier history is saved but unavailable in this request. Do not imply you recall it; ask the user to restate missing details." : "The supplied recent conversation is available.")
         Guide: \(guideRequested ? "The user explicitly requested a step-by-step guide. Return a short guide plan of 2 to 8 concrete steps and explain only the first step now." : "Return null for guide unless the user explicitly asks to replace the current plan.")
-        Current guide: \(session.guide.map{"\($0.plan.title), step \($0.index+1)/\($0.plan.steps.count): \($0.current)"} ?? "None")
+        Current guide: \(GuideFollowUp.describe(session.guide))
         Image context: \(hasImage ? "Images are attached in the order described below." : "No screen image is attached. Do not imply you can see the screen.")
         Window context: \((hasWindow ?? hasImage) ? "A fresh selected-window screenshot is the first image." : "No live window is shared. Attached images are user-provided files, not live screen access.")
         Web search: \(session.webEnabled ? "Enabled. Search when current information or sources would help. Cite sources with direct Markdown links. Never invent a source or claim to have searched without doing so." : "Disabled. Do not claim to have searched. Mention when current verification is needed.")
@@ -188,5 +188,16 @@ public enum TutorPrompt {
         </question>
         Respond to the actual user request, without discussing wrapper labels.
         """
+    }
+}
+
+public enum GuideFollowUp {
+    /// The next question needs every saved step. The coach card and the exported notes stay as they are.
+    public static func describe(_ guide: GuideProgress?) -> String {
+        guard let guide else { return "None" }
+        let lines = guide.plan.steps.enumerated().map { offset, step in
+            "\(offset + 1). \(step)" + (offset == guide.index ? " (current)" : "")
+        }
+        return "\(guide.plan.title), step \(guide.index + 1) of \(guide.plan.steps.count)\n" + lines.joined(separator: "\n")
     }
 }
