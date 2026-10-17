@@ -59,16 +59,15 @@ private final class SearchEventProbe: @unchecked Sendable {
             }
         }
     }
-    var resources: URL {
-        let bundled = Bundle.main.resourceURL!
-        if FileManager.default.fileExists(atPath: bundled.appendingPathComponent("tutor.md").path) { return bundled }
-        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Resources")
-    }
     func ask(prompt: String, images: [Data] = [], search: Bool = false, completion: @escaping (Result<TutorReply, Error>) -> Void) {
         cancel()
         usedWebSearch=false
         if let fixtureReply,(CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")){fixtureReply(prompt,images,search,completion);return}
         guard let executable else { completion(.failure(AppError("Codex wasn’t found. Choose it in Settings, or install the Codex CLI and run codex login in Terminal.", offersSettings: true))); return }
+        guard let resources = InstructionFile.directory(bundleResources: Bundle.main.resourceURL, workingDirectory: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)) else {
+            completion(.failure(AppError("The assistant’s instructions are missing, so there’s no answer yet. Reinstall Vale and try again.")))
+            return
+        }
         self.completion = completion
         do {
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("lilt-\(UUID().uuidString)")

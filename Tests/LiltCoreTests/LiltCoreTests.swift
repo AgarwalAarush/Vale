@@ -240,6 +240,23 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFirstQuestionKeepsGoingWhenInstructionsAreMissing() throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:root)}
+        let bundle=root.appendingPathComponent("Bundle")
+        let work=root.appendingPathComponent("Work")
+        try FileManager.default.createDirectory(at:bundle,withIntermediateDirectories:true)
+        try FileManager.default.createDirectory(at:work.appendingPathComponent("Resources"),withIntermediateDirectories:true)
+        XCTAssertNil(InstructionFile.directory(bundleResources:nil,workingDirectory:work))
+        XCTAssertNil(InstructionFile.directory(bundleResources:bundle,workingDirectory:work))
+        try "instructions".write(to:work.appendingPathComponent("Resources/tutor.md"),atomically:true,encoding:.utf8)
+        XCTAssertNil(InstructionFile.directory(bundleResources:nil,workingDirectory:work))
+        try "{}".write(to:work.appendingPathComponent("Resources/reply.schema.json"),atomically:true,encoding:.utf8)
+        XCTAssertEqual(InstructionFile.directory(bundleResources:nil,workingDirectory:work),work.appendingPathComponent("Resources"))
+        try "instructions".write(to:bundle.appendingPathComponent("tutor.md"),atomically:true,encoding:.utf8)
+        try "{}".write(to:bundle.appendingPathComponent("reply.schema.json"),atomically:true,encoding:.utf8)
+        XCTAssertEqual(InstructionFile.directory(bundleResources:bundle,workingDirectory:work),bundle)
+    }
 
 }
 
@@ -276,7 +293,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("First question keeps going when instructions are missing",tests.testFirstQuestionKeepsGoingWhenInstructionsAreMissing)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
