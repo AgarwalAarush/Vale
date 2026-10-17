@@ -73,6 +73,14 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testReadAloudSpeaksTheReplyAlreadyOnScreen() {
+        let messages=[Message(role:"user",text:"How?"),Message(role:"assistant",text:"Use the menu.")]
+        XCTAssertEqual(ReadAloud.replyToSpeak(messages:messages,enabled:true,alreadySpeaking:false),"Use the menu.")
+        XCTAssertNil(ReadAloud.replyToSpeak(messages:messages,enabled:false,alreadySpeaking:false))
+        XCTAssertNil(ReadAloud.replyToSpeak(messages:messages,enabled:true,alreadySpeaking:true))
+        XCTAssertNil(ReadAloud.replyToSpeak(messages:[Message(role:"user",text:"How?")],enabled:true,alreadySpeaking:false))
+        XCTAssertNil(ReadAloud.replyToSpeak(messages:[Message(role:"assistant",text:"  ")],enabled:true,alreadySpeaking:false))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +263,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Read aloud speaks the reply already on screen",tests.testReadAloudSpeaksTheReplyAlreadyOnScreen),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
