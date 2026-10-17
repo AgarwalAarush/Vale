@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ThreadSeat {
+    /// Once a question is in the thread, that exchange sits with the composer.
+    public static let withTheComposer = true
+    public static func pins(_ messageCount: Int) -> Bool { withTheComposer && messageCount > 0 }
+}
