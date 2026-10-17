@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SentPicture {
+    /// A picture on the question is shown in the exchange, not only as a file chip.
+    public static let shownInTheExchange = true
+    public static let maxHeight: CGFloat = 160
+    public static func shows(_ record: AttachmentRecord) -> Bool { shownInTheExchange && record.kind == .image }
+}
