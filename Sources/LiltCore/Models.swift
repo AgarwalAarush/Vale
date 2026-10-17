@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ImageRead {
+    /// A photo is kept when its preview or the full image can be read.
+    public static func shouldKeep(preview: Bool, fullImage: Bool) -> Bool {
+        preview || fullImage
+    }
+}

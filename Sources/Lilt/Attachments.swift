@@ -35,7 +35,12 @@ final class AttachmentStore: Sendable {
             kind = .pdf; detail="\(pdf.pageCount) \(pdf.pageCount == 1 ? "page" : "pages")"
         } else if let source=CGImageSourceCreateWithData(data as CFData,nil),CGImageSourceGetType(source) != nil,CGImageSourceGetCount(source)>0 {
             let options: [CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
-            guard let image=CGImageSourceCreateThumbnailAtIndex(source,0,options as CFDictionary),let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }
+            let preview=CGImageSourceCreateThumbnailAtIndex(source,0,options as CFDictionary)
+            func pngData(_ image:CGImage)->Data?{NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:])}
+            var png=preview.flatMap(pngData)
+            let full=png==nil ? CGImageSourceCreateImageAtIndex(source,0,nil) : nil
+            if png==nil,let full{png=pngData(full)}
+            guard ImageRead.shouldKeep(preview:preview != nil, fullImage:full != nil), let png else { throw AppError("That image couldn’t be read.") }
             kind = .image; stored=png; detail="Image"
         } else if Self.textExtensions.contains(ext) || ext.isEmpty {
             guard var text=String(data:data,encoding:.utf8), !text.contains("\0") else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
