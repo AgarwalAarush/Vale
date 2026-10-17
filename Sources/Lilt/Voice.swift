@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import Speech
+import LiltCore
 
 @MainActor final class VoiceController:NSObject,ObservableObject,AVSpeechSynthesizerDelegate {
     @Published private(set) var listening=false
@@ -13,6 +14,7 @@ import Speech
     private var recognition:SFSpeechRecognitionTask?
     private var request:SFSpeechAudioBufferRecognitionRequest?
     private var hasTap=false
+    private let intake=MicIntake()
     private var silence:DispatchWorkItem?
     private var finalText=""
     private var generation=UUID()
@@ -52,7 +54,8 @@ import Speech
         self.request=request;finalText="";let id=UUID();generation=id
         let node=engine.inputNode;let format=node.outputFormat(forBus:0)
         guard format.sampleRate>0,format.channelCount>0 else{failed?("No microphone is available. You can still type.");return}
-        node.installTap(onBus:0,bufferSize:1024,format:format){buffer,_ in request.append(buffer)};hasTap=true
+        intake.allow()
+        node.installTap(onBus:0,bufferSize:1024,format:format){[intake] buffer,_ in guard intake.isAccepting else{return};request.append(buffer)};hasTap=true
         recognition=recognizer.recognitionTask(with:request){result,error in DispatchQueue.main.async{
             guard self.generation==id,self.listening else{return}
             if let result{
@@ -69,6 +72,7 @@ import Speech
         if !text.isEmpty{finished?(text)}
     }
     func stopListening(){
+        intake.stop()
         generation=UUID();silence?.cancel();silence=nil;starting=false
         if engine.isRunning{engine.stop()};if hasTap{engine.inputNode.removeTap(onBus:0);hasTap=false}
         request?.endAudio();recognition?.cancel();recognition=nil;request=nil;recognizer=nil;listening=false

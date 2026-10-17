@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+public final class MicIntake: @unchecked Sendable {
+    private let lock=NSLock()
+    private var accepting=false
+    public init() {}
+    public func allow() { lock.lock(); accepting=true; lock.unlock() }
+    public func stop() { lock.lock(); accepting=false; lock.unlock() }
+    public var isAccepting:Bool { lock.lock(); defer{lock.unlock()}; return accepting }
+}
