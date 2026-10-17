@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// History counts the reply. A user-only count makes the first answer look unsaved.
+public enum ChatSummary {
+    public static func messageCount(_ messages: [Message]) -> Int { messages.count }
+}
