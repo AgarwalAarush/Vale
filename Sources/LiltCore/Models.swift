@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum IdleWave {
+    /// The capsule bars use the accent only while voice is on.
+    public static func usesAccent(active: Bool) -> Bool { active }
+}
