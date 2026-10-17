@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum WaitingField {
+    public static let idle = "Ask quietly…"
+    public static let whileWaiting = "Your question is in the chat"
+    /// The empty field invites a new question only when nothing is waiting.
+    public static func shown(waiting: Bool) -> String { waiting ? whileWaiting : idle }
+}
