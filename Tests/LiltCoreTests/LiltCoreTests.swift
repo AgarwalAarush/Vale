@@ -240,6 +240,45 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testReadableChatsSurviveAnUnreadableRecord() throws {
+        let dir=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:dir)}
+        let store=try SessionStore(directory:dir)
+        let file=dir.appendingPathComponent("sessions.json")
+        let library="""
+        [{"id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","title":"First chat","created":0,"updated":0,"elapsed":0,"duration":0,"completed":false,"takeaway":"Kept note","draft":"unsent question","hintLevel":0,"mode":"assistant","webEnabled":"yes","pendingAttachments":{"bad":true},"guide":{"title":1},"messages":[{"id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEE1","role":"user","date":0},{"id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEE2","role":"assistant","text":"The answer is here.","date":0,"attachments":"nope","screenChanged":"nope","highlightUnavailable":"nope"}]},{}]
+        """
+        try library.write(to:file,atomically:true,encoding:.utf8)
+        let loaded=try store.load()
+        XCTAssertEqual(loaded.count,1)
+        XCTAssertEqual(loaded[0].title,"First chat")
+        XCTAssertEqual(loaded[0].draft,"unsent question")
+        XCTAssertEqual(loaded[0].takeaway,"Kept note")
+        XCTAssertEqual(loaded[0].mode,.assistant)
+        XCTAssertFalse(loaded[0].webEnabled)
+        XCTAssertNil(loaded[0].guide)
+        XCTAssertTrue(loaded[0].pendingAttachments.isEmpty)
+        XCTAssertEqual(loaded[0].messages.count,1)
+        XCTAssertEqual(loaded[0].messages[0].text,"The answer is here.")
+        XCTAssertTrue(loaded[0].messages[0].attachments.isEmpty)
+        XCTAssertFalse(loaded[0].messages[0].screenChanged)
+        XCTAssertFalse(loaded[0].messages[0].highlightUnavailable)
+        try XCTAssertEqual(String(contentsOf:file),library)
+        let broken="[{}]"
+        try broken.write(to:file,atomically:true,encoding:.utf8)
+        XCTAssertThrowsError(try store.load())
+        try XCTAssertEqual(String(contentsOf:file),broken)
+        var search=LearningSession(title:"Search")
+        search.webEnabled=true
+        search.guide=GuideProgress(plan:GuidePlan(title:"Plan",steps:["One","Two"]))
+        let restored=try JSONDecoder().decode(LearningSession.self,from:JSONEncoder().encode(search))
+        XCTAssertTrue(restored.webEnabled)
+        XCTAssertEqual(restored.guide?.current,"One")
+        let unknown=Data(#"{"id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","title":"Mode","created":0,"updated":0,"messages":[],"elapsed":0,"duration":0,"completed":false,"takeaway":"","draft":"","hintLevel":0,"mode":"nope"}"#.utf8)
+        let mode=try JSONDecoder().decode(LearningSession.self,from:unknown)
+        XCTAssertEqual(mode.mode,.assistant)
+        XCTAssertFalse(mode.webEnabled)
+    }
 
 }
 
@@ -276,7 +315,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Readable chats survive an unreadable record",tests.testReadableChatsSurviveAnUnreadableRecord)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

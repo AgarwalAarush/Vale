@@ -34,7 +34,12 @@ public struct Message: Codable, Identifiable, Equatable {
         let c=try decoder.container(keyedBy: CodingKeys.self)
         id=try c.decode(UUID.self,forKey:.id); role=try c.decode(String.self,forKey:.role)
         text=try c.decode(String.self,forKey:.text); date=try c.decode(Date.self,forKey:.date)
-        attachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.attachments) ?? [];screenChanged=try c.decodeIfPresent(Bool.self,forKey:.screenChanged) ?? false;highlightUnavailable=try c.decodeIfPresent(Bool.self,forKey:.highlightUnavailable) ?? false
+        attachments=Self.optional([AttachmentRecord].self,from:c,forKey:.attachments) ?? []
+        screenChanged=Self.optional(Bool.self,from:c,forKey:.screenChanged) ?? false
+        highlightUnavailable=Self.optional(Bool.self,from:c,forKey:.highlightUnavailable) ?? false
+    }
+    private static func optional<T: Decodable>(_ type: T.Type, from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> T? {
+        (try? container.decodeIfPresent(type, forKey: key)).flatMap { $0 }
     }
 }
 
@@ -64,15 +69,27 @@ public struct LearningSession: Codable, Identifiable, Equatable {
         let c=try decoder.container(keyedBy:CodingKeys.self)
         id=try c.decode(UUID.self,forKey:.id); title=try c.decode(String.self,forKey:.title)
         created=try c.decode(Date.self,forKey:.created); updated=try c.decode(Date.self,forKey:.updated)
-        messages=try c.decode([Message].self,forKey:.messages); elapsed=try c.decode(Int.self,forKey:.elapsed)
+        elapsed=try c.decode(Int.self,forKey:.elapsed)
         duration=try c.decode(Int.self,forKey:.duration); completed=try c.decode(Bool.self,forKey:.completed)
         takeaway=try c.decode(String.self,forKey:.takeaway); draft=try c.decode(String.self,forKey:.draft)
         hintLevel=try c.decode(Int.self,forKey:.hintLevel)
         // Existing 1.0 sessions were explicitly learning sessions. Preserve that policy.
-        mode=try c.decodeIfPresent(ChatMode.self,forKey:.mode) ?? .learn
-        webEnabled=try c.decodeIfPresent(Bool.self,forKey:.webEnabled) ?? false
-        pendingAttachments=try c.decodeIfPresent([AttachmentRecord].self,forKey:.pendingAttachments) ?? []
-        guide=try c.decodeIfPresent(GuideProgress.self,forKey:.guide);if guide?.plan.isValid != true{guide=nil}
+        // A present value that cannot be read stays general chat, so a bad field cannot withhold answers.
+        if c.contains(.mode), let decoded = try? c.decode(ChatMode.self, forKey: .mode) { mode = decoded }
+        else { mode = c.contains(.mode) ? .assistant : .learn }
+        webEnabled=Self.optional(Bool.self,from:c,forKey:.webEnabled) ?? false
+        pendingAttachments=Self.optional([AttachmentRecord].self,from:c,forKey:.pendingAttachments) ?? []
+        var decodedMessages:[Message]=[]
+        var list=try c.nestedUnkeyedContainer(forKey:.messages)
+        while !list.isAtEnd {
+            if let message=try? list.decode(Message.self) { decodedMessages.append(message) }
+            else { _ = try list.decode(JSONValue.self) }
+        }
+        messages=decodedMessages
+        guide=Self.optional(GuideProgress.self,from:c,forKey:.guide);if guide?.plan.isValid != true{guide=nil}
+    }
+    private static func optional<T: Decodable>(_ type: T.Type, from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> T? {
+        (try? container.decodeIfPresent(type, forKey: key)).flatMap { $0 }
     }
     public var files: [AttachmentRecord] {
         var seen=Set<UUID>()
@@ -114,6 +131,20 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+/// Consumes one JSON value so a message that cannot be read does not stall the list.
+private struct JSONValue: Decodable {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() { return }
+        if (try? container.decode(Bool.self)) != nil { return }
+        if (try? container.decode(Double.self)) != nil { return }
+        if (try? container.decode(String.self)) != nil { return }
+        if (try? container.decode([JSONValue].self)) != nil { return }
+        if (try? container.decode([String: JSONValue].self)) != nil { return }
+        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unreadable value")
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL
@@ -124,12 +155,22 @@ public final class SessionStore {
     public func load() throws -> [LearningSession] {
         guard FileManager.default.fileExists(atPath: file.path) else { return [] }
         let data=try Data(contentsOf:file)
-        let decoded=try JSONDecoder().decode([LearningSession].self,from:data)
-        if let rows=try JSONSerialization.jsonObject(with:data) as? [[String:Any]], rows.contains(where:{$0["mode"] == nil}) {
-            let backup=directory.appendingPathComponent("sessions-v1-backup.json")
-            if !FileManager.default.fileExists(atPath:backup.path) { try data.write(to:backup,options:.atomic); try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:backup.path) }
+        if let decoded=try? JSONDecoder().decode([LearningSession].self,from:data) {
+            if let parsed=try? JSONSerialization.jsonObject(with:data), let rows=parsed as? [[String:Any]], rows.contains(where:{$0["mode"] == nil}) {
+                let backup=directory.appendingPathComponent("sessions-v1-backup.json")
+                if !FileManager.default.fileExists(atPath:backup.path) { try data.write(to:backup,options:.atomic); try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:backup.path) }
+            }
+            return decoded
         }
-        return decoded
+        let parsed=try JSONSerialization.jsonObject(with:data)
+        guard let rows=parsed as? [Any] else { throw StorageError.unreadableLibrary }
+        var loaded:[LearningSession]=[]
+        for row in rows {
+            guard let record=row as? [String:Any], let encoded=try? JSONSerialization.data(withJSONObject:record), let session=try? JSONDecoder().decode(LearningSession.self,from:encoded) else { continue }
+            loaded.append(session)
+        }
+        guard !loaded.isEmpty else { throw StorageError.unreadableLibrary }
+        return loaded
     }
     public func save(_ sessions: [LearningSession]) throws {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -156,7 +197,7 @@ public final class SessionStore {
     }
 }
 
-public enum StorageError:Error{case unreadableBackup}
+public enum StorageError:Error{case unreadableBackup,unreadableLibrary}
 
 public enum TutorPrompt {
     public static func build(session: LearningSession, question: String, hasImage: Bool, pointing: Bool, reveal: Bool, fileContext: String = "", hasWindow: Bool? = nil,guideRequested:Bool=false) -> String {
