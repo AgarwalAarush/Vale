@@ -78,7 +78,7 @@ private final class SearchEventProbe: @unchecked Sendable {
             let process = Process(); process.executableURL = URL(fileURLWithPath: executable)
             var args = ["exec", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only", "--json", "--color", "never", "-C", work.path]
             for option in ["approval_policy=\"never\"", "forced_login_method=\"chatgpt\"", "model_reasoning_effort=\"low\"", "features.shell_tool=false", "features.unified_exec=false", "features.apps=false", "features.plugins=false", "features.browser_use=false", "features.computer_use=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false", "features.image_generation=false", "features.skill_search=false", "features.skip_host_skill_discovery=true", "features.code_mode_host=false", "features.view_image=false", "features.shell_snapshot=false"] { args += ["-c", option] }
-            args += ["-c", "web_search=\"\(search ? "live" : "disabled")\"", "-c", "features.standalone_web_search=\(search)", "-c", "features.code_mode_host=\(search)"]
+            args += ["-c", "web_search=\"\(search ? "live" : "disabled")\"", "-c", "features.standalone_web_search=\(search)", "-c", "features.code_mode_host=\(RequestTools.allowsCodeExecution(webSearch: search))"]
             args += ["-c", "model_instructions_file=\"\(resources.appendingPathComponent("tutor.md").path)\""]
             let model = UserDefaults.standard.string(forKey: "model") ?? ""
             if !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { args += ["-m", model] }

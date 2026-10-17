@@ -5,6 +5,14 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum RequestTools {
+    /// Web search does not turn on host code execution.
+    public static func allowsCodeExecution(webSearch: Bool) -> Bool {
+        _ = webSearch
+        return false
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID
