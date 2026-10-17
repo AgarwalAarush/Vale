@@ -129,7 +129,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let id=UUID();requestID=id;let chatID=chat.id
         if !retry {
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
-            if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
+            if chat.title == "New chat" {chat.title=ChatHeading.from(question)}
             replace(chat);draft=""
         }
         failedQuestion=question;persist()

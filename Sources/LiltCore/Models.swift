@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ChatHeading {
+    /// First line of the question, on any line break, within the existing 60-character title limit.
+    public static func from(_ question: String) -> String {
+        let line=question.split(whereSeparator:\.isNewline).first.map(String.init) ?? question
+        return String(line.filter{!$0.isNewline}.prefix(60))
+    }
+}
