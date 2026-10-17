@@ -240,6 +240,17 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testEndedGuideIsNotRestoredByTheAnswer() {
+        XCTAssertTrue(GuideInstall.shouldInstall(requested:true,windowChanged:false,stillCurrent:true))
+        XCTAssertFalse(GuideInstall.shouldInstall(requested:true,windowChanged:false,stillCurrent:false))
+        XCTAssertFalse(GuideInstall.shouldInstall(requested:true,windowChanged:true,stillCurrent:true))
+        XCTAssertFalse(GuideInstall.shouldInstall(requested:false,windowChanged:false,stillCurrent:true))
+        XCTAssertFalse(GuidePlan(title:"Only",steps:["One step"]).isValid)
+        let ordinary=TutorPrompt.build(session:LearningSession(title:"Install"),question:"What is this button?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(ordinary.contains("Return null for guide"))
+        XCTAssertTrue(ordinary.contains("Current guide: None"))
+        XCTAssertTrue(ordinary.contains("Web search: Disabled"))
+    }
 
 }
 
@@ -276,7 +287,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Ended guide is not restored by the answer",tests.testEndedGuideIsNotRestoredByTheAnswer)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

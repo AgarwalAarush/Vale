@@ -39,6 +39,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var loading = false
     private var observerTokens: [AnyCancellable] = []
     private var failedQuestion: String?
+    private var guideEpoch = UUID()
     private var spokenDraftPrefix = ""
     private var conversationTask:Task<Void,Never>?
     @Published var shortcutWarning:String?
@@ -135,7 +136,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         failedQuestion=question;persist()
         var history=chat
         if history.messages.last?.role=="user",history.messages.last?.text==question{history.messages.removeLast()}
-        let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled
+        let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled;let startedGuide=guideEpoch
         captureTask=Task { [weak self] in
             guard let self else{return};var snapshot:ContextSnapshot?
             do {
@@ -157,12 +158,13 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             let changed=snapshot.map{original in fresh.map{!original.evidence.reflectsSameView($0.evidence)} ?? true} ?? false
                             let canPoint:Bool
                             if let point=reply.point,let snapshot,let fresh,let frame=snapshot.frame,!changed{canPoint=snapshot.evidence.matches(fresh.evidence) && self.context.pointIsVisible(point,frame:frame,windowID:snapshot.windowID)}else{canPoint=false}
+                            let install=GuideInstall.shouldInstall(requested:guideRequested,windowChanged:changed,stillCurrent:self.guideEpoch==startedGuide)
                             self.busy=false
                             self.updateActive{chat in
                                 chat.messages.append(Message(role:"assistant",text:reply.text,screenChanged:changed,highlightUnavailable:reply.point != nil && !changed && !canPoint));chat.updated=Date()
-                                if let plan=reply.guide,guideRequested,!changed{chat.guide=GuideProgress(plan:plan)}
+                                if let plan=reply.guide,install{chat.guide=GuideProgress(plan:plan)}
                             }
-                            if guideRequested,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
+                            if install,reply.guide != nil,!self.expanded{self.expandCoach?()}
                             self.failedQuestion=nil
                             if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(reply.text)}
                             else if changed,(self.readAloud || spoken || self.conversation){self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
@@ -221,7 +223,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let index=max(0,min(guide.plan.steps.count-1,guide.index+delta));updateActive{$0.guide?.index=index};persist()
         send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true)
     }
-    func endGuide(){updateActive{$0.guide=nil};persist()}
+    func endGuide(){guideEpoch=UUID();updateActive{$0.guide=nil};persist()}
     func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true)}
     func stopSharing(){context.stop()}
     func previewContext(){
