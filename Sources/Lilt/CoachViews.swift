@@ -38,16 +38,15 @@ struct CoachView: View {
                 LogoMark(); Text("Vale").font(.system(size: 15, weight: .semibold))
                 Spacer()
                 Menu {
-                    Button("Assistant") {model.setMode(.assistant)}
-                    Button("Learn with hints") {model.setMode(.learn)}
-                } label: {Text(model.active?.mode.label ?? "Ask").font(.system(size:11)).foregroundStyle(Theme.muted)}.menuStyle(.borderlessButton).fixedSize().help("Choose assistant or learning mode")
+                    Button(ChatMode.assistant.label) {model.setMode(.assistant)}
+                    Button(ChatMode.learn.label) {model.setMode(.learn)}
+                } label: {Text(model.active?.mode.label ?? ChatMode.assistant.label).font(.system(size:11)).foregroundStyle(Theme.muted)}.menuStyle(.borderlessButton).fixedSize().help("Choose Assistant or Learn with hints")
                 IconButton(symbol: "rectangle.stack", label: "Chat history") { model.showLibrary?() }
                 Menu {
                     Toggle("Read typed replies aloud", isOn: $model.readAloud)
                     Button("New chat") {model.newSession()}
                     Button("Point it out") {model.pointItOut()}.disabled(!model.context.hasSelection || model.busy)
                     if model.active?.mode == .learn { Button("Show a full walkthrough…") { walkthrough = true }.disabled(model.active?.messages.isEmpty != false || model.busy) }
-                    Menu("Focus timer") {Button("30 minutes"){model.setFocus(minutes:30)};Button("60 minutes"){model.setFocus(minutes:60)};Button("No timer"){model.setFocus(minutes:0)}}
                     Button("Close chat") { model.complete() }.disabled(model.active == nil)
                     Divider(); Button("Settings…") { model.settings = true; model.showLibrary?() }
                 } label: { Image(systemName: "ellipsis").font(.system(size: 14)).frame(width: 24, height: 30) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()

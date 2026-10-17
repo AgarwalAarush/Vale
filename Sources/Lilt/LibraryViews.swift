@@ -85,7 +85,7 @@ struct SessionDetail: View {
         ScrollView{
             VStack(alignment:.leading,spacing:22){
                 HStack(alignment:.top){
-                    VStack(alignment:.leading,spacing:9){Text(session.title).font(.system(size:27,weight:.medium)).tracking(-0.7);Text("\(session.mode == .learn ? "Learn" : "Assistant") · \(session.messages.filter{$0.role == "user"}.count) \(session.messages.filter{$0.role == "user"}.count == 1 ? "message" : "messages")").font(.system(size:11)).foregroundStyle(Theme.muted)}
+                    VStack(alignment:.leading,spacing:9){Text(session.title).font(.system(size:27,weight:.medium)).tracking(-0.7);Text("\(session.mode.label) · \(session.messages.filter{$0.role == "user"}.count) \(session.messages.filter{$0.role == "user"}.count == 1 ? "message" : "messages")").font(.system(size:11)).foregroundStyle(Theme.muted)}
                     Spacer()
                     Menu{Button("Rename…",action:renameAction);Button("Export chat…"){model.export(session)};Button("Forget chat…",role:.destructive,action:deleteAction)}label:{Image(systemName:"ellipsis").frame(width:25,height:25)}.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }

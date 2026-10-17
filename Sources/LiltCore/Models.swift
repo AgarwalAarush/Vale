@@ -2,7 +2,7 @@ import Foundation
 
 public enum ChatMode: String, Codable, CaseIterable, Sendable {
     case assistant, learn
-    public var label: String { self == .assistant ? "Ask" : "Learn" }
+    public var label: String { self == .assistant ? "Assistant" : "Learn with hints" }
 }
 
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
