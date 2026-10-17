@@ -240,6 +240,24 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testUnsavedQuestionReturnsToTheComposer() {
+        let file=AttachmentRecord(name:"Notes.txt",kind:.text,byteCount:4)
+        var chat=LearningSession(title:"New chat")
+        let previous=chat.title
+        chat.messages.append(Message(role:"user",text:"Hello",attachments:[file]))
+        chat.title="Hello"
+        let restored=SendSave.restore(previousTitle:previous,messages:chat.messages,pending:[],question:"Hello",draft:"Hello")
+        XCTAssertEqual(restored.title,"New chat")
+        XCTAssertTrue(restored.messages.isEmpty)
+        XCTAssertEqual(restored.pending,[file])
+        XCTAssertEqual(restored.draft,"Hello")
+        var older=LearningSession(title:"Earlier")
+        older.messages=[Message(role:"user",text:"First"),Message(role:"assistant",text:"Answer"),Message(role:"user",text:"Second")]
+        let kept=SendSave.restore(previousTitle:"Earlier",messages:older.messages,pending:[],question:"Second",draft:"Second ")
+        XCTAssertEqual(kept.title,"Earlier")
+        XCTAssertEqual(kept.messages.map(\.text),["First","Answer"])
+        XCTAssertEqual(kept.draft,"Second ")
+    }
 
 }
 
@@ -276,7 +294,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Unsaved question returns to the composer",tests.testUnsavedQuestionReturnsToTheComposer)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

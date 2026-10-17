@@ -190,3 +190,22 @@ public enum TutorPrompt {
         """
     }
 }
+
+public struct SendSave: Equatable {
+    public var title: String
+    public var messages: [Message]
+    public var pending: [AttachmentRecord]
+    public var draft: String
+    public init(title: String, messages: [Message], pending: [AttachmentRecord], draft: String) {
+        self.title=title; self.messages=messages; self.pending=pending; self.draft=draft
+    }
+    /// The question was not saved, so the composer gets back what was typed.
+    public static func restore(previousTitle: String, messages: [Message], pending: [AttachmentRecord], question: String, draft: String) -> SendSave {
+        var messages=messages
+        var pending=pending
+        if messages.last?.role=="user", messages.last?.text==question {
+            pending=messages.removeLast().attachments+pending
+        }
+        return SendSave(title: previousTitle, messages: messages, pending: pending, draft: draft)
+    }
+}
