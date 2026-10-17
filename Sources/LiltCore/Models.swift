@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ImportReport {
+    /// Every failed file in one drop. A single failure stays the same sentence.
+    public static func summary(_ errors: [String]) -> String? {
+        let items=errors.map{$0.trimmingCharacters(in:.whitespacesAndNewlines)}.filter{!$0.isEmpty}
+        return items.isEmpty ? nil : items.joined(separator: "\n")
+    }
+}

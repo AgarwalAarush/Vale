@@ -251,7 +251,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             if !retained.isEmpty{var recovery=LearningSession(title:"Files awaiting removal");recovery.pendingAttachments=retained;sessions.insert(recovery,at:0);persist();error="Some imported files couldn’t be removed. They were kept in Files awaiting removal so you can retry Forget."};return
         }
         sessions[index].pendingAttachments+=outcomes.compactMap(\.record);sessions[index].updated=Date()
-        if let failure=outcomes.compactMap(\.error).first{error=failure}
+        if let failure=ImportReport.summary(outcomes.compactMap(\.error)){error=failure}
         persist()
     }
     func pasteImage(_ data:Data){
