@@ -114,6 +114,20 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum FooterStatus {
+    /// While a reply is on the way, the footer keeps that wait. Adding a file does not replace it.
+    public static func line(paused: Bool, importing: Bool, microphoneStarting: Bool, listening: Bool, waiting: Bool, speaking: Bool, conversation: Bool) -> String {
+        if paused { return "Paused" }
+        if importing, !waiting { return "Adding files…" }
+        if microphoneStarting { return "Waiting for microphone…" }
+        if listening { return "Listening…" }
+        if waiting { return "Thinking…" }
+        if speaking { return "Speaking · tap mic to interrupt" }
+        if conversation { return "Conversation ready" }
+        return "Voice off"
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL

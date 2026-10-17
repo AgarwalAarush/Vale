@@ -57,7 +57,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var contextName: String? { context.title }
     var pendingFiles: [AttachmentRecord] { active?.pendingAttachments ?? [] }
     var hasInput: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty }
-    var status: String { paused ? "Paused" : importing ? "Adding files…" : voice.starting ? "Waiting for microphone…" : voice.listening ? "Listening…" : busy ? "Thinking…" : voice.speaking ? "Speaking · tap mic to interrupt" : conversation ? "Conversation ready" : "Voice off" }
+    var status: String { FooterStatus.line(paused: paused, importing: importing, microphoneStarting: voice.starting, listening: voice.listening, waiting: busy, speaking: voice.speaking, conversation: conversation) }
     init(dataDirectory: URL? = nil,fileRemoval:(@Sendable(URL)throws->Void)?=nil) {
         // Retain the 1.0 storage identifier so the Vale rename never strands chats.
         let directory = dataDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("Lilt")
