@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum AliasFile {
+    /// A Finder alias is bookmark data. A file that is not an alias stays the original URL. A symbolic link is not an alias.
+    public static func shouldResolve(isAlias: Bool) -> Bool { isAlias }
+    public static func urlToRead(original: URL, resolved: URL?, isAlias: Bool) -> URL {
+        guard shouldResolve(isAlias: isAlias), let resolved else { return original }
+        return resolved
+    }
+}
