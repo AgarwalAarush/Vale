@@ -93,7 +93,8 @@ public struct PointTarget: Codable, Equatable {
         self.x=x; self.y=y; self.width=width; self.height=height; self.label=label
     }
     public var isValid: Bool {
-        [x,y,width,height].allSatisfy { $0.isFinite } && x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= 1.001 && y + height <= 1.001 && label.count <= 120
+        // A long caption still marks a real place. Only the rectangle can reject the highlight.
+        [x,y,width,height].allSatisfy { $0.isFinite } && x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= 1.001 && y + height <= 1.001
     }
 }
 
