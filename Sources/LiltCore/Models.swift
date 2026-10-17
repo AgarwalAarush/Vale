@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// The send button must commit an input-method composition before sending. Otherwise those characters are dropped.
+public enum ComposerSubmit {
+    public static func commitsMarkedTextBeforeSend(hasMarkedText: Bool) -> Bool { hasMarkedText }
+}
