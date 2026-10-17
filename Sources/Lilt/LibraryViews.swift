@@ -110,13 +110,14 @@ struct SessionDetail: View {
 }
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    var embeddedInCoach = false
     @AppStorage("codexPath") private var codexPath = ""
     @AppStorage("model") private var modelName = ""
     @State private var connection = ""
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                Text("Settings").font(.system(size: 28, weight: .medium)).tracking(-0.7)
+                Text("Settings").font(.system(size: embeddedInCoach ? 22 : 28, weight: .medium)).tracking(-0.7)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("ChatGPT via Codex").font(.system(size: 16, weight: .medium))
                     Text(connection.isEmpty ? (model.provider.executable == nil ? "Codex wasn’t found in ~/.local/bin, Homebrew, the app bundle, or your PATH." : "Uses the sign-in saved by your Codex CLI.") : connection).font(.system(size: 12)).foregroundStyle(Theme.muted)
@@ -149,7 +150,7 @@ struct SettingsView: View {
                 }.font(.system(size: 12))
                 Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
                 Text("Vale 1.2.2 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
-            }.padding(.horizontal, 42).padding(.top, 54).padding(.bottom, 40)
+            }.padding(.horizontal, embeddedInCoach ? 18 : 42).padding(.top, embeddedInCoach ? 8 : 54).padding(.bottom, embeddedInCoach ? 20 : 40)
         }.scrollIndicators(.hidden)
     }
     func checkConnection() {
