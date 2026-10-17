@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FileBudget {
+    /// The files on the question being asked are read before older ones, so an earlier document cannot use up the text budget first.
+    public static func ordered(_ records: [AttachmentRecord], newest: [UUID]) -> [AttachmentRecord] {
+        let priority=Set(newest)
+        guard !priority.isEmpty, records.contains(where:{!priority.contains($0.id)}) else { return records }
+        return records.filter{priority.contains($0.id)} + records.filter{!priority.contains($0.id)}
+    }
+}

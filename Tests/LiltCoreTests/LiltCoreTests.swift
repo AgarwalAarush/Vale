@@ -240,6 +240,21 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testNewestFileIsReadBeforeOlderOnes() {
+        let older=AttachmentRecord(name:"Notes.md",kind:.text,byteCount:20)
+        let newer=AttachmentRecord(name:"Error.log",kind:.text,byteCount:20)
+        let image=AttachmentRecord(name:"Shot.png",kind:.image,byteCount:20)
+        XCTAssertEqual(FileBudget.ordered([older,image,newer],newest:[newer.id,image.id]).map(\.name),["Shot.png","Error.log","Notes.md"])
+        XCTAssertEqual(FileBudget.ordered([older,newer],newest:[older.id,newer.id]).map(\.name),["Notes.md","Error.log"])
+        XCTAssertEqual(FileBudget.ordered([older,newer],newest:[newer.id,UUID()]).map(\.name),["Error.log","Notes.md"])
+        XCTAssertEqual(FileBudget.ordered([older,newer],newest:[]).map(\.name),["Notes.md","Error.log"])
+        let chat=LearningSession(title:"New chat")
+        XCTAssertFalse(chat.webEnabled)
+        let prompt=TutorPrompt.build(session:chat,question:"What is this?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("No. Return null for point."))
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +291,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Newest file is read before older ones",tests.testNewestFileIsReadBeforeOlderOnes)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
