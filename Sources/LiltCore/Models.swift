@@ -190,3 +190,18 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ScanPages {
+    /// A scanned page is described as attached only when its picture was actually produced.
+    public static func note(name: String, pageCount: Int, rendered: Int) -> String {
+        let offered = min(4, max(0, pageCount))
+        let shown = min(max(0, rendered), offered)
+        if shown == offered {
+            return "\nScanned PDF: \(name). Only the first \(offered) of \(pageCount) pages follow as images. Do not imply access to later pages.\n"
+        }
+        if shown == 0 {
+            return "\nScanned PDF: \(name). None of the first \(offered) of \(pageCount) pages could be read as images. Do not invent their contents.\n"
+        }
+        return "\nScanned PDF: \(name). \(shown) of the first \(offered) of \(pageCount) pages follow as images. The others could not be read. Do not invent unseen pages.\n"
+    }
+}

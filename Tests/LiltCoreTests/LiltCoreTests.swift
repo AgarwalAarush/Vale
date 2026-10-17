@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testUnreadScanPageIsNotDescribedAsAttached() {
+        let full=ScanPages.note(name:"scan.pdf",pageCount:10,rendered:4)
+        XCTAssertEqual(full,"\nScanned PDF: scan.pdf. Only the first 4 of 10 pages follow as images. Do not imply access to later pages.\n")
+        let none=ScanPages.note(name:"scan.pdf",pageCount:10,rendered:0)
+        XCTAssertTrue(none.contains("None of the first 4 of 10 pages could be read as images"))
+        XCTAssertFalse(none.contains("follow as images"))
+        let partial=ScanPages.note(name:"scan.pdf",pageCount:10,rendered:2)
+        XCTAssertTrue(partial.contains("2 of the first 4 of 10 pages follow as images"))
+        XCTAssertTrue(partial.contains("Do not invent unseen pages"))
+        let prompt=TutorPrompt.build(session:LearningSession(title:"Scan"),question:"What is this?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Current guide: None"))
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Unread scan page is not described as attached",tests.testUnreadScanPageIsNotDescribedAsAttached)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

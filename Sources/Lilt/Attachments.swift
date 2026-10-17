@@ -79,12 +79,13 @@ final class AttachmentStore: Sendable {
                     result.text += "\n--- PDF: \(record.name) (\(pdf.pageCount) pages) ---\n\(text)\n"
                     if pagesRead < pdf.pageCount || text.count >= maximum { result.text += "[PDF text truncated; only the preceding excerpt is available.]\n" }
                 } else {
-                    result.text += "\nScanned PDF: \(record.name). Only the first \(min(4,pdf.pageCount)) of \(pdf.pageCount) pages follow as images. Do not imply access to later pages.\n"
+                    var rendered=0
                     for index in 0..<min(4,pdf.pageCount) {
                         guard let page=pdf.page(at:index) else { continue }
                         let image=page.thumbnail(of:NSSize(width:1200,height:1600),for:.mediaBox)
-                        if let tiff=image.tiffRepresentation,let rep=NSBitmapImageRep(data:tiff),let png=rep.representation(using:.png,properties:[:]) { result.images.append(png) }
+                        if let tiff=image.tiffRepresentation,let rep=NSBitmapImageRep(data:tiff),let png=rep.representation(using:.png,properties:[:]) { result.images.append(png); rendered+=1 }
                     }
+                    result.text += ScanPages.note(name:record.name, pageCount:pdf.pageCount, rendered:rendered)
                 }
             }
         }
