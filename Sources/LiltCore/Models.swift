@@ -190,3 +190,67 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyAddress {
+    /// The page or mail address stays on screen when a reply names it.
+    public static func forDisplay(_ text: String) -> String {
+        var out = ""
+        var index = text.startIndex
+        var fenced = false
+        var inline = false
+        while index < text.endIndex {
+            if !inline && fence(text, at: index) {
+                fenced.toggle()
+                out += "```"
+                index = text.index(index, offsetBy: 3)
+                continue
+            }
+            let character = text[index]
+            if !fenced && character == "`" {
+                inline.toggle()
+                out.append(character)
+                index = text.index(after: index)
+                continue
+            }
+            if !fenced && !inline && character == "[" && !image(text, at: index), let link = link(in: text, from: index) {
+                out += link.display
+                index = link.end
+                continue
+            }
+            out.append(character)
+            index = text.index(after: index)
+        }
+        return out
+    }
+
+    private static func fence(_ text: String, at index: String.Index) -> Bool {
+        let atLine = index == text.startIndex || text[text.index(before: index)] == "\n"
+        return atLine && text[index...].hasPrefix("```")
+    }
+
+    private static func image(_ text: String, at index: String.Index) -> Bool {
+        index > text.startIndex && text[text.index(before: index)] == "!"
+    }
+
+    private static func link(in text: String, from start: String.Index) -> (display: String, end: String.Index)? {
+        guard text[start] == "[" else { return nil }
+        var index = text.index(after: start)
+        let labelStart = index
+        while index < text.endIndex && text[index] != "]" && text[index] != "\n" { index = text.index(after: index) }
+        guard index < text.endIndex, text[index] == "]" else { return nil }
+        let label = String(text[labelStart..<index])
+        index = text.index(after: index)
+        guard index < text.endIndex, text[index] == "(" else { return nil }
+        index = text.index(after: index)
+        let urlStart = index
+        while index < text.endIndex && text[index] != ")" && !text[index].isWhitespace { index = text.index(after: index) }
+        guard index < text.endIndex, text[index] == ")" else { return nil }
+        let url = String(text[urlStart..<index])
+        let end = text.index(after: index)
+        guard !url.isEmpty else { return nil }
+        let shown = url.lowercased().hasPrefix("mailto:") ? String(url.dropFirst("mailto:".count)) : url
+        if label.isEmpty { return ("[\(shown)](\(url))", end) }
+        if label == url || label == shown || label.contains(shown) { return ("[\(label)](\(url))", end) }
+        return ("[\(label) (\(shown))](\(url))", end)
+    }
+}
