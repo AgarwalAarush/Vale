@@ -190,3 +190,14 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum WindowCheck {
+    /// A follow-up picture that never arrives is not a window change.
+    public static func changed(matches: Bool?) -> Bool {
+        guard let matches else { return false }
+        return !matches
+    }
+    public static func highlightUnavailable(askedToPoint: Bool, compared: Bool, changed: Bool, canPoint: Bool) -> Bool {
+        askedToPoint && compared && !changed && !canPoint
+    }
+}
