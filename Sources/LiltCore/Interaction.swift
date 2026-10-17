@@ -5,7 +5,12 @@ public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]
     public init(title:String,steps:[String]){self.title=title;self.steps=steps}
-    public var isValid:Bool{!title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && title.count<=120 && (2...8).contains(steps.count) && steps.allSatisfy{!$0.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && $0.count<=300}}
+    /// A usable plan has 2–8 non-empty steps. Length is checked after trimming so a
+    /// normal paragraph is kept; only an empty or enormous field is refused.
+    public var isValid:Bool{
+        let name=title.trimmingCharacters(in:.whitespacesAndNewlines)
+        return !name.isEmpty && name.count<=400 && (2...8).contains(steps.count) && steps.allSatisfy{let step=$0.trimmingCharacters(in:.whitespacesAndNewlines);return !step.isEmpty && step.count<=4_000}
+    }
 }
 public struct GuideProgress:Codable,Equatable,Sendable {
     public var plan:GuidePlan

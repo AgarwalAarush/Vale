@@ -240,6 +240,21 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testLongGuideStepIsKept()throws{
+        let step=String(repeating:"Walk through the diagram. ",count:20)
+        XCTAssertTrue(step.count>300)
+        let plan=GuidePlan(title:"Follow the diagram",steps:[step,"Name the shape"])
+        let decoded=try TutorReply.decode(JSONEncoder().encode(TutorReply(text:"Start with the first part of the diagram.",guide:plan)))
+        XCTAssertEqual(decoded.guide,plan)
+        let titled=GuidePlan(title:String(repeating:"A",count:121),steps:["Find the circle","Name its color"])
+        try XCTAssertEqual(TutorReply.decode(JSONEncoder().encode(TutorReply(text:"Begin.",guide:titled))).guide,titled)
+        var chat=LearningSession(title:"Diagram");chat.guide=GuideProgress(plan:plan)
+        let restored=try JSONDecoder().decode(LearningSession.self,from:JSONEncoder().encode(chat))
+        XCTAssertEqual(restored.guide?.plan,plan)
+        XCTAssertFalse(GuidePlan(title:"   ",steps:["One","Two"]).isValid)
+        XCTAssertFalse(GuidePlan(title:"Plan",steps:[String(repeating:"x",count:4_001),"Next"]).isValid)
+        try XCTAssertNil(TutorReply.decode(JSONEncoder().encode(TutorReply(text:"Answer",guide:GuidePlan(title:"Bad",steps:["Only one"])))).guide)
+    }
 
 }
 
@@ -276,7 +291,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Keep a guide plan with a long step",tests.testLongGuideStepIsKept)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
