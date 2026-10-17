@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum LineBreak {
+    /// Return sends. Shift-Return and Option-Return stay in the composer so a line can be finished.
+    public static func sends(shift: Bool, option: Bool, marked: Bool) -> Bool {
+        !shift && !option && !marked
+    }
+}
