@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ComposerRows {
+    /// Space between the line you type and the controls under it.
+    public static let spacing: CGFloat = 10
+}
