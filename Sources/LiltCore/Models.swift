@@ -5,6 +5,13 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum ExportedChat {
+    /// Use the chat as it is when the file is written, not the copy from when export was opened.
+    public static func latest(id: UUID, in sessions: [LearningSession], shown: LearningSession) -> LearningSession {
+        sessions.first { $0.id == id } ?? shown
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID

@@ -240,6 +240,17 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testExportUsesTheAnswerThatArrivedWhileSaving() {
+        var shown=LearningSession(title:"First chat")
+        shown.messages=[Message(role:"user",text:"What is 2 + 2?")]
+        var saved=shown
+        saved.messages.append(Message(role:"assistant",text:"4"))
+        let current=ExportedChat.latest(id:shown.id,in:[saved],shown:shown)
+        let file=SessionStore.export(current)
+        XCTAssertTrue(file.contains("What is 2 + 2?"))
+        XCTAssertTrue(file.contains("4"))
+        XCTAssertEqual(ExportedChat.latest(id:UUID(),in:[saved],shown:shown).messages.count,1)
+    }
 
 }
 
@@ -276,7 +287,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Export uses the answer that arrived while saving",tests.testExportUsesTheAnswerThatArrivedWhileSaving)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
