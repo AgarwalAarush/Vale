@@ -113,7 +113,7 @@ struct CoachView: View {
                 }.scrollIndicators(.hidden)
                 .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
-            }.frame(maxHeight: .infinity)
+            }.frame(minHeight: ComposerSeat.staysOnScreen ? CGFloat(0) : nil, maxHeight: .infinity)
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 11)).foregroundStyle(Color(red: 0.96, green: 0.77, blue: 0.49)); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }

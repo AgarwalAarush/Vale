@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ComposerSeat {
+    /// A long answer must not push the composer below the coach.
+    public static let staysOnScreen = true
+}
