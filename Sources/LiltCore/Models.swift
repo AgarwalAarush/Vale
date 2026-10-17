@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum QuestionSend {
+    /// Thinking should end when this question never went out and it is still the current one.
+    public static func shouldClearWaiting(request: UUID, current: UUID, handedOff: Bool) -> Bool {
+        request == current && !handedOff
+    }
+}

@@ -240,6 +240,12 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testWaitingClearsWhenTheQuestionDoesNotGoOut() {
+        let id=UUID()
+        XCTAssertTrue(QuestionSend.shouldClearWaiting(request:id, current:id, handedOff:false))
+        XCTAssertFalse(QuestionSend.shouldClearWaiting(request:id, current:id, handedOff:true))
+        XCTAssertFalse(QuestionSend.shouldClearWaiting(request:id, current:UUID(), handedOff:false))
+    }
 
 }
 
@@ -276,7 +282,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Waiting clears when the question does not go out",tests.testWaitingClearsWhenTheQuestionDoesNotGoOut)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
