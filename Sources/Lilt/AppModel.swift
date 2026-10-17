@@ -218,8 +218,16 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func moveGuide(_ delta:Int){
         guard let guide=active?.guide,!busy,!paused else{return}
-        let index=max(0,min(guide.plan.steps.count-1,guide.index+delta));updateActive{$0.guide?.index=index};persist()
-        send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true)
+        let requested=max(0,min(guide.plan.steps.count-1,guide.index+delta))
+        let promptText="Help me with step \(requested+1): \(guide.plan.steps[requested]). "
+        let starts = !importing && !promptText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+        let index=GuideStep.indexToSave(current:guide.index,requested:requested,questionStarts:starts)
+        guard starts else{
+            if importing{error="Wait for your files to finish attaching."}
+            return
+        }
+        updateActive{$0.guide?.index=index};persist()
+        send(promptText,pointing:context.hasSelection,reveal:true)
     }
     func endGuide(){updateActive{$0.guide=nil};persist()}
     func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true)}
