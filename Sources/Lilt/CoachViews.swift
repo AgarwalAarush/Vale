@@ -153,7 +153,17 @@ struct CoachView: View {
             HStack {
                 Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                 Spacer()
-                Button{model.setConversation(!model.conversation)}label:{Label(model.conversation ? "End conversation" : "Conversation",systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
+                Group {
+                    if ConversationControl.showsAsButton {
+                        Button { model.setConversation(!model.conversation) } label: {
+                            Label(ConversationControl.title(on: model.conversation), systemImage: model.conversation ? "waveform.circle.fill" : "waveform.circle")
+                        }.buttonStyle(QuietButton(filled: model.conversation)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)
+                    } else {
+                        Button { model.setConversation(!model.conversation) } label: {
+                            Label(ConversationControl.title(on: model.conversation), systemImage: model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size: 10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)
+                        }.buttonStyle(.plain)
+                    }
+                }.disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 14)
         }.modifier(GlassSurface(radius: 20))
             .dropDestination(for:URL.self){urls,_ in Task{await model.importFiles(urls)};return urls.contains(where:{$0.isFileURL})}

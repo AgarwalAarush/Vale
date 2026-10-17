@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ConversationControl {
+    /// The optional voice control looks like a button. It still starts only when the person uses it.
+    public static let showsAsButton = true
+    public static func title(on: Bool) -> String { on ? "End conversation" : "Conversation" }
+}
