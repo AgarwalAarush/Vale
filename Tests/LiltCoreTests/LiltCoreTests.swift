@@ -240,6 +240,20 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSentPictureShowsInTheExchange() {
+        XCTAssertTrue(SentPicture.shownInTheExchange)
+        XCTAssertEqual(SentPicture.maxHeight, 160)
+        let picture = AttachmentRecord(name: "Pasted image.png", kind: .image, byteCount: 12, detail: "image")
+        let note = AttachmentRecord(name: "notes.txt", kind: .text, byteCount: 12, detail: "text")
+        XCTAssertTrue(SentPicture.shows(picture))
+        XCTAssertFalse(SentPicture.shows(note))
+        var chat = LearningSession(title: "New chat")
+        chat.messages = [Message(role: "user", text: "What is this?", attachments: [picture])]
+        XCTAssertEqual(chat.messages[0].attachments.first?.kind, .image)
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +290,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Sent picture shows in the exchange",tests.testSentPictureShowsInTheExchange)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

@@ -83,7 +83,29 @@ struct CoachView: View {
                                     Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
                                     Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                                     if !message.attachments.isEmpty {
-                                        ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
+                                        VStack(alignment: .leading, spacing: 7) {
+                                            ForEach(message.attachments) { record in
+                                                if SentPicture.shows(record), let image = model.fileStore?.image(for: record) {
+                                                    Button { model.showFile?(record) } label: {
+                                                        VStack(alignment: .leading, spacing: 4) {
+                                                            Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading).clipShape(RoundedRectangle(cornerRadius: 8))
+                                                            Text(record.name).font(.system(size: 11, weight: .medium)).lineLimit(1).foregroundStyle(Theme.muted)
+                                                        }
+                                                    }.buttonStyle(.plain).help("Preview \(record.name)").accessibilityLabel("Preview \(record.name)")
+                                                }
+                                            }
+                                            if message.attachments.contains(where: { !SentPicture.shows($0) || model.fileStore?.image(for: $0) == nil }) {
+                                                ScrollView(.horizontal) {
+                                                    HStack(spacing: 7) {
+                                                        ForEach(message.attachments) { record in
+                                                            if !SentPicture.shows(record) || model.fileStore?.image(for: record) == nil {
+                                                                FileChip(record: record, model: model, removable: !SentPicture.shows(record))
+                                                            }
+                                                        }
+                                                    }
+                                                }.scrollIndicators(.hidden)
+                                            }
+                                        }
                                     }
                                     if message.highlightUnavailable{Label("Highlight unavailable · check your selected window",systemImage:"eye.slash").font(.system(size:10)).foregroundStyle(Theme.muted)}
                                     if message.screenChanged{
