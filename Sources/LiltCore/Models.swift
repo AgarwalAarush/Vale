@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyControls {
+    /// The reply mask must not slice the controls that sit on that message.
+    public static let stayWhole = true
+    public static func clips(_ role: String) -> Bool { role == "user" || !stayWhole }
+}

@@ -98,7 +98,7 @@ struct CoachView: View {
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(message.role == "user" ? 12 : 0)
                                     .background(message.role == "user" ? Color.white.opacity(0.035) : .clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .clipExchange(ReplyControls.clips(message.role))
                                     .id(message.id)
                             }
                         } else {
@@ -162,5 +162,11 @@ struct CoachView: View {
                 Button("Keep thinking", role: .cancel) {}
                 Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
             } message: { Text("This will reveal the method. Your current hints stay in the conversation.") }
+    }
+}
+
+private extension View {
+    @ViewBuilder func clipExchange(_ clips: Bool) -> some View {
+        if clips { self.clipShape(RoundedRectangle(cornerRadius: 10)) } else { self }
     }
 }
