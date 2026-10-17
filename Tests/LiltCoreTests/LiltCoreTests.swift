@@ -76,7 +76,7 @@ final class LiltCoreTests {
     func testGuideStepIsShownInFull() {
         let step = String(repeating: "Follow the curved edge. ", count: 12)
         XCTAssertEqual(GuideStepText.visible(step), step)
-        XCTAssertGreaterThan(step.count, 200)
+        XCTAssertTrue(step.count > 200)
     }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
