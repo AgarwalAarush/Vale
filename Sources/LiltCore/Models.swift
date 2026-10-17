@@ -190,3 +190,21 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FileName {
+    /// A file name in the exchange keeps every character, with breaks so a long name can wrap.
+    public static func shown(_ name: String) -> String {
+        let breaks: Set<Character> = [".", "-", "_", " "]
+        var result = ""
+        var run = 0
+        for character in name {
+            result.append(character)
+            run += 1
+            if breaks.contains(character) || run == 16 {
+                result.append("\u{200B}")
+                run = 0
+            }
+        }
+        return result
+    }
+}
