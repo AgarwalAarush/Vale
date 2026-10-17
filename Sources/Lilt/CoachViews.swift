@@ -60,6 +60,7 @@ struct CoachView: View {
                 HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
             }
             if let guide=model.active?.guide{GuideCard(model:model,guide:guide)}
+            GeometryReader { geo in
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -109,10 +110,11 @@ struct CoachView: View {
                         }
                         if model.busy { HStack(spacing: 8) { ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 5).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
-                    }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
+                    }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, minHeight: ThreadSeat.pins(model.active?.messages.count ?? 0) ? geo.size.height : nil, alignment: ThreadSeat.pins(model.active?.messages.count ?? 0) ? .bottomLeading : .topLeading)
                 }.scrollIndicators(.hidden)
                 .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
             }.frame(maxHeight: .infinity)
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
