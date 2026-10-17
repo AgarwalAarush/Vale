@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SentFiles {
+    /// Files on a question are listed in full, not tucked into one clipped row.
+    public static let listedInFull = true
+    public static func names(_ records: [AttachmentRecord]) -> [String] { records.map(\.name) }
+}
