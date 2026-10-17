@@ -191,6 +191,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard !paused,active != nil else{return}
         if voice.listening{voice.finishUtterance()}
         else if voice.starting{conversation=false;voice.stopListening()}
+        else if !MicInterrupt.startsMicrophone(speaking: voice.speaking, waiting: busy){voice.stopSpeaking()}
         else{cancel();spokenDraftPrefix=draft.isEmpty ? "" : draft+" ";voice.start()}
     }
     func setConversation(_ enabled:Bool){
