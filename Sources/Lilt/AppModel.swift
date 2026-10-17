@@ -113,7 +113,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func togglePause() {if paused {paused=false; lastTick=Date(); error=nil} else{tick();suspend()};persist()}
     func suspend() {paused=true;conversation=false;conversationTask?.cancel();voice.stop();cancel();context.stop();hideOverlay?();persist()}
     func complete() {
-        tick();updateActive{$0.completed=true};suspend();selectedID=activeID;activeID=nil
+        tick();updateActive{$0=LaunchSelection.chatAfterClose($0)};suspend();selectedID=activeID;activeID=nil
         loading=true;draft="";loading=false;persist();showLibrary?()
     }
     func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}

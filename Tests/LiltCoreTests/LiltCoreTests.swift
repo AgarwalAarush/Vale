@@ -221,6 +221,12 @@ final class LiltCoreTests {
         XCTAssertEqual(LaunchSelection.resumeID(in:[done,newer,older]),newer.id)
         XCTAssertNil(LaunchSelection.resumeID(in:[done]))
     }
+    func testCloseLeavesTheChatForTheNextLaunch() {
+        var chat=LearningSession(title:"First question"); chat.completed=true
+        chat=LaunchSelection.chatAfterClose(chat)
+        XCTAssertFalse(chat.completed)
+        XCTAssertEqual(LaunchSelection.resumeID(in:[chat]),chat.id)
+    }
     func testCodexLookupIncludesUserInstallAndParsesShellPath() {
         let home=URL(fileURLWithPath:"/Users/vale",isDirectory:true)
         let paths=CodexLocator.candidatePaths(home:home,customPath:" /custom/codex ",environmentPath:"/usr/bin:/Users/vale/.local/bin")
@@ -262,6 +268,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Updater configuration security gates",tests.testUpdaterRequiresHTTPSKeyAndBothVerificationGates),
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
+ ("Close leaves the chat resumable",tests.testCloseLeavesTheChatForTheNextLaunch),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
