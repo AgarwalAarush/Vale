@@ -190,3 +190,30 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// Footer copy for the coach. Voice wording appears only while voice is actually in use.
+public struct CompanionStatus: Sendable, Equatable {
+    public var paused: Bool
+    public var importing: Bool
+    public var waitingForMicrophone: Bool
+    public var listening: Bool
+    public var thinking: Bool
+    public var speaking: Bool
+    public var conversation: Bool
+    public var canSend: Bool
+    public init(paused: Bool = false, importing: Bool = false, waitingForMicrophone: Bool = false, listening: Bool = false, thinking: Bool = false, speaking: Bool = false, conversation: Bool = false, canSend: Bool = false) {
+        self.paused = paused; self.importing = importing; self.waitingForMicrophone = waitingForMicrophone
+        self.listening = listening; self.thinking = thinking; self.speaking = speaking
+        self.conversation = conversation; self.canSend = canSend
+    }
+    public var line: String {
+        if paused { return "Paused" }
+        if importing { return "Adding files…" }
+        if waitingForMicrophone { return "Waiting for microphone…" }
+        if listening { return "Listening…" }
+        if thinking { return "Thinking…" }
+        if speaking { return "Speaking · tap mic to interrupt" }
+        if conversation { return "Conversation ready" }
+        return canSend ? "Return to send" : "Ready to type"
+    }
+}

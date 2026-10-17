@@ -33,6 +33,8 @@ struct CoachView: View {
     var close: () -> Void
     @State private var walkthrough = false
     var body: some View {
+        let sendReady = model.hasInput && !model.paused && model.active != nil && !model.importing
+        let showSendHint = sendReady && !model.busy && !model.voice.listening && !model.voice.speaking && !model.voice.starting && !model.conversation
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 LogoMark(); Text("Vale").font(.system(size: 15, weight: .semibold))
@@ -136,7 +138,7 @@ struct CoachView: View {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text("Ask quietly…").font(.system(size: 14)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.top, 6).padding(.leading, 7).allowsHitTesting(false) }
                     DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
-                }
+                }.help("Return sends. Shift–Return adds a line.")
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
                     IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}
@@ -145,13 +147,13 @@ struct CoachView: View {
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
                     Button { if model.busy { model.stopResponse() } else { model.send() } } label: {
-                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink).frame(width: 30, height: 30).background(Theme.accent.opacity(!model.hasInput && !model.busy ? 0.12 : 0.35)).clipShape(Circle())
-                    }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || model.paused || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
+                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(model.busy || sendReady ? Color(red: 0.11, green: 0.14, blue: 0.22) : Theme.ink.opacity(0.45)).frame(width: 30, height: 30).background(model.busy || sendReady ? Theme.accent : Color.white.opacity(0.06)).clipShape(Circle())
+                    }.buttonStyle(.plain).disabled(!model.busy && !sendReady).help(model.busy ? "Stop response" : "Send message (Return)").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
             }.padding(9).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.16), lineWidth: 0.8)).padding(.horizontal, 18)
             HStack {
-                Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
+                Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening || showSendHint ? Theme.accent : Theme.muted)
                 Spacer()
                 Button{model.setConversation(!model.conversation)}label:{Label(model.conversation ? "End conversation" : "Conversation",systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 14)
