@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testRefreshOfPointItOutStillPoints() {
+        XCTAssertTrue(PointRequest.wasPointing(PointRequest.prompt))
+        XCTAssertFalse(PointRequest.wasPointing("What is this button?"))
+        let again=TutorPrompt.build(session:LearningSession(title:"Window"),question:PointRequest.prompt,hasImage:true,pointing:true,reveal:false,hasWindow:true)
+        XCTAssertTrue(again.contains("Pointing requested: Yes"))
+        let ordinary=TutorPrompt.build(session:LearningSession(title:"Window"),question:"What is this button?",hasImage:true,pointing:PointRequest.wasPointing("What is this button?"),reveal:false,hasWindow:true)
+        XCTAssertTrue(ordinary.contains("Pointing requested: No"))
+        XCTAssertTrue(ordinary.contains("Return null for guide"))
+        XCTAssertTrue(ordinary.contains("Current guide: None"))
+        XCTAssertTrue(ordinary.contains("Web search: Disabled"))
+        XCTAssertFalse(GuidePlan(title:"Only",steps:["One step"]).isValid)
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Refresh of point it out still points",tests.testRefreshOfPointItOutStillPoints)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

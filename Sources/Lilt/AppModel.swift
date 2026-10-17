@@ -186,7 +186,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func retry(){if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
     func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send("Give me one slightly more concrete hint, without revealing the full solution.")}
-    func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send("Point out the relevant part of the shared window, with one short explanation.",pointing:true)}
+    func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send(PointRequest.prompt,pointing:true)}
     func toggleVoice(){
         guard !paused,active != nil else{return}
         if voice.listening{voice.finishUtterance()}
@@ -222,7 +222,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true)
     }
     func endGuide(){updateActive{$0.guide=nil};persist()}
-    func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true)}
+    func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true,pointing:PointRequest.wasPointing(question))}
     func stopSharing(){context.stop()}
     func previewContext(){
         let chatID=activeID;let generation=context.generation

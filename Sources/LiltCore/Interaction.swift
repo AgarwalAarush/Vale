@@ -7,6 +7,10 @@ public struct GuidePlan: Codable,Equatable,Sendable {
     public init(title:String,steps:[String]){self.title=title;self.steps=steps}
     public var isValid:Bool{!title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && title.count<=120 && (2...8).contains(steps.count) && steps.allSatisfy{!$0.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && $0.count<=300}}
 }
+public enum PointRequest {
+    public static let prompt = "Point out the relevant part of the shared window, with one short explanation."
+    public static func wasPointing(_ question: String) -> Bool { question == prompt }
+}
 public struct GuideProgress:Codable,Equatable,Sendable {
     public var plan:GuidePlan
     public var index:Int
