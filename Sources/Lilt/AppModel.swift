@@ -151,20 +151,29 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                         guard let self,self.requestID==id,self.activeID==chatID else{return}
                         switch result{
                         case .success(let reply):
+                            guard self.requestID==id,self.activeID==chatID else{return}
+                            let shown=ShownAnswer(text:reply.text);let answerID=UUID()
+                            self.busy=false;self.failedQuestion=nil
+                            self.updateChat(chatID){chat in
+                                chat.messages.append(Message(role:"assistant",text:shown.text,id:answerID));chat.updated=Date()
+                            }
+                            self.persist()
                             var fresh:ContextSnapshot?
                             if snapshot != nil,self.context.hasSelection{fresh=try? await self.context.capture()}
-                            guard self.requestID==id,self.activeID==chatID else{return}
                             let changed=snapshot.map{original in fresh.map{!original.evidence.reflectsSameView($0.evidence)} ?? true} ?? false
+                            let checked=shown.withWindowChanged(changed)
                             let canPoint:Bool
                             if let point=reply.point,let snapshot,let fresh,let frame=snapshot.frame,!changed{canPoint=snapshot.evidence.matches(fresh.evidence) && self.context.pointIsVisible(point,frame:frame,windowID:snapshot.windowID)}else{canPoint=false}
-                            self.busy=false
-                            self.updateActive{chat in
-                                chat.messages.append(Message(role:"assistant",text:reply.text,screenChanged:changed,highlightUnavailable:reply.point != nil && !changed && !canPoint));chat.updated=Date()
+                            self.updateChat(chatID){chat in
+                                guard let index=chat.messages.firstIndex(where:{$0.id==answerID}) else{return}
+                                chat.messages[index].text=checked.text
+                                chat.messages[index].screenChanged=checked.windowChanged
+                                chat.messages[index].highlightUnavailable=reply.point != nil && !changed && !canPoint
                                 if let plan=reply.guide,guideRequested,!changed{chat.guide=GuideProgress(plan:plan)}
                             }
+                            guard self.requestID==id,self.activeID==chatID else{self.persist();return}
                             if guideRequested,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
-                            self.failedQuestion=nil
-                            if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(reply.text)}
+                            if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(checked.text)}
                             else if changed,(self.readAloud || spoken || self.conversation){self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
                             if canPoint,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
@@ -301,6 +310,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         do{try SessionStore.export(chat).write(to:url,atomically:true,encoding:.utf8)}catch{self.error="Couldn’t export your chat."}
     }
     func updateActive(_ change:(inout LearningSession)->Void){guard let i=sessions.firstIndex(where:{$0.id==activeID})else{return};change(&sessions[i])}
+    private func updateChat(_ id:UUID,_ change:(inout LearningSession)->Void){guard let i=sessions.firstIndex(where:{$0.id==id})else{return};change(&sessions[i])}
     private func replace(_ chat:LearningSession){if let i=sessions.firstIndex(where:{$0.id==chat.id}){sessions[i]=chat}}
     private func scheduleSave(){saveWork?.cancel();let work=DispatchWorkItem{[weak self]in self?.persist()};saveWork=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.5,execute:work)}
     func persist(){do{sessions.sort{$0.updated>$1.updated};try store?.save(sessions)}catch{self.error="Couldn’t save your chat. Check available disk space."}}

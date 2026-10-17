@@ -240,6 +240,15 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testAnswerTextIsShownBeforeTheWindowIsRechecked() {
+        let ready=ShownAnswer(text:"Use the menu.")
+        XCTAssertEqual(ready.text,"Use the menu.")
+        XCTAssertFalse(ready.windowChanged)
+        let changed=ready.withWindowChanged(true)
+        XCTAssertEqual(changed.text,"Use the menu.")
+        XCTAssertTrue(changed.windowChanged)
+        XCTAssertFalse(ready.withWindowChanged(false).windowChanged)
+    }
 
 }
 
@@ -276,7 +285,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Answer text is shown before the window is rechecked",tests.testAnswerTextIsShownBeforeTheWindowIsRechecked)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

@@ -38,6 +38,21 @@ public struct Message: Codable, Identifiable, Equatable {
     }
 }
 
+/// The reply text is saved when it arrives. A later window check only updates the warning.
+public struct ShownAnswer: Equatable {
+    public var text: String
+    public var windowChanged: Bool
+    public init(text: String) {
+        self.text = text
+        self.windowChanged = false
+    }
+    public func withWindowChanged(_ changed: Bool) -> ShownAnswer {
+        var copy = self
+        copy.windowChanged = changed
+        return copy
+    }
+}
+
 public struct LearningSession: Codable, Identifiable, Equatable {
     public var id: UUID
     public var title: String
