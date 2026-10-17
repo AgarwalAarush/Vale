@@ -61,14 +61,15 @@ struct CoachView: View {
             }
             if let guide=model.active?.guide{GuideCard(model:model,guide:guide)}
             ScrollViewReader { proxy in
+                GeometryReader { geo in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if let session = model.active {
                             if session.messages.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: 9, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
+                                VStack(alignment: .leading, spacing: EmptyCoach.blockSpacing) {
+                                    Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: EmptyCoach.kickerSize, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
                                     Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
-                                    Text(session.mode == .learn ? "Think it through with a little guidance." : "Ask anything, drop a file, or share a window.").font(.system(size: 13)).foregroundStyle(Theme.muted).lineSpacing(3)
+                                    Text(session.mode == .learn ? "Think it through with a little guidance." : "Ask anything, drop a file, or share a window.").font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted).lineSpacing(4)
                                     if model.provider.executable == nil {
                                         HStack(alignment: .top, spacing: 8) {
                                             Text("Codex isn’t available yet. Install the CLI and run codex login, or choose it in Settings.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
@@ -109,10 +110,11 @@ struct CoachView: View {
                         }
                         if model.busy { HStack(spacing: 8) { ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 5).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
-                    }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
+                    }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, minHeight: EmptyCoach.greetingAnchoredToComposer && model.active?.messages.isEmpty != false ? geo.size.height : nil, alignment: .bottom)
                 }.scrollIndicators(.hidden)
                 .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
+                }
             }.frame(maxHeight: .infinity)
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {

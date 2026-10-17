@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum EmptyCoach {
+    /// The first greeting sits with the composer instead of at the top of a blank panel.
+    public static let greetingAnchoredToComposer = true
+    public static let kickerSize: CGFloat = 11
+    public static let bodySize: CGFloat = 15
+    public static let blockSpacing: CGFloat = 16
+}
