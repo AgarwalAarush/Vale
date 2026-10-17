@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testQuestionLineWrapsALongWord() {
+        let word = String(repeating: "A", count: 30)
+        let shown = QuestionLine.shown(word)
+        XCTAssertEqual(shown.replacingOccurrences(of: "\u{200B}", with: ""), word)
+        XCTAssertTrue(shown.contains("\u{200B}"))
+        XCTAssertEqual(QuestionLine.shown("short words"), "short words")
+        let url = "https://example.com/a-very-long-address-that-stays-whole"
+        XCTAssertEqual(QuestionLine.shown(url), url)
+        XCTAssertEqual(QuestionLine.shown("one\ntwo"), "one\ntwo")
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("A long word in the question wraps",tests.testQuestionLineWrapsALongWord)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
