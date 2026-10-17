@@ -67,3 +67,23 @@ public enum PointVisibility {
         return false
     }
 }
+
+public struct DisplayFrame: Equatable, Sendable {
+    public var x: CGFloat
+    public var y: CGFloat
+    public var width: CGFloat
+    public var height: CGFloat
+    public init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {
+        self.x=x; self.y=y; self.width=width; self.height=height
+    }
+}
+
+public enum HighlightPlacement {
+    /// The main display is the one that contains the AppKit origin. Its height flips CGWindow top-left bounds.
+    public static func primaryHeight(_ frames: [DisplayFrame]) -> CGFloat? {
+        frames.first { $0.x <= 0 && $0.y <= 0 && $0.x + $0.width > 0 && $0.y + $0.height > 0 }?.height
+    }
+    public static func appKitOriginY(cgMinY: CGFloat, cgHeight: CGFloat, primaryHeight: CGFloat) -> CGFloat {
+        primaryHeight - cgMinY - cgHeight
+    }
+}
