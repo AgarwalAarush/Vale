@@ -152,11 +152,18 @@ public final class SessionStore {
         try save(sessions.filter{$0.id != id})
     }
     public static func export(_ session: LearningSession) -> String {
-        "# \(session.title)\n\n" + session.messages.map { "## \($0.role == "user" ? "You" : "Lilt")\n\n\($0.text)" + ($0.attachments.isEmpty ? "" : "\n\nAttachments: " + $0.attachments.map(\.name).joined(separator: ", ")) }.joined(separator: "\n\n") + (session.takeaway.isEmpty ? "" : "\n\n## Takeaway\n\n\(session.takeaway)") + "\n"
+        "# \(session.title)\n\n" + session.messages.map { "## \($0.role == "user" ? "You" : "Lilt")\n\n\($0.text)" + ($0.attachments.isEmpty ? "" : "\n\nAttachments: " + $0.attachments.map(\.name).joined(separator: ", ")) + StaleWindowAnswer.exportNote($0) }.joined(separator: "\n\n") + (session.takeaway.isEmpty ? "" : "\n\n## Takeaway\n\n\(session.takeaway)") + "\n"
     }
 }
 
 public enum StorageError:Error{case unreadableBackup}
+
+/// The coach marks an answer when the shared window changed. History and export have to keep that mark.
+public enum StaleWindowAnswer {
+    public static let notice = "Window changed during this answer"
+    public static func applies(to message: Message) -> Bool { message.role == "assistant" && message.screenChanged }
+    public static func exportNote(_ message: Message) -> String { applies(to: message) ? "\n\n\(notice)." : "" }
+}
 
 public enum TutorPrompt {
     public static func build(session: LearningSession, question: String, hasImage: Bool, pointing: Bool, reveal: Bool, fileContext: String = "", hasWindow: Bool? = nil,guideRequested:Bool=false) -> String {

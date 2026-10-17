@@ -72,6 +72,17 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## You\n\nWhy?"))
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
+        XCTAssertFalse(export.contains(StaleWindowAnswer.notice))
+    }
+    func testStaleAnswerStaysMarkedOutsideTheCoach() {
+        let stale=Message(role:"assistant",text:"Use the old button",screenChanged:true)
+        let fresh=Message(role:"assistant",text:"Use the new button")
+        XCTAssertTrue(StaleWindowAnswer.applies(to:stale))
+        XCTAssertFalse(StaleWindowAnswer.applies(to:fresh))
+        XCTAssertFalse(StaleWindowAnswer.applies(to:Message(role:"user",text:"Where?",screenChanged:true)))
+        var chat=LearningSession(title:"Export")
+        chat.messages=[Message(role:"user",text:"Where is it?"),stale]
+        XCTAssertTrue(SessionStore.export(chat).contains(StaleWindowAnswer.notice))
     }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
@@ -255,6 +266,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Stale answer stays marked outside the coach",tests.testStaleAnswerStaysMarkedOutsideTheCoach),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
