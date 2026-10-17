@@ -240,6 +240,15 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testWaitingFieldKeepsTheQuestionVisible() {
+        XCTAssertEqual(WaitingField.shown(waiting: false), WaitingField.idle)
+        XCTAssertEqual(WaitingField.idle, "Ask quietly…")
+        XCTAssertEqual(WaitingField.shown(waiting: true), "Your question is in the chat")
+        XCTAssertFalse(WaitingField.shown(waiting: true).contains("Thinking"))
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
 
 }
 
@@ -276,7 +285,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("The waiting field keeps the question visible",tests.testWaitingFieldKeepsTheQuestionVisible)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
