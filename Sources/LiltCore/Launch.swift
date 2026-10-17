@@ -5,6 +5,12 @@ public enum LaunchSelection {
     public static func resumeID(in sessions:[LearningSession])->UUID? {
         sessions.first { !$0.completed }?.id
     }
+    /// Close chat hides the windows. It does not finish the session, so the next launch can resume it.
+    public static func chatAfterClose(_ chat:LearningSession)->LearningSession {
+        var chat=chat
+        chat.completed=false
+        return chat
+    }
 }
 
 public enum CodexLocator {
