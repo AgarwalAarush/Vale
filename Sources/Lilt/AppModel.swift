@@ -131,6 +131,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
             if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
             replace(chat);draft=""
+        } else {
+            setAnswerFailed(false)
         }
         failedQuestion=question;persist()
         var history=chat
@@ -159,6 +161,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             if let point=reply.point,let snapshot,let fresh,let frame=snapshot.frame,!changed{canPoint=snapshot.evidence.matches(fresh.evidence) && self.context.pointIsVisible(point,frame:frame,windowID:snapshot.windowID)}else{canPoint=false}
                             self.busy=false
                             self.updateActive{chat in
+                                if let index=chat.messages.indices.last,chat.messages[index].role=="user"{chat.messages[index].answerFailed=false}
                                 chat.messages.append(Message(role:"assistant",text:reply.text,screenChanged:changed,highlightUnavailable:reply.point != nil && !changed && !canPoint));chat.updated=Date()
                                 if let plan=reply.guide,guideRequested,!changed{chat.guide=GuideProgress(plan:plan)}
                             }
@@ -171,6 +174,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             self.persist()
                         case .failure(let failure):
                             self.busy=false;self.conversation=false
+                            self.setAnswerFailed(true);self.persist()
                             let app=failure as? AppError
                             self.showError(app?.message ?? failure.localizedDescription, settings: app?.offersSettings == true)
                         }
@@ -180,6 +184,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             } catch {
                 guard self.requestID==id else{return};self.busy=false
                 self.conversation=false
+                self.setAnswerFailed(true);self.persist()
                 self.error=(error as? AppError)?.message ?? "Couldn’t read the selected context. Your message is saved; check the window or attachments and retry."
             }
         }
@@ -301,6 +306,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         do{try SessionStore.export(chat).write(to:url,atomically:true,encoding:.utf8)}catch{self.error="Couldn’t export your chat."}
     }
     func updateActive(_ change:(inout LearningSession)->Void){guard let i=sessions.firstIndex(where:{$0.id==activeID})else{return};change(&sessions[i])}
+    private func setAnswerFailed(_ failed:Bool){updateActive{chat in guard let index=chat.messages.indices.last,chat.messages[index].role=="user" else{return};chat.messages[index].answerFailed=failed}}
     private func replace(_ chat:LearningSession){if let i=sessions.firstIndex(where:{$0.id==chat.id}){sessions[i]=chat}}
     private func scheduleSave(){saveWork?.cancel();let work=DispatchWorkItem{[weak self]in self?.persist()};saveWork=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.5,execute:work)}
     func persist(){do{sessions.sort{$0.updated>$1.updated};try store?.save(sessions)}catch{self.error="Couldn’t save your chat. Check available disk space."}}

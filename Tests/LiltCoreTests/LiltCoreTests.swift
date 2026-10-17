@@ -240,6 +240,26 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFailedAnswerStaysOnTheQuestion() throws {
+        XCTAssertEqual(FailedAnswer.label, "No answer")
+        XCTAssertTrue(FailedAnswer.shows(failed: true, waiting: false))
+        XCTAssertFalse(FailedAnswer.shows(failed: true, waiting: true))
+        XCTAssertFalse(FailedAnswer.shows(failed: false, waiting: false))
+        let message = Message(role: "user", text: "Hi", answerFailed: true)
+        let data = try JSONEncoder().encode(message)
+        let decoded = try JSONDecoder().decode(Message.self, from: data)
+        XCTAssertTrue(decoded.answerFailed)
+        XCTAssertEqual(decoded.text, "Hi")
+        var object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        object.removeValue(forKey: "answerFailed")
+        let legacy = try JSONSerialization.data(withJSONObject: object)
+        let older = try JSONDecoder().decode(Message.self, from: legacy)
+        XCTAssertFalse(older.answerFailed)
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +296,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("A failed answer stays on the question",tests.testFailedAnswerStaysOnTheQuestion)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
