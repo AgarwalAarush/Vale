@@ -58,7 +58,7 @@ struct LibraryView: View {
                         HStack(spacing:15){
                             VStack(alignment:.leading,spacing:7){
                                 Text(chat.title).font(.system(size:15,weight:.medium)).lineLimit(1)
-                                Text(chat.messages.last?.text ?? (chat.pendingAttachments.isEmpty ? "Ready when you are." : "\(chat.pendingAttachments.count) files attached")).font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
+                                Text(chat.historyPreview(matching:query)).font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
                             }
                             Spacer(minLength:20);Text(chat.updated,style:.date).font(.system(size:11)).foregroundStyle(Theme.muted);Image(systemName:"chevron.right").font(.system(size:10)).foregroundStyle(Theme.muted)
                         }.padding(.vertical,18)

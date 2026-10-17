@@ -79,6 +79,17 @@ public struct LearningSession: Codable, Identifiable, Equatable {
         return (messages.flatMap(\.attachments)+pendingAttachments).filter { seen.insert($0.id).inserted }
     }
     public func matches(_ query:String)->Bool { let q=query.trimmingCharacters(in:.whitespacesAndNewlines); return q.isEmpty || ([title,takeaway] + messages.map(\.text) + files.map(\.name)).contains{$0.localizedCaseInsensitiveContains(q)} }
+    /// The row shows the message that matched. An empty search still shows the latest line.
+    public func historyPreview(matching query:String)->String {
+        let fallback=messages.last?.text ?? (pendingAttachments.isEmpty ? "Ready when you are." : "\(pendingAttachments.count) files attached")
+        let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard !q.isEmpty else { return fallback }
+        if let message=messages.last(where:{$0.text.localizedCaseInsensitiveContains(q)}) { return message.text }
+        if title.localizedCaseInsensitiveContains(q) { return title }
+        if takeaway.localizedCaseInsensitiveContains(q) { return takeaway }
+        if let file=files.first(where:{$0.name.localizedCaseInsensitiveContains(q)}) { return file.name }
+        return fallback
+    }
     public var contextLimited:Bool{ConversationWindow(messages:messages).limited}
     public var remaining: Int { max(0, duration - elapsed) }
     public var timerText: String { Self.formatTime(remaining) }
