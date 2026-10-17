@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// A note keeps what you are typing. Opening another chat loads the note stored there.
+public enum NoteEdit {
+    public static func next(local: String, stored: String, sameSession: Bool) -> String {
+        sameSession ? local : stored
+    }
+}
