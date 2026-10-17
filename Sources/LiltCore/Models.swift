@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum GuideControl {
+    /// Step-by-step help is in the menu, not a list icon in the composer.
+    public static let inTheMenu = true
+    public static let title = "Start step-by-step help"
+}
