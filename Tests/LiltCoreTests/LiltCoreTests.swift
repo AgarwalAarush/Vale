@@ -240,6 +240,15 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testRichTextKeepsTheWordsWithoutNullBytes() {
+        XCTAssertEqual(RichText.textToStore("Bring the notes"),"Bring the notes")
+        XCTAssertEqual(RichText.textToStore(""),"")
+        XCTAssertNil(RichText.textToStore(nil))
+        XCTAssertNil(RichText.textToStore("Bring\0the notes"))
+        let prompt=TutorPrompt.build(session:LearningSession(title:"Notes"),question:"Read this",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Current guide: None"))
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+    }
 
 }
 
@@ -276,7 +285,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Rich text keeps the words without null bytes",tests.testRichTextKeepsTheWordsWithoutNullBytes)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
