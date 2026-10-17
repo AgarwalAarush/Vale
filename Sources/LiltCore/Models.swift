@@ -168,7 +168,7 @@ public enum TutorPrompt {
         Chat title: \(session.title)
         \(policy)
         Conversation context: \(window.limited ? "Only recent/excerpted messages are included. Earlier history is saved but unavailable in this request. Do not imply you recall it; ask the user to restate missing details." : "The supplied recent conversation is available.")
-        Guide: \(guideRequested ? "The user explicitly requested a step-by-step guide. Return a short guide plan of 2 to 8 concrete steps and explain only the first step now." : "Return null for guide unless the user explicitly asks to replace the current plan.")
+        Guide: \((guideRequested || GuideRequest.explicit(question)) ? "The user explicitly requested a step-by-step guide. Return a short guide plan of 2 to 8 concrete steps and explain only the first step now." : "Return null for guide unless the user explicitly asks to replace the current plan.")
         Current guide: \(session.guide.map{"\($0.plan.title), step \($0.index+1)/\($0.plan.steps.count): \($0.current)"} ?? "None")
         Image context: \(hasImage ? "Images are attached in the order described below." : "No screen image is attached. Do not imply you can see the screen.")
         Window context: \((hasWindow ?? hasImage) ? "A fresh selected-window screenshot is the first image." : "No live window is shared. Attached images are user-provided files, not live screen access.")

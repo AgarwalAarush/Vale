@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testTypedGuideRequestKeepsAPlan() {
+        XCTAssertTrue(GuideRequest.explicit("Guide me through the installer"))
+        XCTAssertTrue(GuideRequest.explicit("Explain this step by step"))
+        XCTAssertTrue(GuideRequest.explicit("Walk it step-by-step"))
+        XCTAssertFalse(GuideRequest.explicit("What is this button?"))
+        XCTAssertFalse(GuidePlan(title:"Only",steps:["One step"]).isValid)
+        let typed=TutorPrompt.build(session:LearningSession(title:"Install"),question:"Guide me through the installer",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(typed.contains("explicitly requested a step-by-step guide"))
+        XCTAssertTrue(typed.contains("Current guide: None"))
+        XCTAssertTrue(typed.contains("Web search: Disabled"))
+        let ordinary=TutorPrompt.build(session:LearningSession(title:"Install"),question:"What is this button?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(ordinary.contains("Return null for guide"))
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Typed guide request keeps a plan",tests.testTypedGuideRequestKeepsAPlan)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
