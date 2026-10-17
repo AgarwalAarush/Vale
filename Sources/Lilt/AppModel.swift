@@ -119,22 +119,24 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
     func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false) {
         guard var chat=active else{return}
-        var question=(override ?? draft).trimmingCharacters(in:.whitespacesAndNewlines)
-        if question.isEmpty && !chat.pendingAttachments.isEmpty {question="Help me understand these attachments."}
-        guard !question.isEmpty else{return}
+        let typed=override ?? draft
+        let hasAttachment = !chat.pendingAttachments.isEmpty
+        guard let question=AttachmentQuestion.promptText(typed:typed,hasAttachment:hasAttachment) else{return}
+        let saved=AttachmentQuestion.savedText(typed:typed,hasAttachment:hasAttachment)
         guard !importing else{error="Wait for your files to finish attaching.";return}
         guard !paused else{error="Resume the chat before sending a message.";return}
         guard question.count<=32_000 else{error="That message is too long. Attach it as a text file or send a smaller excerpt.";return}
         cancel();voice.stopListening();error=nil;busy=true
         let id=UUID();requestID=id;let chatID=chat.id
         if !retry {
-            chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
-            if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
+            let naming=saved.isEmpty ? (chat.pendingAttachments.first?.name ?? "") : saved
+            chat.messages.append(Message(role:"user",text:saved,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
+            if chat.title == "New chat", !naming.isEmpty {chat.title=String(naming.split(separator:"\n").first.map(String.init)?.prefix(60) ?? naming.prefix(60))}
             replace(chat);draft=""
         }
         failedQuestion=question;persist()
         var history=chat
-        if history.messages.last?.role=="user",history.messages.last?.text==question{history.messages.removeLast()}
+        if history.messages.last?.role=="user",history.messages.last?.text==question || history.messages.last?.text==saved{history.messages.removeLast()}
         let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled
         captureTask=Task { [weak self] in
             guard let self else{return};var snapshot:ContextSnapshot?

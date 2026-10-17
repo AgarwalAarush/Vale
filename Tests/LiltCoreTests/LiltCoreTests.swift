@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testAttachmentQuestionStaysWhatYouSent() {
+        XCTAssertEqual(AttachmentQuestion.savedText(typed: "", hasAttachment: true), "")
+        XCTAssertEqual(AttachmentQuestion.promptText(typed: "", hasAttachment: true), AttachmentQuestion.modelPrompt)
+        XCTAssertEqual(AttachmentQuestion.savedText(typed: "  \n", hasAttachment: true), "")
+        XCTAssertNil(AttachmentQuestion.promptText(typed: "   ", hasAttachment: false))
+        XCTAssertEqual(AttachmentQuestion.savedText(typed: "What is this?", hasAttachment: true), "What is this?")
+        XCTAssertEqual(AttachmentQuestion.promptText(typed: "What is this?", hasAttachment: false), "What is this?")
+        XCTAssertFalse(AttachmentQuestion.savedText(typed: "", hasAttachment: true).contains("Help me understand"))
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Attachment question stays what you sent",tests.testAttachmentQuestionStaysWhatYouSent)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

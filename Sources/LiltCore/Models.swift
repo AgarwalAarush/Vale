@@ -190,3 +190,19 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum AttachmentQuestion {
+    /// Asked of the model when the question is only files. Not shown as something the person typed.
+    public static let modelPrompt = "Help me understand these attachments."
+    public static func promptText(typed: String, hasAttachment: Bool) -> String? {
+        let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        if hasAttachment { return modelPrompt }
+        return nil
+    }
+    public static func savedText(typed: String, hasAttachment: Bool) -> String {
+        let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty && hasAttachment { return "" }
+        return trimmed
+    }
+}
