@@ -39,7 +39,15 @@ struct LibraryView: View {
         }.alert("Rename chat",isPresented:Binding(get:{renameID != nil},set:{if !$0{renameID=nil}})){
             TextField("Chat title",text:$newTitle)
             Button("Cancel",role:.cancel){renameID=nil}
-            Button("Save"){if let id=renameID{model.rename(id,to:newTitle)};renameID=nil}
+            Button("Save"){
+                guard let id=renameID else { return }
+                if ChatTitle.saved(newTitle) != nil {
+                    model.rename(id,to:newTitle)
+                    renameID=nil
+                } else {
+                    DispatchQueue.main.async { renameID=id }
+                }
+            }
         }
     }
     var home:some View{

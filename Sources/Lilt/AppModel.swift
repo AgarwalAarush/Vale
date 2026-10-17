@@ -271,7 +271,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             removeReferences([record.id],from:chatID);filesRemoved?([record.id]);persist()
         }catch{self.error="Couldn’t remove \(record.name). It is still attached; try removing it again."}
     }
-    func rename(_ id:UUID,to title:String){let cleaned=title.trimmingCharacters(in:.whitespacesAndNewlines);guard !cleaned.isEmpty,let index=sessions.firstIndex(where:{$0.id==id})else{return};sessions[index].title=String(cleaned.prefix(100));persist()}
+    func rename(_ id:UUID,to title:String){guard let cleaned=ChatTitle.saved(title),let index=sessions.firstIndex(where:{$0.id==id})else{return};sessions[index].title=cleaned;persist()}
     func setTakeaway(_ text:String,for id:UUID){if let i=sessions.firstIndex(where:{$0.id==id}){sessions[i].takeaway=text;scheduleSave()}}
     @Published var deletionToRetry:UUID?
     func delete(_ id:UUID){
