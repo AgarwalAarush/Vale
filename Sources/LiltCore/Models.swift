@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyWait {
+    /// The wait is the assistant's turn in the thread, using the same speaker mark as the reply.
+    public static let inTheThread = true
+    public static let speaker = "LILT"
+}

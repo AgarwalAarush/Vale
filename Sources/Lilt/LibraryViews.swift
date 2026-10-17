@@ -100,7 +100,7 @@ struct SessionDetail: View {
                 if !session.messages.isEmpty{Divider().overlay(Theme.line)}
                 ForEach(session.messages){message in
                     VStack(alignment:.leading,spacing:9){
-                        Text(message.role == "user" ? "YOU" : "LILT").font(.system(size:10,weight:.medium)).tracking(1).foregroundStyle(Theme.muted)
+                        Text(message.role == "user" ? "YOU" : ReplyWait.speaker).font(.system(size:10,weight:.medium)).tracking(1).foregroundStyle(Theme.muted)
                         Text(.init(message.text)).font(.system(size:14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading)
                     }.padding(.vertical,5)
                 }
