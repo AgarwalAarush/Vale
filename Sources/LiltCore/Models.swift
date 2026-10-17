@@ -114,6 +114,13 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum CoachClose {
+    /// Close window hides the coach. It does not end the chat or stop a reply that is still on the way.
+    public static func hidesTheCoach(key: String, command: Bool, shift: Bool, option: Bool, control: Bool, coachIsKey: Bool, blocked: Bool) -> Bool {
+        command && !shift && !option && !control && key == "w" && coachIsKey && !blocked
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL

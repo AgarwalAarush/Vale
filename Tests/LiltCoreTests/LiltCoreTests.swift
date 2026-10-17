@@ -209,6 +209,14 @@ final class LiltCoreTests {
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:nil)]))
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:42,bounds:target.bounds,opacity:0)]))
     }
+    func testCloseWindowHidesTheCoach() {
+        XCTAssertTrue(CoachClose.hidesTheCoach(key: "w", command: true, shift: false, option: false, control: false, coachIsKey: true, blocked: false))
+        XCTAssertFalse(CoachClose.hidesTheCoach(key: "w", command: true, shift: false, option: false, control: false, coachIsKey: false, blocked: false))
+        XCTAssertFalse(CoachClose.hidesTheCoach(key: "w", command: true, shift: false, option: false, control: false, coachIsKey: true, blocked: true))
+        XCTAssertFalse(CoachClose.hidesTheCoach(key: "w", command: true, shift: true, option: false, control: false, coachIsKey: true, blocked: false))
+        XCTAssertFalse(CoachClose.hidesTheCoach(key: "q", command: true, shift: false, option: false, control: false, coachIsKey: true, blocked: false))
+        XCTAssertFalse(CoachClose.hidesTheCoach(key: "w", command: false, shift: false, option: false, control: false, coachIsKey: true, blocked: false))
+    }
     func testPointVisibilityIgnoresFullyTransparentForegroundOnly(){
         let box=CGRect(x:200,y:200,width:80,height:60);let target=PointWindow(id:42,bounds:CGRect(x:100,y:100,width:400,height:300))
         XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil,opacity:0),target]))
@@ -276,7 +284,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Close window hides the coach",tests.testCloseWindowHidesTheCoach)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

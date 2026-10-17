@@ -41,6 +41,10 @@ final class FloatingPanel: NSPanel {
             if event.keyCode == 53 { self.model.stopInteraction(); self.clearAnnotation(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "," { self.model.settings = true; self.openLibrary(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.newSession(); return nil }
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
+            if CoachClose.hidesTheCoach(key: event.charactersIgnoringModifiers ?? "", command: mods.contains(.command), shift: mods.contains(.shift), option: mods.contains(.option), control: mods.contains(.control), coachIsKey: self.coach.isKeyWindow, blocked: self.coach.attachedSheet != nil || NSApp.modalWindow != nil) {
+                self.coach.orderOut(nil); return nil
+            }
             return event
         }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.willSleepNotification, object: nil)
@@ -111,7 +115,7 @@ final class FloatingPanel: NSPanel {
         let appQuit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); appQuit.target = self; appMenu.addItem(appQuit)
         let fileItem = NSMenuItem(); main.addItem(fileItem); let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
         let newItem = NSMenuItem(title: "New chat", action: #selector(menuNew), keyEquivalent: "n"); newItem.target = self; fileMenu.addItem(newItem)
-        fileMenu.addItem(NSMenuItem(title: "Close window", action: NSSelectorFromString("performClose:"), keyEquivalent: "w"))
+        let closeItem = NSMenuItem(title: "Close window", action: #selector(menuClose), keyEquivalent: "w"); closeItem.target = self; fileMenu.addItem(closeItem)
         let editItem = NSMenuItem(); main.addItem(editItem); let editMenu = NSMenu(title: "Edit"); editItem.submenu = editMenu
         for (title, selector, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
             editMenu.addItem(NSMenuItem(title: title, action: NSSelectorFromString(selector), keyEquivalent: key))
@@ -189,6 +193,10 @@ final class FloatingPanel: NSPanel {
     }
     @objc func systemSuspend() { model.suspend() }
     @objc private func menuNew() { model.newSession() }
+    @objc private func menuClose() {
+        if CoachClose.hidesTheCoach(key: "w", command: true, shift: false, option: false, control: false, coachIsKey: coach.isKeyWindow, blocked: coach.attachedSheet != nil || NSApp.modalWindow != nil) { coach.orderOut(nil) }
+        else { NSApp.keyWindow?.performClose(nil) }
+    }
     @objc private func menuUpdates() { model.updates.check() }
     func validateMenuItem(_ item:NSMenuItem)->Bool { item.action == #selector(menuUpdates) ? model.updates.canCheck : true }
     @objc private func menuCoach() { openCoach() }
