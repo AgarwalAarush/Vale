@@ -5,6 +5,22 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+/// What the collapsed capsule shows. An unsent draft stays visible after the coach is hidden.
+public enum CapsuleLabel {
+    public static func text(draft: String, title: String?) -> String {
+        if let line = firstLine(draft) { return line }
+        if let title, title != "New chat", !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return title }
+        return "Vale"
+    }
+    public static func showsDraft(_ draft: String) -> Bool { firstLine(draft) != nil }
+    private static func firstLine(_ draft: String) -> String? {
+        let pending = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let line = pending.split(whereSeparator: \.isNewline).first else { return nil }
+        let text = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID
