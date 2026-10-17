@@ -214,6 +214,15 @@ final class LiltCoreTests {
         XCTAssertTrue(PointVisibility.isVisible(targetID:42,box:box,frontToBack:[PointWindow(id:99,bounds:nil,opacity:0),target]))
         XCTAssertFalse(PointVisibility.isVisible(targetID:42,box:.zero,frontToBack:[target]))
     }
+    func testUnnamedPDFIsNotRefusedAsText() {
+        let header=Data("%PDF-1.4\n%\0\0\0\0".utf8)
+        XCTAssertTrue(FileSignature.treatAsPDF(fileExtension:"pdf",data:Data("not a header".utf8),isTextExtension:false))
+        XCTAssertTrue(FileSignature.treatAsPDF(fileExtension:"",data:header,isTextExtension:false))
+        XCTAssertTrue(FileSignature.treatAsPDF(fileExtension:"bin",data:header,isTextExtension:false))
+        XCTAssertFalse(FileSignature.treatAsPDF(fileExtension:"txt",data:header,isTextExtension:true))
+        XCTAssertFalse(FileSignature.treatAsPDF(fileExtension:"",data:Data("notes".utf8),isTextExtension:false))
+        XCTAssertFalse(FileSignature.treatAsPDF(fileExtension:"png",data:Data([0x89,0x50,0x4E,0x47]),isTextExtension:false))
+    }
     func testLaunchResumesNewestUnfinishedChat() {
         var older=LearningSession(title:"Older ask",mode:.assistant); older.updated=Date(timeIntervalSince1970:10); older.completed=false
         var newer=LearningSession(title:"Newer learn",mode:.learn); newer.updated=Date(timeIntervalSince1970:20); newer.completed=false
@@ -276,7 +285,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Unnamed PDF is not refused as text",tests.testUnnamedPDFIsNotRefusedAsText)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

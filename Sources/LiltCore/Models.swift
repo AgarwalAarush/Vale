@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FileSignature {
+    /// A PDF is recognized from its header when the name is not already a text or code file.
+    /// A `.pdf` name stays on the PDF path. A declared text or code file stays on the text path.
+    public static func treatAsPDF(fileExtension ext: String, data: Data, isTextExtension: Bool) -> Bool {
+        if ext == "pdf" { return true }
+        guard !isTextExtension else { return false }
+        return data.starts(with: Data("%PDF-".utf8))
+    }
+}
