@@ -141,7 +141,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             do {
                 if self.context.hasSelection {snapshot=try await self.context.capture()}
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
-                let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records) ?? FileContext()}.value
+                let leadingImages=snapshot==nil ? 0 : 1
+                let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records, leadingImages:leadingImages) ?? FileContext()}.value
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
                 var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
                 let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:guideRequested)

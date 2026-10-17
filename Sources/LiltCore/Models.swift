@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ImageOrder {
+    /// File images are numbered after a shared-window image when one is attached.
+    public static func line(name: String, placedBefore: Int, fileImagesSoFar: Int) -> String {
+        let number = placedBefore + fileImagesSoFar
+        return "\nImage \(number) (after any shared-window image): \(name).\n"
+    }
+}
