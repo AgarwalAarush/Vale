@@ -56,7 +56,7 @@ struct CoachView: View {
             }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11)
             ContextStrip(model:model)
             if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
-            if model.active?.contextLimited == true{
+            if model.active?.showsEarlierContextNotice == true{
                 HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
             }
             if let guide=model.active?.guide{GuideCard(model:model,guide:guide)}
