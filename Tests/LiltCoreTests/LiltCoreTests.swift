@@ -240,6 +240,16 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testPdfPreviewWaitsToRead() {
+        XCTAssertFalse(PreviewRead.showsFailure(loaded: false, hasPage: false))
+        XCTAssertTrue(PreviewRead.showsFailure(loaded: true, hasPage: false))
+        XCTAssertFalse(PreviewRead.showsFailure(loaded: true, hasPage: true))
+        XCTAssertEqual(PreviewRead.pageLabel(loaded: false, index: 0, count: 0), "")
+        XCTAssertEqual(PreviewRead.pageLabel(loaded: true, index: 0, count: 3), "Page 1 of 3")
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
 
 }
 
@@ -276,7 +286,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("A PDF preview waits until the file is read",tests.testPdfPreviewWaitsToRead)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

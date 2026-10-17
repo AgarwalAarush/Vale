@@ -24,19 +24,21 @@ struct PDFPreview: View {
     @State private var document:PDFDocument?
     @State private var pageIndex=0
     @State private var image:NSImage?
+    @State private var loaded=false
     var body:some View {
         VStack(spacing:0){
             HStack(spacing:14){
-                IconButton(symbol:"chevron.left",label:"Previous page"){pageIndex-=1;render()}.disabled(pageIndex==0)
-                Text("Page \(pageIndex+1) of \(document?.pageCount ?? 0)").font(.system(size:12)).foregroundStyle(Theme.muted).monospacedDigit()
-                IconButton(symbol:"chevron.right",label:"Next page"){pageIndex+=1;render()}.disabled(pageIndex+1 >= (document?.pageCount ?? 0))
+                IconButton(symbol:"chevron.left",label:"Previous page"){pageIndex-=1;render()}.disabled(!loaded || pageIndex==0)
+                Text(PreviewRead.pageLabel(loaded:loaded, index:pageIndex, count:document?.pageCount ?? 0)).font(.system(size:12)).foregroundStyle(Theme.muted).monospacedDigit()
+                IconButton(symbol:"chevron.right",label:"Next page"){pageIndex+=1;render()}.disabled(!loaded || pageIndex+1 >= (document?.pageCount ?? 0))
                 Spacer()
                 Button("Copy page text"){NSPasteboard.general.clearContents();NSPasteboard.general.setString(document?.page(at:pageIndex)?.string ?? "",forType:.string)}.buttonStyle(QuietButton()).disabled(document?.page(at:pageIndex)?.string?.isEmpty != false)
             }.padding(.horizontal,18).padding(.vertical,9)
             Divider().overlay(Theme.line)
             if let image{Image(nsImage:image).resizable().scaledToFit().padding(20).frame(maxWidth:.infinity,maxHeight:.infinity)}
-            else{Text("This page couldn’t be previewed.").font(.system(size:13)).foregroundStyle(Theme.muted).frame(maxWidth:.infinity,maxHeight:.infinity)}
-        }.onAppear{document=PDFDocument(url:url);render()}
+            else if PreviewRead.showsFailure(loaded:loaded, hasPage:false){Text("This page couldn’t be previewed.").font(.system(size:13)).foregroundStyle(Theme.muted).frame(maxWidth:.infinity,maxHeight:.infinity)}
+            else{ProgressView().frame(maxWidth:.infinity,maxHeight:.infinity)}
+        }.onAppear{document=PDFDocument(url:url);render();loaded=true}
     }
     private func render(){image=document?.page(at:pageIndex)?.thumbnail(of:NSSize(width:1600,height:2000),for:.mediaBox)}
 }
