@@ -26,7 +26,8 @@ public struct ConversationWindow {
             guard budget>0 else{break}
             let count=min(8_000,budget);let fragment=String(message.text.prefix(count))
             let truncated=fragment.count<message.text.count;clipped = clipped || truncated
-            selected.append("\(message.role == "user" ? "USER" : "ASSISTANT"): \(fragment)" + (truncated ? "\n[Message excerpt; remaining text omitted.]" : ""));budget-=fragment.count
+            let stale=message.screenChanged ? "\n[The shared window changed while this answer was prepared. It may not match the current window.]" : ""
+            selected.append("\(message.role == "user" ? "USER" : "ASSISTANT"): \(fragment)" + (truncated ? "\n[Message excerpt; remaining text omitted.]" : "") + stale);budget-=fragment.count
         }
         omitted=messages.count-selected.count;excerpted=clipped;text=selected.reversed().joined(separator:"\n\n")
     }

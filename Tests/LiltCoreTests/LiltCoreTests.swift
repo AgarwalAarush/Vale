@@ -240,6 +240,24 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFollowUpHearsWhenTheWindowChanged() {
+        let changed=Message(role:"assistant",text:"Use the toolbar.",screenChanged:true)
+        let hidden=Message(role:"assistant",text:"Use the toolbar.",highlightUnavailable:true)
+        let plain=Message(role:"assistant",text:"Use the toolbar.")
+        XCTAssertTrue(ConversationWindow(messages:[changed]).text.contains("The shared window changed while this answer was prepared."))
+        XCTAssertFalse(ConversationWindow(messages:[changed]).text.contains("Highlight unavailable"))
+        XCTAssertFalse(ConversationWindow(messages:[hidden]).text.contains("shared window changed"))
+        XCTAssertFalse(ConversationWindow(messages:[plain]).text.contains("shared window changed"))
+        var chat=LearningSession(title:"Toolbar")
+        chat.messages=[changed]
+        let prompt=TutorPrompt.build(session:chat,question:"What should I do now?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("The shared window changed while this answer was prepared."))
+        XCTAssertTrue(prompt.contains("Return null for guide"))
+        XCTAssertTrue(prompt.contains("Current guide: None"))
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertFalse(GuidePlan(title:"Only",steps:["One step"]).isValid)
+        XCTAssertFalse(SessionStore.export(chat).contains("shared window changed"))
+    }
 
 }
 
@@ -276,7 +294,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Follow-up hears when the window changed",tests.testFollowUpHearsWhenTheWindowChanged)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
