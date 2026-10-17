@@ -21,7 +21,7 @@ struct CapsuleView: View {
                 Button("Chat history") { model.showLibrary?() }
                 if model.active != nil { Button("Close chat") { model.complete() } }
                 Divider()
-                Button("Settings…") { model.settings = true; model.showLibrary?() }
+                Button("Settings…") { model.showCoach?(); model.openSettingsInCoach() }
                 Button("Quit Vale") { NSApplication.shared.terminate(nil) }
             } label: { Image(systemName: "ellipsis").font(.system(size: 15)).frame(width: 20, height: 28) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("More options")
         }.padding(.horizontal, 20).frame(height: 62).modifier(GlassSurface(radius: 20))
@@ -49,7 +49,7 @@ struct CoachView: View {
                     if model.active?.mode == .learn { Button("Show a full walkthrough…") { walkthrough = true }.disabled(model.active?.messages.isEmpty != false || model.busy) }
                     Menu("Focus timer") {Button("30 minutes"){model.setFocus(minutes:30)};Button("60 minutes"){model.setFocus(minutes:60)};Button("No timer"){model.setFocus(minutes:0)}}
                     Button("Close chat") { model.complete() }.disabled(model.active == nil)
-                    Divider(); Button("Settings…") { model.settings = true; model.showLibrary?() }
+                    Divider(); Button("Settings…") { model.openSettingsInCoach() }
                 } label: { Image(systemName: "ellipsis").font(.system(size: 14)).frame(width: 24, height: 30) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 IconButton(symbol:model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",label:model.expanded ? "Compact assistant" : "Expand assistant"){model.expandCoach?()}
                 IconButton(symbol: "xmark", label: "Collapse coach", action: close)
@@ -59,7 +59,14 @@ struct CoachView: View {
             if model.active?.contextLimited == true{
                 HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
             }
-            if let guide=model.active?.guide{GuideCard(model:model,guide:guide)}
+            if let guide=model.active?.guide, !model.settingsInCoach {GuideCard(model:model,guide:guide)}
+            if model.settingsInCoach {
+                HStack {
+                    Button("Back to chat") { model.settingsInCoach = false }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent).accessibilityLabel("Back to chat")
+                    Spacer()
+                }.padding(.horizontal, 18).padding(.bottom, 4)
+                SettingsView(model: model, embeddedInCoach: true).frame(maxHeight: .infinity)
+            } else {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -69,13 +76,7 @@ struct CoachView: View {
                                     Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: 9, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
                                     Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
                                     Text(session.mode == .learn ? "Think it through with a little guidance." : "Ask anything, drop a file, or share a window.").font(.system(size: 13)).foregroundStyle(Theme.muted).lineSpacing(3)
-                                    if model.provider.executable == nil {
-                                        HStack(alignment: .top, spacing: 8) {
-                                            Text("Codex isn’t available yet. Install the CLI and run codex login, or choose it in Settings.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
-                                            Spacer(minLength: 0)
-                                            Button("Settings") { model.openSettings() }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
-                                        }
-                                    }
+                                    CodexSignInCard(model: model)
                                 }.padding(.top, 16)
                             }
                             ForEach(session.messages) { message in
@@ -114,12 +115,13 @@ struct CoachView: View {
                 .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
             }.frame(maxHeight: .infinity)
+            }
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 11)).foregroundStyle(Color(red: 0.96, green: 0.77, blue: 0.49)); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
                     HStack(spacing: 14) {
                         if model.active?.messages.last?.role == "user" { Button("Retry message") { model.retry() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
-                        if model.errorOffersSettings { Button("Open Settings") { model.openSettings() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
+                        if model.errorOffersSettings { Button("Open Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
                         if model.context.hasSelection { Button("Change window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
                     }
                 }.padding(11).background(Color.orange.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 9)).padding(.horizontal, 18).padding(.bottom, 10)
@@ -127,7 +129,7 @@ struct CoachView: View {
             if model.paused, model.active != nil {
                 HStack { Text("Paused · mic and sharing off").font(.system(size: 11)).foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.accent) }.padding(.horizontal, 20).padding(.bottom, 10)
             }
-            if model.active?.mode == .learn { HStack(spacing: 9) {
+            if model.active?.mode == .learn, !model.settingsInCoach { HStack(spacing: 9) {
                 Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
                 Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
             }.disabled(model.busy || model.paused || model.active == nil).padding(.horizontal, 18).padding(.bottom, 10) }
@@ -162,5 +164,23 @@ struct CoachView: View {
                 Button("Keep thinking", role: .cancel) {}
                 Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
             } message: { Text("This will reveal the method. Your current hints stay in the conversation.") }
+    }
+}
+
+struct CodexSignInCard: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let notice = CodexSignInNotice.beforeFirstSend(executableFound: model.provider.executable != nil)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(notice.title).font(.system(size: 13, weight: .semibold))
+            Text(notice.detail).font(.system(size: 12)).foregroundStyle(Theme.ink).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+            Button("Settings") { model.openSettingsInCoach() }.buttonStyle(QuietButton())
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.accent.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accent.opacity(0.35), lineWidth: 0.8))
+        .accessibilityElement(children: .contain)
     }
 }

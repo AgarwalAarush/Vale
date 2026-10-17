@@ -37,3 +37,22 @@ public enum CodexLocator {
         return line
     }
 }
+
+/// Shown on an empty coach, before the first send. Not a setup gate: typing stays available.
+public struct CodexSignInNotice: Equatable, Sendable {
+    public var title: String
+    public var detail: String
+    public init(title: String, detail: String) { self.title = title; self.detail = detail }
+    public static func beforeFirstSend(executableFound: Bool) -> CodexSignInNotice {
+        if executableFound {
+            return CodexSignInNotice(
+                title: "Replies use your Codex sign-in",
+                detail: "Vale answers through the Codex CLI on this Mac. Run codex login in Terminal if you haven’t signed in. You can type before you do."
+            )
+        }
+        return CodexSignInNotice(
+            title: "Codex sign-in is required for a reply",
+            detail: "Install the Codex CLI and run codex login, or choose it in Settings. You can keep typing either way."
+        )
+    }
+}

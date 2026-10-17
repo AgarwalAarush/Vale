@@ -234,6 +234,18 @@ final class LiltCoreTests {
         XCTAssertNil(CodexLocator.shellExecutable(from:"codex not found\n"))
         XCTAssertNil(CodexLocator.shellExecutable(from:""))
     }
+    func testCodexSignInIsStatedBeforeTheFirstSend() {
+        let missing = CodexSignInNotice.beforeFirstSend(executableFound: false)
+        let found = CodexSignInNotice.beforeFirstSend(executableFound: true)
+        XCTAssertTrue(missing.title.contains("Codex sign-in"))
+        XCTAssertTrue(missing.detail.contains("codex login"))
+        XCTAssertTrue(missing.detail.contains("Settings"))
+        XCTAssertTrue(missing.detail.localizedCaseInsensitiveContains("typing"))
+        XCTAssertTrue(found.title.contains("Codex sign-in"))
+        XCTAssertTrue(found.detail.contains("codex login"))
+        XCTAssertTrue(found.detail.localizedCaseInsensitiveContains("type"))
+        XCTAssertFalse(found.detail.contains("Install the Codex CLI"))
+    }
     func testGuideRequiresExplicitRequest(){
         let chat=LearningSession(title:"Explain this")
         let ordinary=TutorPrompt.build(session:chat,question:"What is it?",hasImage:false,pointing:false,reveal:false)
@@ -263,6 +275,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Updater archive origin policy",tests.testUpdaterRejectsForeignAndInsecureArchiveURLs),
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
+ ("Codex sign-in is stated before the first send",tests.testCodexSignInIsStatedBeforeTheFirstSend),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
  ("Forget failure preserves retryable chat",tests.testForgetFailurePreservesRetryableChat),

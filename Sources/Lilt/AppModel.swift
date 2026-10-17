@@ -23,6 +23,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var draft = "" { didSet { if !loading { updateActive { $0.draft = draft }; scheduleSave() } } }
     @Published var selectedID: UUID?
     @Published var settings = false
+    @Published var settingsInCoach = false
     @Published var onboarding = false // Kept for old preference compatibility; no setup gate.
     @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet { UserDefaults.standard.set(readAloud, forKey: "readAloud"); if !readAloud && !conversation { voice.stopSpeaking() } } }
     let context = WindowContext()
@@ -80,6 +81,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
     func openSettings() { settings = true; showLibrary?() }
+    /// Recovery and the pre-send notice stay on the coach. They do not open the history window.
+    func openSettingsInCoach() { settingsInCoach = true }
     func showError(_ message: String, settings: Bool = false) { settingsForNextError = settings; error = message }
     func prepareChat() {
         guard active == nil else { showCoach?(); return }
@@ -88,6 +91,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
         guard store != nil else { error="The chat library is unavailable. Restore the library folder before starting."; return }
+        settingsInCoach = false
         suspend()
         if !importing,let old=active, old.title == "New chat",old.messages.isEmpty,old.draft.isEmpty,old.files.isEmpty {sessions.removeAll{$0.id==old.id}}
         let title=title.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -97,6 +101,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         persist(); showCoach?()
     }
     func resume(_ id: UUID) {
+        settingsInCoach = false
         suspend(); guard let chat=sessions.first(where:{$0.id==id}) else{return}
         activeID=id; selectedID=id; loading=true; draft=chat.draft; loading=false
         updateActive{$0.completed=false}; paused=false; lastTick=Date(); error=nil; failedQuestion=nil
