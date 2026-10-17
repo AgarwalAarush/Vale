@@ -108,11 +108,19 @@ struct SessionDetail: View {
         }.scrollIndicators(.hidden)
     }
 }
+private final class SignInWait: @unchecked Sendable {
+    private let lock = NSLock()
+    private var timedOut = false
+    func markTimedOut() { lock.lock(); timedOut = true; lock.unlock() }
+    func didTimeOut() -> Bool { lock.lock(); defer { lock.unlock() }; return timedOut }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @AppStorage("codexPath") private var codexPath = ""
     @AppStorage("model") private var modelName = ""
     @State private var connection = ""
+    @State private var signInToken = UUID()
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
@@ -155,12 +163,19 @@ struct SettingsView: View {
     func checkConnection() {
         guard let path = model.provider.executable else { connection = "Codex wasn’t found. Choose its path below."; return }
         connection = "Checking…"
+        let token = UUID(); signInToken = token
         let process = Process(); process.executableURL = URL(fileURLWithPath: path); process.arguments = ["login", "status"]
         let pipe = Pipe(); process.standardOutput = pipe; process.standardError = pipe
+        let wait = SignInWait()
         process.terminationHandler = { process in
             let data = pipe.fileHandleForReading.readDataToEndOfFile(); let text = String(data: data, encoding: .utf8) ?? ""
-            DispatchQueue.main.async { connection = process.terminationStatus == 0 ? (text.contains("ChatGPT") ? "Signed in with ChatGPT." : "Codex is signed in.") : "Not signed in. Run codex login in Terminal." }
+            let message = SignInCheck.result(status: process.terminationStatus, output: text, timedOut: wait.didTimeOut())
+            DispatchQueue.main.async { if signInToken == token { connection = message } }
         }
-        do { try process.run() } catch { connection = "Couldn’t launch Codex. Check the executable path." }
+        do { try process.run() } catch { connection = "Couldn’t launch Codex. Check the executable path."; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + SignInCheck.limit) {
+            guard signInToken == token, process.isRunning else { return }
+            wait.markTimedOut(); process.terminate()
+        }
     }
 }
