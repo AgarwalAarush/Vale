@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum TypedText {
+    /// Automatic spelling correction rewrites the first sentence. Leave the words as typed.
+    public static let correctsSpelling = false
+}
