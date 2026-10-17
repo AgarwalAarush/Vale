@@ -131,8 +131,9 @@ struct CoachView: View {
                 Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
                 Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
             }.disabled(model.busy || model.paused || model.active == nil).padding(.horizontal, 18).padding(.bottom, 10) }
-            if !model.pendingFiles.isEmpty {ScrollView(.horizontal){HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,model:model,removable:true)}}.padding(.horizontal,18)}.scrollIndicators(.hidden).padding(.bottom,10)}
+            if !UnsentFilePlace.withTheDraft, !model.pendingFiles.isEmpty {ScrollView(.horizontal){HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,model:model,removable:true)}}.padding(.horizontal,18)}.scrollIndicators(.hidden).padding(.bottom,10)}
             VStack(spacing: 3) {
+                if UnsentFilePlace.withTheDraft, !model.pendingFiles.isEmpty {ScrollView(.horizontal){HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)}
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text("Ask quietly…").font(.system(size: 14)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.top, 6).padding(.leading, 7).allowsHitTesting(false) }
                     DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
