@@ -240,6 +240,19 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testRemovingAnUnsentFileKeepsTheReply() {
+        XCTAssertFalse(UnsentRemoval.stopsTheReply(waiting: true, unsent: true))
+        XCTAssertTrue(UnsentRemoval.stopsTheReply(waiting: true, unsent: false))
+        XCTAssertFalse(UnsentRemoval.stopsTheReply(waiting: false, unsent: true))
+        var chat = LearningSession(title: "New chat")
+        let file = AttachmentRecord(name: "notes.txt", kind: .text, byteCount: 4, detail: "TXT")
+        chat.pendingAttachments = [file]
+        let unsent = chat.pendingAttachments.contains { $0.id == file.id } && !chat.messages.contains { $0.attachments.contains { $0.id == file.id } }
+        XCTAssertTrue(unsent)
+        XCTAssertFalse(UnsentRemoval.stopsTheReply(waiting: true, unsent: unsent))
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
 
 }
 
@@ -276,7 +289,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Removing an unsent file keeps the reply",tests.testRemovingAnUnsentFileKeepsTheReply)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
