@@ -73,6 +73,14 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testHistoryCountsTheReply() {
+        var chat=LearningSession(title:"Export")
+        XCTAssertEqual(ChatSummary.messageCount(chat.messages),0)
+        chat.messages=[Message(role:"user",text:"How?")]
+        XCTAssertEqual(ChatSummary.messageCount(chat.messages),1)
+        chat.messages.append(Message(role:"assistant",text:"Use the menu."))
+        XCTAssertEqual(ChatSummary.messageCount(chat.messages),2)
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +263,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("History counts the reply",tests.testHistoryCountsTheReply),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
