@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// Turning read aloud on speaks the reply already on screen. It does not start the microphone.
+public enum ReadAloud {
+    public static func replyToSpeak(messages: [Message], enabled: Bool, alreadySpeaking: Bool) -> String? {
+        guard enabled, !alreadySpeaking else { return nil }
+        guard let text = messages.last(where: { $0.role == "assistant" })?.text,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return text
+    }
+}

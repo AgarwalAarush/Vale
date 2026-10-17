@@ -24,7 +24,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var selectedID: UUID?
     @Published var settings = false
     @Published var onboarding = false // Kept for old preference compatibility; no setup gate.
-    @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet { UserDefaults.standard.set(readAloud, forKey: "readAloud"); if !readAloud && !conversation { voice.stopSpeaking() } } }
+    @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet {
+        UserDefaults.standard.set(readAloud, forKey: "readAloud")
+        if let text=ReadAloud.replyToSpeak(messages:active?.messages ?? [],enabled:readAloud,alreadySpeaking:voice.speaking) { voice.speak(text) }
+        else if !readAloud && !conversation { voice.stopSpeaking() }
+    } }
     let context = WindowContext()
     let voice = VoiceController()
     let provider = TutorProvider()
