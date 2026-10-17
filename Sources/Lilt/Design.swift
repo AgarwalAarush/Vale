@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import LiltCore
 
 enum Theme {
     static let ink = Color(red: 0.94, green: 0.95, blue: 0.96)
@@ -54,7 +55,7 @@ struct LogoMark: View {
 struct AudioMark: View {
     var active: Bool
     var body: some View {
-        HStack(spacing: 3) { ForEach(Array([9.0,18.0,25.0,15.0,7.0].enumerated()), id: \.offset) { _, value in Capsule().fill(active ? Theme.accent : Theme.accent.opacity(0.75)).frame(width: 3, height: value) } }.frame(width: 29, height: 27).accessibilityHidden(true)
+        HStack(spacing: 3) { ForEach(Array([9.0,18.0,25.0,15.0,7.0].enumerated()), id: \.offset) { _, value in Capsule().fill(IdleWave.usesAccent(active: active) ? Theme.accent : Theme.muted).frame(width: 3, height: value) } }.frame(width: 29, height: 27).accessibilityHidden(true)
     }
 }
 
