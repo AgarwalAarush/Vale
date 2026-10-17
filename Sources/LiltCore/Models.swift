@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum AttachControl {
+    /// The control that adds a file shows its name, not only a plus.
+    public static let title = "Attach"
+}
