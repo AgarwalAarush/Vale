@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ComposerFocus {
+    /// After a question leaves the field, the keyboard returns there.
+    public static func returns(afterSending sent: Bool) -> Bool { sent }
+}

@@ -21,6 +21,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
     }
     @Published var draft = "" { didSet { if !loading { updateActive { $0.draft = draft }; scheduleSave() } } }
+    @Published var composerFocus = 0
     @Published var selectedID: UUID?
     @Published var settings = false
     @Published var onboarding = false // Kept for old preference compatibility; no setup gate.
@@ -131,6 +132,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
             if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
             replace(chat);draft=""
+            if ComposerFocus.returns(afterSending: override == nil && !spoken && !pointing && !reveal && !guideRequested) {
+                composerFocus += 1
+            }
         }
         failedQuestion=question;persist()
         var history=chat
