@@ -97,7 +97,7 @@ struct CoachView: View {
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(message.role == "user" ? 12 : 0)
-                                    .background(message.role == "user" ? Color.white.opacity(0.035) : .clear)
+                                    .background(message.role == "user" ? Theme.fill : .clear)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                     .id(message.id)
                             }
@@ -148,8 +148,8 @@ struct CoachView: View {
                         Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink).frame(width: 30, height: 30).background(Theme.accent.opacity(!model.hasInput && !model.busy ? 0.12 : 0.35)).clipShape(Circle())
                     }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || model.paused || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
-            }.padding(9).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.16), lineWidth: 0.8)).padding(.horizontal, 18)
+            }.padding(9).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.7)).padding(.horizontal, 18)
             HStack {
                 Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                 Spacer()

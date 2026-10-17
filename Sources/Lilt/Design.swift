@@ -2,11 +2,21 @@ import SwiftUI
 import AppKit
 
 enum Theme {
-    static let ink = Color(red: 0.94, green: 0.95, blue: 0.96)
+    static let inkColor = NSColor(srgbRed: 0.94, green: 0.95, blue: 0.96, alpha: 1)
+    static let ink = Color(nsColor: inkColor)
     static let muted = Color(red: 0.61, green: 0.64, blue: 0.68)
     static let accent = Color(red: 0.57, green: 0.67, blue: 1)
     static let line = Color.white.opacity(0.09)
-    static let background = Color(red: 0.10, green: 0.11, blue: 0.12)
+    /// Quiet warm charcoal for opaque windows. Distinct from the cool glass tint.
+    static let windowBackground = NSColor(srgbRed: 0.165, green: 0.145, blue: 0.125, alpha: 1)
+    static let background = Color(nsColor: windowBackground)
+    /// Deeper warm recess for the history rail.
+    static let rail = Color(nsColor: NSColor(srgbRed: 0.11, green: 0.095, blue: 0.08, alpha: 1))
+    static let fill = Color.white.opacity(0.045)
+    static let fillRaised = Color.white.opacity(0.08)
+    static let fillPressed = Color.white.opacity(0.12)
+    /// Capsule and coach glass tint. Unchanged so those panels keep their current fill.
+    private static let glassTint = Color(red: 0.10, green: 0.11, blue: 0.12)
 }
 struct GlassMaterial: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
@@ -18,17 +28,24 @@ struct GlassMaterial: NSViewRepresentable {
 struct GlassSurface: ViewModifier {
     var radius: CGFloat = 20
     func body(content: Content) -> some View {
-        content.background(GlassMaterial().overlay(Theme.background.opacity(0.86)))
+        content.background(GlassMaterial().overlay(Theme.glassTint.opacity(0.86)))
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.7))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.7))
             .foregroundStyle(Theme.ink).preferredColorScheme(.dark)
+    }
+}
+struct QuietField: ViewModifier {
+    func body(content: Content) -> some View {
+        content.textFieldStyle(.plain).padding(.horizontal, 10).padding(.vertical, 8).background(Theme.fill)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.7))
     }
 }
 struct QuietButton: ButtonStyle {
     var filled = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 12, weight: .medium)).padding(.horizontal, 12).padding(.vertical, 8)
-            .background(Color.white.opacity(configuration.isPressed ? 0.15 : filled ? 0.075 : 0.025))
+            .background(configuration.isPressed ? Theme.fillPressed : (filled ? Theme.fillRaised : Theme.fill))
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.7))
     }
@@ -37,7 +54,7 @@ struct IconButton: View {
     var symbol: String; var label: String; var tint: Color = Theme.muted; var action: () -> Void
     @State private var hover = false
     var body: some View {
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).frame(width: 30, height: 30).background(Color.white.opacity(hover ? 0.075 : 0)).clipShape(Circle()) }
+        Button(action: action) { Image(systemName: symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).frame(width: 30, height: 30).background(hover ? Theme.fillRaised : .clear).clipShape(Circle()) }
             .buttonStyle(.plain).help(label).accessibilityLabel(label).onHover { hover = $0 }
     }
 }
@@ -85,7 +102,7 @@ struct DraftEditor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false
-        editor.font = .systemFont(ofSize: 14); editor.textColor = NSColor(white: 0.93, alpha: 1); editor.insertionPointColor = NSColor(red: 0.57, green: 0.67, blue: 1, alpha: 1)
+        editor.font = .systemFont(ofSize: 14); editor.textColor = Theme.inkColor; editor.insertionPointColor = NSColor(srgbRed: 0.57, green: 0.67, blue: 1, alpha: 1)
         editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
         editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false; editor.isAutomaticTextReplacementEnabled = false
