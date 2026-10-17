@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import LiltCore
 
 enum Theme {
     static let ink = Color(red: 0.94, green: 0.95, blue: 0.96)
@@ -67,6 +68,7 @@ final class ComposerTextView: NSTextView {
         let board=NSPasteboard.general
         if let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL], !urls.isEmpty,let pasteFiles {pasteFiles(urls);return}
         if let data=board.data(forType:.png) ?? board.data(forType:.tiff),let pasteImage {pasteImage(data);return}
+        if let words=ClipboardHTML.text(html:board.string(forType:.html),plain:board.string(forType:.string)) {insertText(words,replacementRange:selectedRange());return}
         super.paste(sender)
     }
     override func keyDown(with event: NSEvent) {

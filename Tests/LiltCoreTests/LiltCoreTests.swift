@@ -240,6 +240,22 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testHTMLPasteKeepsTheWords() {
+        XCTAssertEqual(ClipboardHTML.text(html:"<p>Hello <b>there</b></p>",plain:nil),"Hello there")
+        XCTAssertEqual(ClipboardHTML.text(html:"a&amp;b",plain:" "),"a&b")
+        XCTAssertEqual(ClipboardHTML.text(html:"<script>alert(1)</script><p>Keep</p>",plain:nil),"Keep")
+        XCTAssertNil(ClipboardHTML.text(html:"<p>Hidden</p>",plain:"Keep these words"))
+        XCTAssertNil(ClipboardHTML.text(html:"<style>p{}</style>",plain:nil))
+        var chat=LearningSession(title:"New chat")
+        chat.draft="secret draft"
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertFalse(chat.matches("secret"))
+        XCTAssertFalse(chat.matches("missing"))
+        let prompt=TutorPrompt.build(session:chat,question:"What is this?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("No. Return null for point."))
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +292,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("HTML paste keeps the words",tests.testHTMLPasteKeepsTheWords)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
