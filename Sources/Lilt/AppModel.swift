@@ -146,14 +146,13 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                 var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
                 let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:guideRequested)
                 self.provider.ask(prompt:prompt,images:images,search:wantsSearch) { [weak self] result in
-                    guard let self,self.requestID==id,self.activeID==chatID else{return}
-                    Task{[weak self]in
-                        guard let self,self.requestID==id,self.activeID==chatID else{return}
+                    Task { @MainActor [weak self] in
+                        guard let self, ReplyDelivery.shouldApply(request:id, current:self.requestID, chat:chatID, active:self.activeID) else{return}
                         switch result{
                         case .success(let reply):
                             var fresh:ContextSnapshot?
                             if snapshot != nil,self.context.hasSelection{fresh=try? await self.context.capture()}
-                            guard self.requestID==id,self.activeID==chatID else{return}
+                            guard ReplyDelivery.shouldApply(request:id, current:self.requestID, chat:chatID, active:self.activeID) else{return}
                             let changed=snapshot.map{original in fresh.map{!original.evidence.reflectsSameView($0.evidence)} ?? true} ?? false
                             let canPoint:Bool
                             if let point=reply.point,let snapshot,let fresh,let frame=snapshot.frame,!changed{canPoint=snapshot.evidence.matches(fresh.evidence) && self.context.pointIsVisible(point,frame:frame,windowID:snapshot.windowID)}else{canPoint=false}

@@ -240,6 +240,13 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testAnswerAppliesOnlyToTheCurrentChat() {
+        let request=UUID();let chat=UUID();let other=UUID()
+        XCTAssertTrue(ReplyDelivery.shouldApply(request:request,current:request,chat:chat,active:chat))
+        XCTAssertFalse(ReplyDelivery.shouldApply(request:request,current:UUID(),chat:chat,active:chat))
+        XCTAssertFalse(ReplyDelivery.shouldApply(request:request,current:request,chat:chat,active:other))
+        XCTAssertFalse(ReplyDelivery.shouldApply(request:request,current:request,chat:chat,active:nil))
+    }
 
 }
 
@@ -276,7 +283,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Answer applies only to the current chat",tests.testAnswerAppliesOnlyToTheCurrentChat)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

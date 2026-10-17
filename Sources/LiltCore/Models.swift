@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyDelivery {
+    /// The reply belongs on the main actor, and only for the request still in this chat.
+    public static func shouldApply(request: UUID, current: UUID, chat: UUID, active: UUID?) -> Bool {
+        request == current && active == chat
+    }
+}
