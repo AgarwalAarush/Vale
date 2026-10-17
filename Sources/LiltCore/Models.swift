@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum PasteSpacing {
+    /// A paste or a word delete must not insert or remove spaces the person did not type.
+    public static let adjustsAutomatically = false
+}
