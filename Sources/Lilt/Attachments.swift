@@ -12,7 +12,7 @@ struct FileContext: Sendable {
 final class AttachmentStore: Sendable {
     let directory: URL
     private let unlink:@Sendable(URL)throws->Void
-    static let maxBytes = 25_000_000
+    static let maxBytes = AttachmentFileKind.maxBytes
     static let textExtensions = Set(["txt","md","markdown","csv","json","jsonl","yaml","yml","xml","html","css","js","jsx","ts","tsx","py","swift","rs","go","java","c","h","cpp","hpp","sql","sh","toml","log","tex","rtf"])
     init(directory: URL,unlink:(@Sendable(URL)throws->Void)?=nil) throws {
         self.unlink=unlink ?? {try FileManager.default.removeItem(at:$0)}
@@ -22,12 +22,14 @@ final class AttachmentStore: Sendable {
     func url(for record: AttachmentRecord) -> URL { directory.appendingPathComponent(record.storageName) }
     func importFile(_ url: URL) throws -> AttachmentRecord {
         let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
-        guard (attributes[.type] as? FileAttributeType) == .typeRegular, let bytes=attributes[.size] as? NSNumber, bytes.intValue <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
+        let isRegular=(attributes[.type] as? FileAttributeType) == .typeRegular
+        let bytes=(attributes[.size] as? NSNumber)?.intValue
+        if let refusal=AttachmentFileKind.refusal(isRegularFile:isRegular,byteCount:bytes){throw AppError(refusal)}
         let data=try Data(contentsOf:url,options:.mappedIfSafe)
         return try importData(data,name:url.lastPathComponent,fileExtension:url.pathExtension.lowercased())
     }
     func importData(_ data: Data, name: String, fileExtension ext: String) throws -> AttachmentRecord {
-        guard data.count <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
+        if let refusal=AttachmentFileKind.refusal(isRegularFile:true,byteCount:data.count){throw AppError(refusal)}
         let kind: AttachmentRecord.Kind
         var stored=data; var detail=""
         if ext == "pdf" {

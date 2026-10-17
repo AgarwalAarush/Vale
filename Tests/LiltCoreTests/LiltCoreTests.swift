@@ -73,6 +73,12 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testFolderDropIsNotReportedAsTooLarge() {
+        XCTAssertEqual(AttachmentFileKind.refusal(isRegularFile: false, byteCount: 100), "Choose a file, not a folder.")
+        XCTAssertEqual(AttachmentFileKind.refusal(isRegularFile: true, byteCount: nil), "Choose a file, not a folder.")
+        XCTAssertEqual(AttachmentFileKind.refusal(isRegularFile: true, byteCount: AttachmentFileKind.maxBytes + 1), "Choose a file under 25 MB.")
+        XCTAssertNil(AttachmentFileKind.refusal(isRegularFile: true, byteCount: AttachmentFileKind.maxBytes))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +261,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Folder drop is not reported as too large",tests.testFolderDropIsNotReportedAsTooLarge),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
