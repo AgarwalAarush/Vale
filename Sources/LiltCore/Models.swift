@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsuleMic {
+    /// The capsule microphone stays quiet until the person is listening, speaking, or interrupting a reply.
+    public static func idleIsQuiet(listening: Bool, speaking: Bool, busy: Bool) -> Bool {
+        !listening && !speaking && !busy
+    }
+}
