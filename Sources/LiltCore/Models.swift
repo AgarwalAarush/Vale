@@ -78,7 +78,12 @@ public struct LearningSession: Codable, Identifiable, Equatable {
         var seen=Set<UUID>()
         return (messages.flatMap(\.attachments)+pendingAttachments).filter { seen.insert($0.id).inserted }
     }
-    public func matches(_ query:String)->Bool { let q=query.trimmingCharacters(in:.whitespacesAndNewlines); return q.isEmpty || ([title,takeaway] + messages.map(\.text) + files.map(\.name)).contains{$0.localizedCaseInsensitiveContains(q)} }
+    public func matches(_ query:String)->Bool {
+        let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
+        if q.isEmpty { return true }
+        let fields=[title,takeaway]+messages.map(\.text)+files.map(\.name)
+        return q.split(whereSeparator:\.isWhitespace).allSatisfy{word in fields.contains{$0.localizedCaseInsensitiveContains(String(word))}}
+    }
     public var contextLimited:Bool{ConversationWindow(messages:messages).limited}
     public var remaining: Int { max(0, duration - elapsed) }
     public var timerText: String { Self.formatTime(remaining) }

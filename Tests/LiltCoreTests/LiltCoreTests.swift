@@ -240,6 +240,22 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSearchFindsEveryWord() {
+        var chat=LearningSession(title:"Weekend plan")
+        chat.messages=[Message(role:"user",text:"Where is the harbor?"),Message(role:"assistant",text:"Bring a notebook.")]
+        chat.draft="secret draft words"
+        XCTAssertTrue(chat.matches("weekend notebook"))
+        XCTAssertTrue(chat.matches("HARBOR plan"))
+        XCTAssertFalse(chat.matches("weekend missing"))
+        XCTAssertFalse(chat.matches("secret draft"))
+        XCTAssertTrue(chat.matches("  "))
+        let fresh=LearningSession(title:"New chat")
+        XCTAssertFalse(fresh.webEnabled)
+        let prompt=TutorPrompt.build(session:fresh,question:"What is this?",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("Web search: Disabled"))
+        XCTAssertTrue(prompt.contains("No. Return null for point."))
+        XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
 
 }
 
@@ -276,7 +292,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Search finds every word",tests.testSearchFindsEveryWord)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
