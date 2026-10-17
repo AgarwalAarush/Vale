@@ -1,6 +1,12 @@
 import Foundation
 import CoreGraphics
 
+/// A failed send stays visible on the capsule after the coach is closed.
+public enum CapsuleFailure {
+    public static let label = "Couldn't answer"
+    public static func text(hasError: Bool) -> String? { hasError ? label : nil }
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]
