@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum WebToggle {
+    /// Web search can change only when a reply is not already on the way.
+    public static func changes(waiting: Bool) -> Bool { !waiting }
+}

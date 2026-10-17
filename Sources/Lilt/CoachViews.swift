@@ -139,7 +139,7 @@ struct CoachView: View {
                 }
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
-                    IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}
+                    IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}.disabled(!WebToggle.changes(waiting: model.busy))
                     IconButton(symbol:"list.number",label:"Start step-by-step help"){model.startGuide()}.disabled(model.busy || model.paused)
                     Spacer()
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }

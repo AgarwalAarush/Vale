@@ -103,7 +103,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         persist(); showCoach?()
     }
     func setMode(_ mode: ChatMode) { conversation=false;conversationTask?.cancel();cancel(); voice.stopListening(); updateActive{$0.mode=mode}; persist() }
-    func setWeb(_ enabled: Bool) { updateActive{$0.webEnabled=enabled}; persist() }
+    func setWeb(_ enabled: Bool) { guard WebToggle.changes(waiting: busy) else { return }; updateActive{$0.webEnabled=enabled}; persist() }
     func setFocus(minutes: Int) { updateActive{$0.duration=minutes>0 ? $0.elapsed+minutes*60 : 0}; persist() }
     func tick() {
         defer{lastTick=Date()}; guard !paused,active != nil else{return}
