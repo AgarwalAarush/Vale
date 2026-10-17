@@ -38,7 +38,11 @@ final class FloatingPanel: NSPanel {
         model.showPreview = { [weak self] image in self?.preview(image) }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            if event.keyCode == 53 { self.model.stopInteraction(); self.clearAnnotation(); return nil }
+            if event.keyCode == 53 {
+                let dialogOpen=NSApp.modalWindow != nil || NSApp.windows.contains{$0.attachedSheet != nil}
+                if EscapeKey.stopsSession(dialogOpen:dialogOpen){self.model.stopInteraction();self.clearAnnotation();return nil}
+                return event
+            }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "," { self.model.settings = true; self.openLibrary(); return nil }
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.newSession(); return nil }
             return event

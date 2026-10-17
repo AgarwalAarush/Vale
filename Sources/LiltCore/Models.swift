@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum EscapeKey {
+    /// Escape stops the session only when a dialog is not using that key.
+    public static func stopsSession(dialogOpen: Bool) -> Bool { !dialogOpen }
+}
