@@ -107,8 +107,9 @@ struct ContextSnapshot {
                 let config=SCStreamConfiguration();let scale=min(2.0,1600.0/max(rect.width,rect.height))
                 config.width=max(2,Int(rect.width*scale));config.height=max(2,Int(rect.height*scale));config.showsCursor=false;config.ignoreShadowsSingleWindow=true
                 let image=try await SCScreenshotManager.captureImage(contentFilter:filter,configuration:config)
-                guard let data=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else{throw AppError("Couldn’t read the selected window.")}
-                result=ContextSnapshot(data:data,image:NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height)),windowID:selectedID,frame:self.currentFrame(),generation:expected,capturedAt:Date())
+                guard let data=windowPNG(image) else{throw AppError("Couldn’t read the selected window.")}
+                let shown=NSImage(data:data) ?? NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height))
+                result=ContextSnapshot(data:data,image:shown,windowID:selectedID,frame:self.currentFrame(),generation:expected,capturedAt:Date())
             }
             guard !Task.isCancelled,self.generation==expected,result.windowID==selectedID,(selectedID==nil || self.currentFrame() != nil) else{throw AppError("Sharing changed. Ask again with the selected window.")}
             result.generation=expected;result.capturedAt=Date();return result
@@ -138,6 +139,15 @@ struct ContextSnapshot {
         }
         let box=CGRect(x:frame.minX+point.x*frame.width,y:frame.minY+point.y*frame.height,width:point.width*frame.width,height:point.height*frame.height).intersection(frame)
         return PointVisibility.isVisible(targetID:windowID,box:box,frontToBack:windows)
+    }
+    private func windowPNG(_ image:CGImage)->Data?{
+        let primary=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:])
+        if let data=WindowImage.png(primary:primary,flattened:nil){return data}
+        let width=image.width,height=image.height
+        guard width>0,height>0,let context=CGContext(data:nil,width:width,height:height,bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else{return nil}
+        context.draw(image,in:CGRect(x:0,y:0,width:width,height:height))
+        guard let flattened=context.makeImage() else{return nil}
+        return WindowImage.png(primary:nil,flattened:NSBitmapImageRep(cgImage:flattened).representation(using:.png,properties:[:]))
     }
     // App-owned generated fixtures only; unavailable in normal launches.
     func installFixture(windowID:CGWindowID=42,frame:CGRect=CGRect(x:100,y:100,width:400,height:260),timeout:Double=6,onScreen:Bool=true,pointVisible:Bool=true,source:@escaping ()async throws->ContextSnapshot){

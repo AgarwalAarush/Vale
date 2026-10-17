@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum WindowImage {
+    /// Use the direct PNG when it exists. Otherwise use a plain bitmap encoding.
+    public static func png(primary: Data?, flattened: Data?) -> Data? {
+        if let primary, !primary.isEmpty { return primary }
+        if let flattened, !flattened.isEmpty { return flattened }
+        return nil
+    }
+}
