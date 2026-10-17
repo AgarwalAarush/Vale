@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SentFile {
+    /// A file already on a question stays there. A file still waiting can be removed.
+    public static func canRemove(id: UUID, session: LearningSession?) -> Bool {
+        guard let session else { return false }
+        return !session.messages.contains { $0.attachments.contains { $0.id == id } }
+    }
+}
