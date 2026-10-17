@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SendGesture {
+    /// A second click that is still part of sending does not stop that question.
+    public static let separateStop: TimeInterval = 0.4
+    public static func stops(elapsed: TimeInterval) -> Bool { elapsed >= separateStop }
+}

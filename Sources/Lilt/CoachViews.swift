@@ -144,7 +144,9 @@ struct CoachView: View {
                     Spacer()
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
-                    Button { if model.busy { model.stopResponse() } else { model.send() } } label: {
+                    Button {
+                        if model.busy { model.stopIfSeparate() } else { model.send() }
+                    } label: {
                         Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink).frame(width: 30, height: 30).background(Theme.accent.opacity(!model.hasInput && !model.busy ? 0.12 : 0.35)).clipShape(Circle())
                     }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || model.paused || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
