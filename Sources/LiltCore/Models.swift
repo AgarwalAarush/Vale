@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+/// While search is on screen, the sidebar lists the same chats as the results. Otherwise it lists every chat.
+public enum HistoryLists {
+    public static func sidebar(_ sessions: [LearningSession], query: String, searchVisible: Bool) -> [LearningSession] {
+        searchVisible ? sessions.filter { $0.matches(query) } : sessions
+    }
+}
