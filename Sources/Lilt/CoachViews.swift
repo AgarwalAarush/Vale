@@ -138,7 +138,12 @@ struct CoachView: View {
                     DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
                 }
                 HStack {
-                    IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
+                    Button { model.attachFiles() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus").font(.system(size: 12, weight: .medium))
+                            Text(AttachControl.title).font(.system(size: 12, weight: .medium))
+                        }.foregroundStyle(Theme.muted).padding(.horizontal, 8).padding(.vertical, 6)
+                    }.buttonStyle(.plain).disabled(model.importing).help("Attach files").accessibilityLabel("Attach files")
                     IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}
                     IconButton(symbol:"list.number",label:"Start step-by-step help"){model.startGuide()}.disabled(model.busy || model.paused)
                     Spacer()
