@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum UnsentFilePlace {
+    /// A file that has not been sent sits in the composer with the draft.
+    public static let withTheDraft = true
+}
