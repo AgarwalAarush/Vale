@@ -142,8 +142,11 @@ final class FloatingPanel: NSPanel {
     func point(_ point: PointTarget, snapshot: ContextSnapshot) {
         clearAnnotation()
         guard point.isValid, let bounds = snapshot.frame, snapshot.generation == model.context.generation,model.context.pointIsVisible(point,frame:bounds,windowID:snapshot.windowID) else { return }
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? 900
-        let frame = NSRect(x: bounds.minX + CGFloat(point.x) * bounds.width - 6, y: primaryHeight - bounds.minY - CGFloat(point.y + point.height) * bounds.height - 6, width: CGFloat(point.width) * bounds.width + 12, height: CGFloat(point.height) * bounds.height + 12)
+        let frames=NSScreen.screens.map{DisplayFrame(x:$0.frame.origin.x,y:$0.frame.origin.y,width:$0.frame.size.width,height:$0.frame.size.height)}
+        let primaryHeight=HighlightPlacement.primaryHeight(frames) ?? NSScreen.screens.first?.frame.height ?? 900
+        let itemTop=bounds.minY+CGFloat(point.y)*bounds.height
+        let itemHeight=CGFloat(point.height)*bounds.height
+        let frame = NSRect(x: bounds.minX + CGFloat(point.x) * bounds.width - 6, y: HighlightPlacement.appKitOriginY(cgMinY:itemTop,cgHeight:itemHeight,primaryHeight:primaryHeight) - 6, width: CGFloat(point.width) * bounds.width + 12, height: CGFloat(point.height) * bounds.height + 12)
         let window = NSWindow(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.backgroundColor = .clear; window.isOpaque = false; window.hasShadow = false; window.ignoresMouseEvents = true; window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]; window.isReleasedWhenClosed = false

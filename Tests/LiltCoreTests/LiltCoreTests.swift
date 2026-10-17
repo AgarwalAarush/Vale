@@ -240,6 +240,14 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testHighlightUsesTheMainDisplay() {
+        let laptop=DisplayFrame(x:-1440,y:0,width:1440,height:900)
+        let external=DisplayFrame(x:0,y:0,width:2560,height:1440)
+        XCTAssertEqual(HighlightPlacement.primaryHeight([laptop, external]), 1440)
+        XCTAssertEqual(HighlightPlacement.primaryHeight([DisplayFrame(x:0,y:0,width:1440,height:900)]), 900)
+        XCTAssertNil(HighlightPlacement.primaryHeight([]))
+        XCTAssertEqual(HighlightPlacement.appKitOriginY(cgMinY:100, cgHeight:40, primaryHeight:1000), 860)
+    }
 
 }
 
@@ -276,7 +284,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Highlight uses the main display",tests.testHighlightUsesTheMainDisplay)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
