@@ -139,7 +139,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         captureTask=Task { [weak self] in
             guard let self else{return};var snapshot:ContextSnapshot?
             do {
-                if self.context.hasSelection {snapshot=try await self.context.capture()}
+                if self.context.hasSelection {snapshot=try await self.context.captureForQuestion()}
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
                 let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records) ?? FileContext()}.value
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}

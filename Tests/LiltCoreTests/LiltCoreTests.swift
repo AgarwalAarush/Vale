@@ -240,6 +240,12 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testQuestionSkipsACaptureThatWasAlreadyRunning() {
+        XCTAssertFalse(RequestCapture.useFrame(joinedExisting:true,waitsSoFar:0))
+        XCTAssertFalse(RequestCapture.useFrame(joinedExisting:true,waitsSoFar:RequestCapture.maxWaits-1))
+        XCTAssertTrue(RequestCapture.useFrame(joinedExisting:false,waitsSoFar:0))
+        XCTAssertTrue(RequestCapture.useFrame(joinedExisting:true,waitsSoFar:RequestCapture.maxWaits))
+    }
 
 }
 
@@ -276,7 +282,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Question skips a capture that was already running",tests.testQuestionSkipsACaptureThatWasAlreadyRunning)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
