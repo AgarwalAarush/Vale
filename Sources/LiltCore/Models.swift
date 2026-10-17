@@ -190,3 +190,17 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ClipboardAddress {
+    /// A copied web or mail address with no plain text is still text the person can ask about.
+    public static func text(plain: String?, urls: [URL]) -> String? {
+        let plain = plain?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !plain.isEmpty { return nil }
+        return urls.lazy.compactMap { url -> String? in
+            switch url.scheme?.lowercased() {
+            case "https", "http", "mailto": return url.absoluteString
+            default: return nil
+            }
+        }.first
+    }
+}
