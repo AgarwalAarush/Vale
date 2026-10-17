@@ -38,6 +38,17 @@ public struct Message: Codable, Identifiable, Equatable {
     }
 }
 
+/// Assistant replies are formatted only when that formatting still shows the answer.
+public enum AssistantReplyDisplay {
+    public static func needsLiteral(source: String, rendered: String) -> Bool {
+        if source.isEmpty { return false }
+        if rendered.isEmpty { return true }
+        if source.contains("<"), !rendered.contains("<") { return true }
+        if source.contains("%"), !rendered.contains("%") { return true }
+        return false
+    }
+}
+
 public struct LearningSession: Codable, Identifiable, Equatable {
     public var id: UUID
     public var title: String

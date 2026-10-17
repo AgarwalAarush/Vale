@@ -81,7 +81,7 @@ struct CoachView: View {
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
-                                    Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                    displayedMessage(message).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                                     if !message.attachments.isEmpty {
                                         ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
                                     }
@@ -163,4 +163,19 @@ struct CoachView: View {
                 Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
             } message: { Text("This will reveal the method. Your current hints stay in the conversation.") }
     }
+}
+
+func displayedMessage(_ message: Message) -> Text {
+    message.role == "assistant" ? assistantReplyText(message.text) : Text(.init(message.text))
+}
+
+func assistantReplyText(_ source: String) -> Text {
+    var options = AttributedString.MarkdownParsingOptions()
+    options.interpretedSyntax = .full
+    options.failurePolicy = .throwError
+    if let attributed = try? AttributedString(markdown: source, options: options) {
+        let plain = String(attributed.characters)
+        if !AssistantReplyDisplay.needsLiteral(source: source, rendered: plain) { return Text(attributed) }
+    }
+    return Text(verbatim: source)
 }
