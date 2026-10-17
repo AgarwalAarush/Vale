@@ -114,6 +114,14 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum TextPreview {
+    public static let characterLimit = 100_000
+    /// The opened file, stopping at the kept length, with no note added after it.
+    public static func shown(_ text: String) -> String {
+        String(text.prefix(characterLimit))
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL

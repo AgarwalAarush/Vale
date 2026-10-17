@@ -52,6 +52,6 @@ struct FilePreviewView: View {
     }
     private var textPreview:String{
         guard let text=try? String(contentsOf:store.url(for:record),encoding:.utf8) else{return "File unavailable."}
-        return String(text.prefix(100_000)) + (text.count>100_000 ? "\n\n[Preview limited to the first 100,000 characters.]" : "")
+        return TextPreview.shown(text)
     }
 }
