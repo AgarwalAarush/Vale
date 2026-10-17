@@ -32,6 +32,7 @@ struct CoachView: View {
     @ObservedObject var model: AppModel
     var close: () -> Void
     @State private var walkthrough = false
+    @State private var copiedReply: UUID?
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
@@ -92,7 +93,11 @@ struct CoachView: View {
                                     if message.role == "assistant" {
                                         HStack(spacing: 8) {
                                             IconButton(symbol: "speaker.wave.2", label: "Read this reply") { model.voice.speak(message.text) }
-                                            IconButton(symbol: "doc.on.doc", label: "Copy reply") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) }
+                                            IconButton(symbol: copiedReply == message.id ? "checkmark" : "doc.on.doc", label: copiedReply == message.id ? "Copied" : "Copy reply", tint: copiedReply == message.id ? Theme.accent : Theme.muted) {
+                                                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string)
+                                                let id = message.id; copiedReply = id
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if copiedReply == id { copiedReply = nil } }
+                                            }
                                         }.padding(.leading, -7)
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .leading)
