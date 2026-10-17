@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FieldSurface {
+    /// The composer must not paint a plate over the words being typed.
+    public static let staysClear = true
+}
