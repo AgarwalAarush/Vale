@@ -240,6 +240,16 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testUnicodeTextFileIsReadable() {
+        let words="Total 1840"
+        let utf16=Data([0xFF,0xFE])+words.data(using:.utf16LittleEndian)!
+        XCTAssertEqual(TextFile.decode(utf16),words)
+        XCTAssertEqual(TextFile.decode(Data([0xFE,0xFF,0x00,0x54,0x00,0x6F])),"To")
+        XCTAssertEqual(TextFile.decode(Data([0xEF,0xBB,0xBF])+Data("Hello".utf8)),"Hello")
+        XCTAssertEqual(TextFile.decode(Data("Hello".utf8)),"Hello")
+        XCTAssertNil(TextFile.decode(Data([0x00,0x01,0x02,0x03])))
+        XCTAssertNil(TextFile.decode(Data("bad\0byte".utf8)))
+    }
 
 }
 
@@ -276,7 +286,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Unicode text files stay readable",tests.testUnicodeTextFileIsReadable)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
