@@ -240,6 +240,20 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testSameFileNameIsNumbered() {
+        let first = AttachmentRecord(name: "Pasted image.png", kind: .image, byteCount: 10, detail: "Image")
+        let other = AttachmentRecord(name: "notes.txt", kind: .text, byteCount: 4, detail: "TXT")
+        let second = AttachmentRecord(name: "Pasted image.png", kind: .image, byteCount: 12, detail: "Image")
+        let files = [first, other, second]
+        XCTAssertEqual(FileCopy.detail(for: first, among: files), "Image · 1")
+        XCTAssertEqual(FileCopy.detail(for: second, among: files), "Image · 2")
+        XCTAssertEqual(FileCopy.detail(for: other, among: files), "TXT")
+        XCTAssertEqual(FileCopy.detail(for: first, among: [first]), "Image")
+        XCTAssertEqual(first.name, second.name)
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
 
 }
 
@@ -276,7 +290,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("The same file name is numbered",tests.testSameFileNameIsNumbered)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
