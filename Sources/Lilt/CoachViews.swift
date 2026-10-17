@@ -8,11 +8,12 @@ struct CapsuleView: View {
         HStack(spacing: 15) {
             Button(action: openCoach) {HStack(spacing:5){AudioMark(active: model.voice.listening || model.voice.speaking);if model.context.hasSelection{Image(systemName:model.context.live ? "record.circle.fill" : "macwindow").font(.system(size:10)).foregroundStyle(Theme.accent)}}}.buttonStyle(.plain).help(model.context.live ? "Live window context is on" : "Open assistant").accessibilityLabel(model.context.live ? "Open assistant. Live window context is on" : "Open assistant")
             Button(action: openCoach) {
+                let label = CapsuleLabel.text(draft: model.draft, title: model.active?.title)
                 HStack(spacing: 12) {
                     if let chat=model.active,chat.duration>0 { Text(chat.timerText).font(.system(size:13,weight:.semibold,design:.monospaced)).monospacedDigit() }
-                    Text(model.active?.title == "New chat" ? "Vale" : model.active?.title ?? "Vale").font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
+                    Text(label).font(.system(size: 12, weight: .medium)).lineLimit(1).frame(maxWidth: model.active?.duration == 0 ? (model.context.hasSelection ? 150 : 185) : 118, alignment: .leading)
                 }
-            }.buttonStyle(.plain).help("Type a question")
+            }.buttonStyle(.plain).help(CapsuleLabel.showsDraft(model.draft) ? "Open your unsent message" : "Type a question").accessibilityLabel(CapsuleLabel.showsDraft(model.draft) ? "Open your unsent message" : "Type a question")
             Spacer(minLength: 0)
             IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.ink) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
             Button { model.togglePause() } label: { Label(model.paused ? "Resume" : "Pause", systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)

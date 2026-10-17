@@ -73,6 +73,14 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testCapsuleKeepsAnUnsentDraftVisible() {
+        XCTAssertEqual(CapsuleLabel.text(draft: "", title: "New chat"), "Vale")
+        XCTAssertEqual(CapsuleLabel.text(draft: "   \n", title: nil), "Vale")
+        XCTAssertEqual(CapsuleLabel.text(draft: "", title: "Images and notes"), "Images and notes")
+        XCTAssertEqual(CapsuleLabel.text(draft: "  How does this loop end?\nmore", title: "New chat"), "How does this loop end?")
+        XCTAssertTrue(CapsuleLabel.showsDraft("  How does this loop end?"))
+        XCTAssertFalse(CapsuleLabel.showsDraft(" \n "))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +263,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Capsule keeps an unsent draft visible",tests.testCapsuleKeepsAnUnsentDraftVisible),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
