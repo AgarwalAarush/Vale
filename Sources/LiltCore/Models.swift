@@ -190,3 +190,16 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum InstructionFile {
+    /// Directory that contains both assistant files. A missing bundle resource URL is skipped.
+    public static func directory(bundleResources: URL?, workingDirectory: URL, fileManager: FileManager = .default) -> URL? {
+        let candidates = [bundleResources, workingDirectory.appendingPathComponent("Resources")].compactMap { $0 }
+        for directory in candidates {
+            let instructions = directory.appendingPathComponent("tutor.md")
+            let schema = directory.appendingPathComponent("reply.schema.json")
+            if fileManager.fileExists(atPath: instructions.path), fileManager.fileExists(atPath: schema.path) { return directory }
+        }
+        return nil
+    }
+}
