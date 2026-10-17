@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SpeakerTurn {
+    /// What you typed sits on the trailing side, short of the reply's line.
+    public static let yoursTrails = true
+    public static let leadingClearance: CGFloat = 48
+    public static func trails(_ role: String) -> Bool { yoursTrails && role == "user" }
+}

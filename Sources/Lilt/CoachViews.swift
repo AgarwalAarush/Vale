@@ -79,27 +79,29 @@ struct CoachView: View {
                                 }.padding(.top, 16)
                             }
                             ForEach(session.messages) { message in
-                                VStack(alignment: .leading, spacing: 7) {
-                                    Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
-                                    Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                                    if !message.attachments.isEmpty {
-                                        ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
-                                    }
-                                    if message.highlightUnavailable{Label("Highlight unavailable · check your selected window",systemImage:"eye.slash").font(.system(size:10)).foregroundStyle(Theme.muted)}
-                                    if message.screenChanged{
-                                        HStack{Image(systemName:"arrow.clockwise");Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:10)).foregroundStyle(Theme.muted)
-                                    }
-                                    if message.role == "assistant" {
-                                        HStack(spacing: 8) {
-                                            IconButton(symbol: "speaker.wave.2", label: "Read this reply") { model.voice.speak(message.text) }
-                                            IconButton(symbol: "doc.on.doc", label: "Copy reply") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) }
-                                        }.padding(.leading, -7)
-                                    }
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(message.role == "user" ? 12 : 0)
-                                    .background(message.role == "user" ? Color.white.opacity(0.035) : .clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .id(message.id)
+                                HStack(alignment: .top, spacing: 0) {
+                                    if SpeakerTurn.trails(message.role) { Spacer(minLength: SpeakerTurn.leadingClearance).layoutPriority(-1) }
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
+                                        Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                        if !message.attachments.isEmpty {
+                                            ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
+                                        }
+                                        if message.highlightUnavailable{Label("Highlight unavailable · check your selected window",systemImage:"eye.slash").font(.system(size:10)).foregroundStyle(Theme.muted)}
+                                        if message.screenChanged{
+                                            HStack{Image(systemName:"arrow.clockwise");Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:10)).foregroundStyle(Theme.muted)
+                                        }
+                                        if message.role == "assistant" {
+                                            HStack(spacing: 8) {
+                                                IconButton(symbol: "speaker.wave.2", label: "Read this reply") { model.voice.speak(message.text) }
+                                                IconButton(symbol: "doc.on.doc", label: "Copy reply") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) }
+                                            }.padding(.leading, -7)
+                                        }
+                                    }.layoutPriority(1)
+                                        .padding(message.role == "user" ? 12 : 0)
+                                        .background(message.role == "user" ? Color.white.opacity(0.035) : .clear)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }.id(message.id)
                             }
                         } else {
                             VStack(alignment: .leading, spacing: 12) {
