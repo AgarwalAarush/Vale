@@ -240,6 +240,13 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testHistoryWindowComesBackOnScreen() {
+        let screen=DisplayRect(x:0,y:0,width:1440,height:900)
+        XCTAssertTrue(WindowPlacement.isVisible(DisplayRect(x:100,y:80,width:900,height:650), on:[screen]))
+        XCTAssertFalse(WindowPlacement.isVisible(DisplayRect(x:4000,y:80,width:900,height:650), on:[screen]))
+        XCTAssertFalse(WindowPlacement.isVisible(DisplayRect(x:1400,y:80,width:900,height:650), on:[screen]))
+        XCTAssertTrue(WindowPlacement.isVisible(DisplayRect(x:4000,y:0,width:900,height:650), on:[]))
+    }
 
 }
 
@@ -276,7 +283,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("History window comes back on screen",tests.testHistoryWindowComesBackOnScreen)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
