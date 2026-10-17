@@ -73,6 +73,17 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testIdleStatusTreatsTypingAsReady() {
+        XCTAssertEqual(CompanionStatus().line, "Ready to type")
+        XCTAssertEqual(CompanionStatus(canSend: true).line, "Return to send")
+        XCTAssertEqual(CompanionStatus(listening: true, conversation: true, canSend: true).line, "Listening…")
+        XCTAssertEqual(CompanionStatus(paused: true, canSend: true).line, "Paused")
+        XCTAssertEqual(CompanionStatus(speaking: true).line, "Speaking · tap mic to interrupt")
+        XCTAssertEqual(CompanionStatus(waitingForMicrophone: true).line, "Waiting for microphone…")
+        XCTAssertEqual(CompanionStatus(importing: true, canSend: true).line, "Adding files…")
+        XCTAssertEqual(CompanionStatus(thinking: true, canSend: true).line, "Thinking…")
+        XCTAssertEqual(CompanionStatus(conversation: true, canSend: true).line, "Conversation ready")
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +266,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Idle coach status prefers typing",tests.testIdleStatusTreatsTypingAsReady),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
