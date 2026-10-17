@@ -32,7 +32,7 @@ struct LibraryView: View {
                 else{home}
             }.frame(maxWidth:.infinity,maxHeight:.infinity)
         }.foregroundStyle(Theme.ink).background(Theme.background).preferredColorScheme(.dark)
-        .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
+        .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
         .confirmationDialog("Forget this chat and its uploaded files?",isPresented:Binding(get:{deleteID != nil},set:{if !$0{deleteID=nil}}),titleVisibility:.visible){
             Button("Forget chat",role:.destructive){if let id=deleteID{model.delete(id)};deleteID=nil}
             Button("Cancel",role:.cancel){deleteID=nil}

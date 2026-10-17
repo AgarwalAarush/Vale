@@ -190,3 +190,13 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum AnswerLink {
+    /// An answer may open a web page or an email address. Other schemes stay closed.
+    public static func canOpen(_ url: URL) -> Bool {
+        switch url.scheme?.lowercased() {
+        case "https", "http", "mailto": return true
+        default: return false
+        }
+    }
+}

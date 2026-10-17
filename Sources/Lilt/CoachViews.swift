@@ -157,7 +157,7 @@ struct CoachView: View {
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 14)
         }.modifier(GlassSurface(radius: 20))
             .dropDestination(for:URL.self){urls,_ in Task{await model.importFiles(urls)};return urls.contains(where:{$0.isFileURL})}
-            .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
+            .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}
                 Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
