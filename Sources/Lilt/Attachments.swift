@@ -33,6 +33,9 @@ final class AttachmentStore: Sendable {
         if ext == "pdf" {
             guard let pdf=PDFDocument(data:data), !pdf.isLocked, pdf.pageCount > 0 else { throw AppError("This PDF is locked or unreadable.") }
             kind = .pdf; detail="\(pdf.pageCount) \(pdf.pageCount == 1 ? "page" : "pages")"
+        } else if WordFile.isDocument(ext) {
+            guard let text=wordDocumentText(data), let encoded=text.data(using:.utf8) else { throw AppError("This Word document has no readable text.") }
+            kind = .text; stored=encoded; detail="DOCX"
         } else if let source=CGImageSourceCreateWithData(data as CFData,nil),CGImageSourceGetType(source) != nil,CGImageSourceGetCount(source)>0 {
             let options: [CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
             guard let image=CGImageSourceCreateThumbnailAtIndex(source,0,options as CFDictionary),let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }
@@ -47,6 +50,12 @@ final class AttachmentStore: Sendable {
         try stored.write(to:url(for:record),options:.atomic)
         try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:url(for:record).path)
         return record
+    }
+    private func wordDocumentText(_ data: Data) -> String? {
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [.documentType: NSAttributedString.DocumentType.officeOpenXML]
+        let read = { try? NSAttributedString(data: data, options: options, documentAttributes: nil).string }
+        let raw = Thread.isMainThread ? read() : DispatchQueue.main.sync(execute: read)
+        return raw.flatMap(WordFile.text)
     }
     func remove(_ record: AttachmentRecord)throws {
         let file=url(for:record);guard FileManager.default.fileExists(atPath:file.path) else{return};try unlink(file)
