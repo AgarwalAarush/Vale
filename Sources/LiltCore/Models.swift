@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FieldPrompt {
+    /// The idle prompt shows when the field has no words yet.
+    public static func showsIdle(_ draft: String) -> Bool {
+        draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
