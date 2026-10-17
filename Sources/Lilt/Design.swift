@@ -77,6 +77,7 @@ final class ComposerTextView: NSTextView {
 }
 struct DraftEditor: NSViewRepresentable {
     @Binding var text: String
+    var focusToken: Int = 0
     var submit: () -> Void
     var cancel: () -> Void
     var pasteFiles: (([URL]) -> Void)? = nil
@@ -101,10 +102,20 @@ struct DraftEditor: NSViewRepresentable {
             let selection = editor.selectedRange(); editor.string = text
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
         }
+        if context.coordinator.lastFocus != focusToken {
+            context.coordinator.lastFocus = focusToken
+            if ComposerFocus.returns(afterSending: true) {
+                DispatchQueue.main.async { [weak editor] in
+                    guard let editor, let window = editor.window else { return }
+                    window.makeFirstResponder(editor)
+                }
+            }
+        }
     }
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: DraftEditor
-        init(_ parent: DraftEditor) { self.parent = parent }
+        var lastFocus: Int
+        init(_ parent: DraftEditor) { self.parent = parent; lastFocus = parent.focusToken }
         func textDidChange(_ notification: Notification) { if let editor = notification.object as? NSTextView { parent.text = editor.string } }
     }
 }
