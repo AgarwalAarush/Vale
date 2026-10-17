@@ -240,6 +240,12 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testAnswerIsSavedBeforeSpeechOrPointing() {
+        XCTAssertEqual(AnswerStep.sequence(speaks:false,points:false),[.save])
+        XCTAssertEqual(AnswerStep.sequence(speaks:true,points:false),[.save,.speak])
+        XCTAssertEqual(AnswerStep.sequence(speaks:true,points:true),[.save,.speak,.point])
+        XCTAssertEqual(AnswerStep.sequence(speaks:false,points:true).first,.save)
+    }
 
 }
 
@@ -276,7 +282,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Answer is saved before speech or pointing",tests.testAnswerIsSavedBeforeSpeechOrPointing)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

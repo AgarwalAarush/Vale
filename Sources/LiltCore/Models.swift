@@ -190,3 +190,14 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum AnswerStep: String, Equatable {
+    case save, speak, point
+    /// The answer is written to the chat before speech or a highlight.
+    public static func sequence(speaks: Bool, points: Bool) -> [AnswerStep] {
+        var steps: [AnswerStep] = [.save]
+        if speaks { steps.append(.speak) }
+        if points { steps.append(.point) }
+        return steps
+    }
+}
