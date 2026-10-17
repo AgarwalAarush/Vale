@@ -207,7 +207,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             self.spokenDraftPrefix=self.draft.isEmpty ? "" : self.draft+" ";self.voice.start()
         }
     }
-    func editDraft(_ text:String){conversation=false;conversationTask?.cancel();if voice.listening || voice.starting{voice.stopListening()};draft=text}
+    func editDraft(_ text:String){guard DraftEcho.isTyping(text,stored:draft) else{return};conversation=false;conversationTask?.cancel();if voice.listening || voice.starting{voice.stopListening()};draft=text}
     func stopResponse(){conversation=false;conversationTask?.cancel();voice.stop();cancel()}
     func stopInteraction(){stopResponse();context.stop();hideOverlay?()}
     func startGuide(){
