@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum UnsentRemoval {
+    /// Taking off a file that has not been sent leaves a reply already on the way.
+    public static let keepsTheReply = true
+    public static func stopsTheReply(waiting: Bool, unsent: Bool) -> Bool {
+        waiting && !(unsent && keepsTheReply)
+    }
+}
