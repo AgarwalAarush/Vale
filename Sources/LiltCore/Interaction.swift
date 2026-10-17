@@ -67,3 +67,12 @@ public enum PointVisibility {
         return false
     }
 }
+
+public enum DraftCaret {
+    /// When the caret was at the end of the previous draft, keep it at the end after that draft is shown again.
+    public static func location(previousUTF16: Int, nextUTF16: Int, caret: Int) -> Int {
+        let next = max(nextUTF16, 0)
+        if caret >= max(previousUTF16, 0) { return next }
+        return min(max(caret, 0), next)
+    }
+}
