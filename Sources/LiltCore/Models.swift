@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplySpeaker {
+    /// The reply carries the companion mark. The question does not. The name stays LILT.
+    public static let name = "LILT"
+    public static func showsMark(for role: String) -> Bool { role == "assistant" }
+}
