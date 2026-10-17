@@ -67,6 +67,7 @@ final class ComposerTextView: NSTextView {
         let board=NSPasteboard.general
         if let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL], !urls.isEmpty,let pasteFiles {pasteFiles(urls);return}
         if let data=board.data(forType:.png) ?? board.data(forType:.tiff),let pasteImage {pasteImage(data);return}
+        if let jpeg=ClipboardImage.attachableJPEG(jpeg:board.data(forType:NSPasteboard.PasteboardType("public.jpeg")),plainText:board.string(forType:.string)),let pasteImage {pasteImage(jpeg);return}
         super.paste(sender)
     }
     override func keyDown(with event: NSEvent) {

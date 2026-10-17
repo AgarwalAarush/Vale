@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ClipboardImage {
+    /// JPEG bytes to attach when the clipboard has no plain text. PNG, TIFF, and copied files stay on their existing path.
+    public static func attachableJPEG(jpeg: Data?, plainText: String?) -> Data? {
+        guard plainText?.isEmpty != false, let jpeg, !jpeg.isEmpty else { return nil }
+        return jpeg
+    }
+}
