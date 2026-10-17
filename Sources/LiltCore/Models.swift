@@ -1,5 +1,15 @@
 import Foundation
 
+/// The composer grows with what you typed, and stops before it covers the coach.
+public enum ComposerHeight {
+    public static let minimum = 61.0
+    public static let maximum = 140.0
+    public static func clamped(_ measured: Double) -> Double {
+        guard measured.isFinite else { return minimum }
+        return min(maximum, max(minimum, measured))
+    }
+}
+
 public enum ChatMode: String, Codable, CaseIterable, Sendable {
     case assistant, learn
     public var label: String { self == .assistant ? "Ask" : "Learn" }

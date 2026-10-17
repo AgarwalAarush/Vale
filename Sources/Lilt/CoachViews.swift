@@ -32,6 +32,7 @@ struct CoachView: View {
     @ObservedObject var model: AppModel
     var close: () -> Void
     @State private var walkthrough = false
+    @State private var composerHeight: CGFloat = 61
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
@@ -135,7 +136,10 @@ struct CoachView: View {
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text("Ask quietly…").font(.system(size: 14)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.top, 6).padding(.leading, 7).allowsHitTesting(false) }
-                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
+                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { model.send() }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}, onMeasuredHeight: { measured in
+                        let next = CGFloat(ComposerHeight.clamped(Double(measured)))
+                        if abs(composerHeight - next) > 0.5 { composerHeight = next }
+                    }).frame(height: composerHeight)
                 }
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
