@@ -1,6 +1,12 @@
 import Foundation
 import CoreGraphics
 
+/// Starting a guide sends and clears a typed draft and any attached files.
+public enum GuideStart {
+    public static func needsConfirmation(draft: String, attachmentCount: Int) -> Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachmentCount > 0
+    }
+}
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]

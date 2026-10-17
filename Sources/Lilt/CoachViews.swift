@@ -32,6 +32,7 @@ struct CoachView: View {
     @ObservedObject var model: AppModel
     var close: () -> Void
     @State private var walkthrough = false
+    @State private var confirmGuide = false
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
@@ -140,7 +141,9 @@ struct CoachView: View {
                 HStack {
                     IconButton(symbol: "plus", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
                     IconButton(symbol:"globe",label:model.active?.webEnabled == true ? "Web search on" : "Enable web search",tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}
-                    IconButton(symbol:"list.number",label:"Start step-by-step help"){model.startGuide()}.disabled(model.busy || model.paused)
+                    IconButton(symbol:"list.number",label:"Start step-by-step help"){
+                        if GuideStart.needsConfirmation(draft: model.draft, attachmentCount: model.pendingFiles.count) { confirmGuide = true } else { model.startGuide() }
+                    }.disabled(model.busy || model.paused)
                     Spacer()
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
@@ -158,6 +161,10 @@ struct CoachView: View {
         }.modifier(GlassSurface(radius: 20))
             .dropDestination(for:URL.self){urls,_ in Task{await model.importFiles(urls)};return urls.contains(where:{$0.isFileURL})}
             .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
+            .alert("Send this as a step guide?", isPresented: $confirmGuide) {
+                Button("Keep typing", role: .cancel) {}
+                Button("Start guide") { model.startGuide() }
+            } message: { Text("This sends what you typed, and any attached files, as step-by-step help. Keep typing to leave them in the composer.") }
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}
                 Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }

@@ -73,6 +73,12 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testGuideStartConfirmsBeforeClearingWork() {
+        XCTAssertFalse(GuideStart.needsConfirmation(draft: "", attachmentCount: 0))
+        XCTAssertFalse(GuideStart.needsConfirmation(draft: "  \n", attachmentCount: 0))
+        XCTAssertTrue(GuideStart.needsConfirmation(draft: "How does this loop end?", attachmentCount: 0))
+        XCTAssertTrue(GuideStart.needsConfirmation(draft: "", attachmentCount: 1))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -255,6 +261,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Guide start confirms before clearing work",tests.testGuideStartConfirmsBeforeClearingWork),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),
