@@ -190,3 +190,9 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum SourceFile {
+    /// Text and code extensions. Objective-C implementation files are included. SVG is not.
+    public static let extensions: Set<String> = ["txt","md","markdown","csv","json","jsonl","yaml","yml","xml","html","css","js","jsx","ts","tsx","py","swift","rs","go","java","c","h","cpp","hpp","sql","sh","toml","log","tex","rtf","m","mm"]
+    public static func isReadable(_ text: String) -> Bool { !text.contains("\0") }
+}
