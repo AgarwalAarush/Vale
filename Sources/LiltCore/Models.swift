@@ -190,3 +190,16 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsuleTitle {
+    /// Longest first. A shortened name ends on a word.
+    public static func candidates(_ title: String) -> [String] {
+        let words = title.split(separator: " ").map(String.init)
+        guard words.count > 1 else { return [title] }
+        var names = [title]
+        for count in stride(from: words.count - 1, through: 1, by: -1) {
+            names.append(words.prefix(count).joined(separator: " ") + "…")
+        }
+        return names
+    }
+}

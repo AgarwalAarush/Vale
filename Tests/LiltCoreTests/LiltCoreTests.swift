@@ -240,6 +240,23 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testCapsuleNameEndsOnAWord() {
+        let title = "How do I reset my password tonight"
+        let names = CapsuleTitle.candidates(title)
+        XCTAssertEqual(names.first, title)
+        XCTAssertTrue(names.count > 1)
+        for name in names.dropFirst() {
+            XCTAssertTrue(name.hasSuffix("…"))
+            let stem = String(name.dropLast())
+            XCTAssertFalse(stem.hasSuffix(" "))
+            XCTAssertTrue(title.hasPrefix(stem))
+        }
+        XCTAssertEqual(names[1], "How do I reset my password…")
+        XCTAssertEqual(CapsuleTitle.candidates("Vale"), ["Vale"])
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
 
 }
 
@@ -276,7 +293,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("The capsule name ends on a word",tests.testCapsuleNameEndsOnAWord)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
