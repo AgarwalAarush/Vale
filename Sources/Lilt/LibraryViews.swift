@@ -91,7 +91,7 @@ struct SessionDetail: View {
                 }
                 if let error=model.error{VStack(alignment:.leading,spacing:10){Text(error).font(.system(size:12)).foregroundStyle(.orange).textSelection(.enabled).fixedSize(horizontal:false,vertical:true);if model.errorOffersSettings{Button("Open Settings"){model.openSettings()}.buttonStyle(.plain).font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent)};if model.deletionToRetry==session.id{Button("Retry Forget"){model.delete(session.id)}.buttonStyle(QuietButton())}}}
                 Button(session.id == model.activeID ? "Return to chat" : "Continue chat"){if session.id == model.activeID{model.showCoach?()}else{model.resume(session.id)}}.buttonStyle(QuietButton(filled:true))
-                if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,model:model)}}}.scrollIndicators(.hidden)}
+                if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,among:session.files,model:model)}}}.scrollIndicators(.hidden)}
                 Divider().overlay(Theme.line)
                 VStack(alignment:.leading,spacing:10){
                     Text(session.mode == .learn ? "WHAT CLICKED?" : "NOTES").font(.system(size:10,weight:.medium)).tracking(1.1).foregroundStyle(Theme.muted)

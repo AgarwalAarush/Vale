@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FileCopy {
+    /// When several files share a name, the detail line numbers them in list order.
+    public static func detail(for record: AttachmentRecord, among records: [AttachmentRecord]) -> String {
+        let same = records.filter { $0.name == record.name }
+        guard same.count > 1, let index = same.firstIndex(where: { $0.id == record.id }) else { return record.detail }
+        return "\(record.detail) · \(index + 1)"
+    }
+}
