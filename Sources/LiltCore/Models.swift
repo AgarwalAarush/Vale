@@ -190,3 +190,52 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyCode {
+    public struct Segment: Equatable {
+        public var code: Bool
+        public var text: String
+        public init(code: Bool, text: String) { self.code = code; self.text = text }
+    }
+
+    /// A fenced block is code. The words around it stay as written, including line breaks.
+    public static func segments(_ text: String) -> [Segment] {
+        var result: [Segment] = []
+        var prose = ""
+        var index = text.startIndex
+        while index < text.endIndex {
+            if let afterTicks = fenceEnd(text, at: index) {
+                if !prose.isEmpty { result.append(Segment(code: false, text: prose)); prose = "" }
+                var cursor = afterTicks
+                while cursor < text.endIndex && text[cursor] != "\n" { cursor = text.index(after: cursor) }
+                if cursor < text.endIndex { cursor = text.index(after: cursor) }
+                var code = ""
+                while cursor < text.endIndex {
+                    if let close = fenceEnd(text, at: cursor) {
+                        cursor = close
+                        while cursor < text.endIndex && text[cursor] != "\n" { cursor = text.index(after: cursor) }
+                        if cursor < text.endIndex { cursor = text.index(after: cursor) }
+                        break
+                    }
+                    code.append(text[cursor])
+                    cursor = text.index(after: cursor)
+                }
+                result.append(Segment(code: true, text: code))
+                index = cursor
+            } else {
+                prose.append(text[index])
+                index = text.index(after: index)
+            }
+        }
+        if !prose.isEmpty || result.isEmpty { result.append(Segment(code: false, text: prose)) }
+        return result
+    }
+
+    private static func fenceEnd(_ text: String, at index: String.Index) -> String.Index? {
+        guard index == text.startIndex || text[text.index(before: index)] == "\n" else { return nil }
+        var cursor = index
+        while cursor < text.endIndex && text[cursor] == " " { cursor = text.index(after: cursor) }
+        guard text[cursor...].hasPrefix("```") else { return nil }
+        return text.index(cursor, offsetBy: 3)
+    }
+}

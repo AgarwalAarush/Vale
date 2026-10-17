@@ -240,6 +240,28 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testReplyCodeStaysABlock() {
+        let parts = ReplyCode.segments("Run this:\n```\nswift test\n```\nThen stop.")
+        XCTAssertEqual(parts.count, 3)
+        XCTAssertFalse(parts[0].code)
+        XCTAssertEqual(parts[0].text, "Run this:\n")
+        XCTAssertTrue(parts[1].code)
+        XCTAssertEqual(parts[1].text, "swift test\n")
+        XCTAssertFalse(parts[2].code)
+        XCTAssertEqual(parts[2].text, "Then stop.")
+        let tagged = ReplyCode.segments("```swift\nlet x = 1\n```")
+        XCTAssertEqual(tagged.count, 1)
+        XCTAssertTrue(tagged[0].code)
+        XCTAssertEqual(tagged[0].text, "let x = 1\n")
+        let plain = ReplyCode.segments("Check the left panel.\nThen press Save.")
+        XCTAssertEqual(plain.count, 1)
+        XCTAssertFalse(plain[0].code)
+        XCTAssertEqual(plain[0].text, "Check the left panel.\nThen press Save.")
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(PointTarget(x: 1.2, y: 0.1, width: 0.2, height: 0.1, label: "Edge").isValid)
+    }
 
 }
 
@@ -276,7 +298,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("Reply code stays a block",tests.testReplyCodeStaysABlock)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

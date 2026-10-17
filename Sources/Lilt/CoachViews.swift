@@ -81,7 +81,17 @@ struct CoachView: View {
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
-                                    Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                    if message.role == "assistant" {
+                                        ForEach(Array(ReplyCode.segments(message.text).enumerated()), id: \.offset) { _, segment in
+                                            if segment.code {
+                                                Text(segment.text).font(.system(size: 14, design: .monospaced)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 8))
+                                            } else if !segment.text.isEmpty {
+                                                Text(.init(segment.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                            }
+                                        }
+                                    } else {
+                                        Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                    }
                                     if !message.attachments.isEmpty {
                                         ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
                                     }
