@@ -190,3 +190,18 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum FilePreviewPlace {
+    /// The file preview opens beside the coach so the question stays visible.
+    public static func origin(screenX: Double, screenY: Double, screenWidth: Double, screenHeight: Double, previewWidth: Double, previewHeight: Double, coachX: Double, coachWidth: Double) -> (x: Double, y: Double) {
+        let minX = screenX + 16
+        let maxX = screenX + screenWidth - previewWidth - 16
+        let left = coachX - previewWidth - 16
+        let preferred = left >= minX ? left : coachX + coachWidth + 16
+        let x = min(max(preferred, minX), max(maxX, minX))
+        let minY = screenY + 16
+        let maxY = screenY + screenHeight - previewHeight - 16
+        let y = min(max(screenY + (screenHeight - previewHeight) / 2, minY), max(maxY, minY))
+        return (x, y)
+    }
+}

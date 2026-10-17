@@ -240,6 +240,18 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testFilePreviewStaysBesideTheCoach() {
+        let beside = FilePreviewPlace.origin(screenX: 0, screenY: 0, screenWidth: 1440, screenHeight: 900, previewWidth: 800, previewHeight: 550, coachX: 1010, coachWidth: 410)
+        XCTAssertTrue(beside.x + 800 + 16 <= 1010)
+        XCTAssertTrue(beside.x >= 16)
+        XCTAssertTrue(beside.y >= 16)
+        XCTAssertTrue(beside.y + 550 <= 900)
+        let otherSide = FilePreviewPlace.origin(screenX: 0, screenY: 0, screenWidth: 1440, screenHeight: 900, previewWidth: 800, previewHeight: 550, coachX: 16, coachWidth: 410)
+        XCTAssertTrue(otherSide.x >= 16 + 410 + 16)
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
 
 }
 
@@ -276,7 +288,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("A file preview stays beside the coach",tests.testFilePreviewStaysBesideTheCoach)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
