@@ -53,10 +53,11 @@ struct ContextSnapshot {
     var changed:(()->Void)?
     var failed:((String)->Void)?
     var hasSelection:Bool{filter != nil || fixtureSource != nil}
+    private var sharedSelection:SharedWindowSelection?{hasSelection ? SharedWindowSelection(id:windowID ?? 0,title:title ?? "Selected window",live:live) : nil}
     var preview:NSImage?{latest?.image}
     override init(){super.init();SCContentSharingPicker.shared.add(self)}
     func choose(live:Bool=false){
-        stop();requestedLive=live
+        requestedLive=live
         var config=SCContentSharingPickerConfiguration();config.allowedPickerModes=[.singleWindow]
         config.excludedBundleIDs=[Bundle.main.bundleIdentifier ?? "local.lilt.companion"]
         SCContentSharingPicker.shared.defaultConfiguration=config;SCContentSharingPicker.shared.isActive=true;SCContentSharingPicker.shared.present()
@@ -81,14 +82,30 @@ struct ContextSnapshot {
         filter=nil;fixtureSource=nil;fixtureFrame=nil;captureTimeout=6;title=nil;windowID=nil;generation=UUID();requestedLive=false
         SCContentSharingPicker.shared.isActive=false;changed?()
     }
-    nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didCancelFor stream:SCStream?){DispatchQueue.main.async{self.requestedLive=false}}
-    nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){DispatchQueue.main.async{self.stop();self.failed?("Couldn’t open window sharing. Keep typing or attach an image.")}}
+    nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didCancelFor stream:SCStream?){
+        DispatchQueue.main.async{
+            let kept=SharingPicker.selection(after:.cancelled,keeping:self.sharedSelection)
+            self.requestedLive=false
+            if kept==nil,self.hasSelection{self.stop()}
+        }
+    }
+    nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){
+        DispatchQueue.main.async{
+            let kept=SharingPicker.selection(after:.failedToOpen,keeping:self.sharedSelection)
+            self.requestedLive=false
+            if kept==nil,self.hasSelection{self.stop()}
+            self.failed?(SharingPicker.failureMessage(keeping:kept))
+        }
+    }
     nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didUpdateWith filter:SCContentFilter,for stream:SCStream?){
         DispatchQueue.main.async{
-            self.filter=filter;self.generation=UUID();self.latest=nil;self.lastCapture=nil
-            if #available(macOS 15.2,*),let window=filter.includedWindows.first{self.windowID=window.windowID;self.title="\(window.owningApplication?.applicationName ?? "Selected") window"}
-            else{self.windowID=nil;self.title="Selected window"}
-            self.changed?();if self.requestedLive{self.requestedLive=false;self.startLive()}
+            var windowID:CGWindowID?;var title="Selected window"
+            if #available(macOS 15.2,*),let window=filter.includedWindows.first{windowID=window.windowID;title="\(window.owningApplication?.applicationName ?? "Selected") window"}
+            let chosen=SharedWindowSelection(id:windowID ?? 0,title:title,live:self.requestedLive)
+            guard let next=SharingPicker.selection(after:.chose(chosen),keeping:self.sharedSelection) else{return}
+            if !next.live{self.stopLive()}
+            self.filter=filter;self.generation=UUID();self.latest=nil;self.lastCapture=nil;self.windowID=windowID;self.title=next.title
+            self.requestedLive=false;self.changed?();if next.live{self.startLive()}
         }
     }
     func capture()async throws->ContextSnapshot{
