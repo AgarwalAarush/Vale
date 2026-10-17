@@ -1,6 +1,11 @@
 import Foundation
 import CoreGraphics
 
+/// A new reply should open at its first line, not its tail.
+public enum TranscriptReveal {
+    public static let showsStartOfNewestMessage = true
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]
