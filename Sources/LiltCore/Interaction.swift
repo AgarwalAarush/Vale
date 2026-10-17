@@ -15,6 +15,11 @@ public struct GuideProgress:Codable,Equatable,Sendable {
     public init(from decoder:Decoder)throws{let c=try decoder.container(keyedBy:CodingKeys.self);self.init(plan:try c.decode(GuidePlan.self,forKey:.plan),index:try c.decode(Int.self,forKey:.index))}
     public var current:String{plan.steps.indices.contains(index) ? plan.steps[index] : ""}
 }
+
+/// The current step is shown in full. A three-line cap hides the instruction.
+public enum GuideStepText {
+    public static func visible(_ step: String) -> String { step }
+}
 public struct ConversationWindow {
     public let text:String
     public let omitted:Int
