@@ -67,3 +67,25 @@ public enum PointVisibility {
         return false
     }
 }
+
+public struct DisplayRect: Equatable, Sendable {
+    public var x: CGFloat
+    public var y: CGFloat
+    public var width: CGFloat
+    public var height: CGFloat
+    public init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {
+        self.x=x; self.y=y; self.width=width; self.height=height
+    }
+}
+
+public enum WindowPlacement {
+    /// A restored history window is on screen when a meaningful part of it intersects a display.
+    public static func isVisible(_ window: DisplayRect, on screens: [DisplayRect]) -> Bool {
+        if screens.isEmpty { return true }
+        return screens.contains { screen in
+            let overlapW=min(window.x+window.width, screen.x+screen.width)-max(window.x, screen.x)
+            let overlapH=min(window.y+window.height, screen.y+screen.height)-max(window.y, screen.y)
+            return overlapW>=80 && overlapH>=80
+        }
+    }
+}

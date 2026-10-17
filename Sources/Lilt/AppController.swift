@@ -71,7 +71,13 @@ final class FloatingPanel: NSPanel {
         if !testing {
             library.setFrameAutosaveName("LiltLibrary")
             if library.frame.width > visible.width || library.frame.height > visible.height { library.setContentSize(NSSize(width: min(900, visible.width), height: min(650, visible.height - 30))); library.center() }
+            bringLibraryOnScreen()
         }
+    }
+    private func bringLibraryOnScreen() {
+        let window=DisplayRect(x:library.frame.origin.x,y:library.frame.origin.y,width:library.frame.width,height:library.frame.height)
+        let screens=NSScreen.screens.map{DisplayRect(x:$0.frame.origin.x,y:$0.frame.origin.y,width:$0.frame.width,height:$0.frame.height)}
+        if !WindowPlacement.isVisible(window,on:screens){library.center()}
     }
     private func makePanel(size: NSSize) -> FloatingPanel {
         let panel = FloatingPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -94,7 +100,7 @@ final class FloatingPanel: NSPanel {
             if let input = editor(root) { self.coach.makeFirstResponder(input) }
         }
     }
-    func openLibrary() { coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
+    func openLibrary() { bringLibraryOnScreen(); coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     private func toggleCoachSize(){
         model.expanded.toggle();let visible=NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
         let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
