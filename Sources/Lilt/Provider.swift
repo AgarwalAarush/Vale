@@ -98,8 +98,11 @@ private final class SearchEventProbe: @unchecked Sendable {
             err.fileHandleForReading.readabilityHandler = { handle in _ = handle.availableData }
             self.process = process; self.completion = completion
             process.terminationHandler = { [weak self, weak process] finished in
-                out.fileHandleForReading.readabilityHandler = nil; err.fileHandleForReading.readabilityHandler = nil
                 DispatchQueue.main.async {
+                    if OutputPipe.closesReaderBeforeFile(exited:true, onHandlerThread:false) {
+                        out.fileHandleForReading.readabilityHandler = nil
+                        err.fileHandleForReading.readabilityHandler = nil
+                    }
                     guard let self, let process, self.process === process else { return }
                     self.usedWebSearch=searchEvents.usedSearch
                     if finished.terminationStatus == 0 {

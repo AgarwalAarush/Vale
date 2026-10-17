@@ -190,3 +190,10 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum OutputPipe {
+    /// Close the assistant’s output readers only after leaving the thread that delivers them, then read the answer file.
+    public static func closesReaderBeforeFile(exited: Bool, onHandlerThread: Bool) -> Bool {
+        exited && !onHandlerThread
+    }
+}
