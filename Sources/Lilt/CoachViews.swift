@@ -54,7 +54,7 @@ struct CoachView: View {
                 IconButton(symbol:model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",label:model.expanded ? "Compact assistant" : "Expand assistant"){model.expandCoach?()}
                 IconButton(symbol: "xmark", label: "Collapse coach", action: close)
             }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11)
-            ContextStrip(model:model)
+            if !ShareRow.afterTheComposer { ContextStrip(model:model) }
             if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
             if model.active?.contextLimited == true{
                 HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
@@ -150,6 +150,7 @@ struct CoachView: View {
                 }
             }.padding(9).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.16), lineWidth: 0.8)).padding(.horizontal, 18)
+            if ShareRow.afterTheComposer { ContextStrip(model:model) }
             HStack {
                 Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                 Spacer()

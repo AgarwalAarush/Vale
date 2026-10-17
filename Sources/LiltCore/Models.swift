@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ShareRow {
+    /// Window sharing sits after the composer, so it is not the first step.
+    public static let afterTheComposer = true
+}
