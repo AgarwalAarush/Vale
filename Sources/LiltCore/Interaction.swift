@@ -24,11 +24,22 @@ public struct ConversationWindow {
         var selected:[String]=[];var budget=48_000;var clipped=false
         for message in messages.suffix(18).reversed(){
             guard budget>0 else{break}
-            let count=min(8_000,budget);let fragment=String(message.text.prefix(count))
-            let truncated=fragment.count<message.text.count;clipped = clipped || truncated
-            selected.append("\(message.role == "user" ? "USER" : "ASSISTANT"): \(fragment)" + (truncated ? "\n[Message excerpt; remaining text omitted.]" : ""));budget-=fragment.count
+            let piece=MessageExcerpt.keepingEnds(message.text,limit:min(8_000,budget))
+            clipped = clipped || piece.truncated
+            selected.append("\(message.role == "user" ? "USER" : "ASSISTANT"): \(piece.text)" + (piece.truncated ? "\n[Message excerpt; remaining text omitted.]" : ""));budget-=piece.text.count
         }
         omitted=messages.count-selected.count;excerpted=clipped;text=selected.reversed().joined(separator:"\n\n")
+    }
+}
+
+/// A long message keeps its ending as well as its start. The conclusion is usually at the end.
+public enum MessageExcerpt {
+    public static func keepingEnds(_ text: String, limit: Int) -> (text: String, truncated: Bool) {
+        guard limit > 1 else { return (String(text.prefix(max(0, limit))), text.count > limit) }
+        guard text.count > limit else { return (text, false) }
+        let tailCount = limit / 2
+        let headCount = limit - tailCount - 1
+        return (String(text.prefix(headCount)) + "\n" + String(text.suffix(tailCount)), true)
     }
 }
 public struct ScreenEvidence:Equatable {

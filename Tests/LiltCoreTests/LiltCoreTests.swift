@@ -165,6 +165,23 @@ final class LiltCoreTests {
         let messages=(0..<18).map{_ in Message(role:"user",text:String(repeating:"x",count:20_000))}
         let window=ConversationWindow(messages:messages);XCTAssertTrue(window.excerpted);XCTAssertTrue(window.omitted>0);XCTAssertTrue(window.text.count<49_000);XCTAssertTrue(window.text.contains("Message excerpt"))
     }
+    func testExcerptKeepsTheEndOfALongReply() {
+        let text=String(repeating:"A",count:5_000)+"CONCLUSION"
+        let piece=MessageExcerpt.keepingEnds(text,limit:1_000)
+        XCTAssertTrue(piece.truncated)
+        XCTAssertEqual(piece.text.count,1_000)
+        XCTAssertTrue(piece.text.hasPrefix("A"))
+        XCTAssertTrue(piece.text.hasSuffix("CONCLUSION"))
+        let short=MessageExcerpt.keepingEnds("Short reply",limit:1_000)
+        XCTAssertFalse(short.truncated)
+        XCTAssertEqual(short.text,"Short reply")
+        let long=String(repeating:"A",count:9_000)+"CONCLUSION"
+        let followUp=ConversationWindow(messages:[Message(role:"assistant",text:long)])
+        XCTAssertTrue(followUp.excerpted)
+        XCTAssertTrue(followUp.text.contains("CONCLUSION"))
+        XCTAssertTrue(followUp.text.contains("Message excerpt"))
+        XCTAssertFalse(followUp.text.contains(String(repeating:"A",count:9_000)))
+    }
     func testGuideValidationAndLegacyReplyCompatibility()throws{
         let valid=GuidePlan(title:"Check the diagram",steps:["Locate the circle","Compare the square"])
         let reply=TutorReply(text:"Start with the circle",guide:valid)
@@ -268,6 +285,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Forget failure preserves retryable chat",tests.testForgetFailurePreservesRetryableChat),
  ("Visible conversation limit",tests.testConversationLimitIsExplicit),
  ("Bounded message excerpts",tests.testConversationExcerptsHaveBoundedBudget),
+ ("Excerpt keeps the end of a long reply",tests.testExcerptKeepsTheEndOfALongReply),
  ("Guide validation and legacy replies",tests.testGuideValidationAndLegacyReplyCompatibility),
  ("Guide progress bounds",tests.testGuideProgressClampsPersistedIndex),
  ("Reject changed screen scope and pixels",tests.testScreenEvidenceRejectsChangedScopeAndPixels),
