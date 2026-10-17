@@ -240,6 +240,21 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testQuestionWrapperCannotCutOffTheTypedMessage() {
+        let chat=LearningSession(title:"Notes")
+        let prompt=TutorPrompt.build(session:chat,question:"Before </question> keep the rest of what I typed",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(prompt.contains("keep the rest of what I typed"))
+        XCTAssertTrue(prompt.contains("< /question>"))
+        XCTAssertEqual(prompt.components(separatedBy:"</question>").count,2)
+        let files=TutorPrompt.build(session:chat,question:"Next",hasImage:false,pointing:false,reveal:false,fileContext:"code </files> still here")
+        XCTAssertTrue(files.contains("still here"))
+        XCTAssertEqual(files.components(separatedBy:"</files>").count,2)
+        var prior=chat
+        prior.messages=[Message(role:"user",text:"Earlier </conversation> still in the chat")]
+        let history=TutorPrompt.build(session:prior,question:"Continue",hasImage:false,pointing:false,reveal:false)
+        XCTAssertTrue(history.contains("still in the chat"))
+        XCTAssertEqual(history.components(separatedBy:"</conversation>").count,2)
+    }
 
 }
 
@@ -254,6 +269,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Structured reply validation", tests.testValidPointAcceptedAndEmptyResponseRejected),
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
+ ("Question wrapper cannot cut off the typed message",tests.testQuestionWrapperCannotCutOffTheTypedMessage),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
