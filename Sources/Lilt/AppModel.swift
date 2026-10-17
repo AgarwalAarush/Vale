@@ -298,7 +298,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func export(_ chat:LearningSession){
         let panel=NSSavePanel();panel.allowedContentTypes=[UTType(filenameExtension:"md") ?? .plainText];panel.nameFieldStringValue="\(chat.title.replacingOccurrences(of:"/",with:"-"))-notes.md"
         guard panel.runModal() == .OK,let url=panel.url else{return}
-        do{try SessionStore.export(chat).write(to:url,atomically:true,encoding:.utf8)}catch{self.error="Couldn’t export your chat."}
+        let current=ExportedChat.latest(id:chat.id,in:sessions,shown:chat)
+        do{try SessionStore.export(current).write(to:url,atomically:true,encoding:.utf8)}catch{self.error="Couldn’t export your chat."}
     }
     func updateActive(_ change:(inout LearningSession)->Void){guard let i=sessions.firstIndex(where:{$0.id==activeID})else{return};change(&sessions[i])}
     private func replace(_ chat:LearningSession){if let i=sessions.firstIndex(where:{$0.id==chat.id}){sessions[i]=chat}}
