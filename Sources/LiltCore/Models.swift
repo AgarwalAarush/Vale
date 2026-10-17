@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum MicInterrupt {
+    /// Tapping the mic while a reply is only being read stops the voice and does not start the microphone.
+    public static func startsMicrophone(speaking: Bool, waiting: Bool) -> Bool { !(speaking && !waiting) }
+}
