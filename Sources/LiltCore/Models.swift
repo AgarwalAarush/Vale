@@ -190,3 +190,11 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum CapsuleName {
+    /// An unnamed chat says Vale. A question whose text is “New chat” keeps that title.
+    public static func shown(title: String, hasMessages: Bool) -> String {
+        if title == "New chat" && !hasMessages { return "Vale" }
+        return title
+    }
+}

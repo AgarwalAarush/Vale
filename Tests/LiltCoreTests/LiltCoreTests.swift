@@ -240,6 +240,16 @@ final class LiltCoreTests {
         let guide=TutorPrompt.build(session:chat,question:"Guide me",hasImage:true,pointing:true,reveal:true,hasWindow:true,guideRequested:true)
         XCTAssertTrue(ordinary.contains("Return null for guide"));XCTAssertTrue(guide.contains("explicitly requested a step-by-step guide"))
     }
+    func testAskedNewChatShowsOnTheCapsule() {
+        XCTAssertEqual(CapsuleName.shown(title: "New chat", hasMessages: false), "Vale")
+        XCTAssertEqual(CapsuleName.shown(title: "New chat", hasMessages: true), "New chat")
+        XCTAssertEqual(CapsuleName.shown(title: "Hello", hasMessages: true), "Hello")
+        XCTAssertEqual(CapsuleName.shown(title: "Project", hasMessages: false), "Project")
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertTrue(chat.messages.isEmpty)
+    }
 
 }
 
@@ -276,7 +286,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Text context without unsafe geometry fallback",tests.testTextFreshnessWithoutGeometryStillRejectsPointing),
  ("Reject foreground highlight occlusion",tests.testPointVisibilityRejectsForegroundOcclusion),
  ("Reject missing or unknown highlight windows",tests.testPointVisibilityRejectsMissingAndUnknownWindows),
- ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly)
+ ("Transparent foreground visibility policy",tests.testPointVisibilityIgnoresFullyTransparentForegroundOnly),
+ ("A question named New chat shows on the capsule",tests.testAskedNewChatShowsOnTheCapsule)
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {
