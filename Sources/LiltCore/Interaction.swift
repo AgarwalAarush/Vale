@@ -26,7 +26,8 @@ public struct ConversationWindow {
             guard budget>0 else{break}
             let count=min(8_000,budget);let fragment=String(message.text.prefix(count))
             let truncated=fragment.count<message.text.count;clipped = clipped || truncated
-            selected.append("\(message.role == "user" ? "USER" : "ASSISTANT"): \(fragment)" + (truncated ? "\n[Message excerpt; remaining text omitted.]" : ""));budget-=fragment.count
+            let hidden=message.highlightUnavailable ? "\n[Highlight unavailable. The place could not be shown on the selected window.]" : ""
+            selected.append("\(message.role == "user" ? "USER" : "ASSISTANT"): \(fragment)" + (truncated ? "\n[Message excerpt; remaining text omitted.]" : "") + hidden);budget-=fragment.count
         }
         omitted=messages.count-selected.count;excerpted=clipped;text=selected.reversed().joined(separator:"\n\n")
     }
