@@ -190,3 +190,12 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum PreviewRead {
+    /// A page failure is shown only after the file has been read.
+    public static func showsFailure(loaded: Bool, hasPage: Bool) -> Bool { loaded && !hasPage }
+    public static func pageLabel(loaded: Bool, index: Int, count: Int) -> String {
+        guard loaded, count > 0 else { return "" }
+        return "Page \(index + 1) of \(count)"
+    }
+}
