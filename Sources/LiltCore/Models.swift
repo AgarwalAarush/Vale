@@ -190,3 +190,27 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum ReplyLines {
+    /// A single line break in a reply stays a line. A blank line stays a paragraph. Fenced code is unchanged.
+    public static func forDisplay(_ text: String) -> String {
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        let lines = normalized.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var out = ""
+        var fenced = false
+        for (index, line) in lines.enumerated() {
+            if index > 0 {
+                let previousBlank = lines[index - 1].trimmingCharacters(in: .whitespaces).isEmpty
+                let thisBlank = line.trimmingCharacters(in: .whitespaces).isEmpty
+                if fenced || previousBlank || thisBlank || out.hasSuffix("\\") {
+                    out.append("\n")
+                } else {
+                    out.append("\\\n")
+                }
+            }
+            out.append(line)
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") { fenced.toggle() }
+        }
+        return out
+    }
+}
