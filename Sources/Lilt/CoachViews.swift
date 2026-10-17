@@ -82,6 +82,9 @@ struct CoachView: View {
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(message.role == "user" ? "YOU" : "LILT").font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
                                     Text(.init(message.text)).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                    if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) {
+                                        Text(FailedAnswer.label).font(.system(size: 12)).foregroundStyle(Theme.muted)
+                                    }
                                     if !message.attachments.isEmpty {
                                         ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,model:model,removable:true)}}}.scrollIndicators(.hidden)
                                     }
