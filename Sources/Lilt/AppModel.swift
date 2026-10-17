@@ -135,7 +135,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         failedQuestion=question;persist()
         var history=chat
         if history.messages.last?.role=="user",history.messages.last?.text==question{history.messages.removeLast()}
-        let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled
+        let newest=(chat.messages.last{$0.role=="user"}?.attachments ?? []).map(\.id)+chat.pendingAttachments.map(\.id)
+        let records=FileBudget.ordered(chat.files,newest:newest);let files=fileStore;let wantsSearch=chat.webEnabled
         captureTask=Task { [weak self] in
             guard let self else{return};var snapshot:ContextSnapshot?
             do {
