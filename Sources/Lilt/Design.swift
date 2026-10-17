@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import LiltCore
 
 enum Theme {
     static let ink = Color(red: 0.94, green: 0.95, blue: 0.96)
@@ -70,7 +71,7 @@ final class ComposerTextView: NSTextView {
         super.paste(sender)
     }
     override func keyDown(with event: NSEvent) {
-        if (event.keyCode == 36 || event.keyCode == 76), !event.modifierFlags.contains(.shift), !hasMarkedText() { submit?(); return }
+        if (event.keyCode == 36 || event.keyCode == 76), LineBreak.sends(shift: event.modifierFlags.contains(.shift), option: event.modifierFlags.contains(.option), marked: hasMarkedText()) { submit?(); return }
         if event.keyCode == 53 { escape?(); return }
         super.keyDown(with: event)
     }
