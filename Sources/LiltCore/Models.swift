@@ -190,3 +190,8 @@ public enum TutorPrompt {
         """
     }
 }
+
+public enum OpeningLine {
+    /// The first screen invites a question without making a window look required.
+    public static let assistant = "Ask anything, or drop a file."
+}
