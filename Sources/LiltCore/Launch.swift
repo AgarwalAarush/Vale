@@ -7,6 +7,13 @@ public enum LaunchSelection {
     }
 }
 
+/// A launch with no chat still opens the coach when there is an error to show.
+public enum LaunchPresentation {
+    public static func presentsCoach(hasActiveChat: Bool, hasError: Bool) -> Bool {
+        hasActiveChat || hasError
+    }
+}
+
 public enum CodexLocator {
     public static func candidatePaths(home:URL,customPath:String?,environmentPath:String?)->[String] {
         var paths:[String]=[]
