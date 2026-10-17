@@ -5,6 +5,23 @@ public enum ChatMode: String, Codable, CaseIterable, Sendable {
     public var label: String { self == .assistant ? "Ask" : "Learn" }
 }
 
+public enum OutgoingMessage {
+    /// A real message keeps its leading indentation. Trailing space and a blank message are not part of it.
+    public static func text(_ raw: String) -> String? {
+        guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        var end = raw.endIndex
+        while end > raw.startIndex {
+            let previous = raw.index(before: end)
+            if raw[previous].isWhitespace { end = previous } else { break }
+        }
+        var start = raw.startIndex
+        while start < end, raw[start].isNewline { start = raw.index(after: start) }
+        let core = raw[start..<end]
+        guard !core.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return String(core)
+    }
+}
+
 public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case image, pdf, text }
     public var id: UUID

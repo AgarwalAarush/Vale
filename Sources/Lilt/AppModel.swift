@@ -119,9 +119,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
     func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false) {
         guard var chat=active else{return}
-        var question=(override ?? draft).trimmingCharacters(in:.whitespacesAndNewlines)
-        if question.isEmpty && !chat.pendingAttachments.isEmpty {question="Help me understand these attachments."}
-        guard !question.isEmpty else{return}
+        var raw=override ?? draft
+        if raw.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && !chat.pendingAttachments.isEmpty {raw="Help me understand these attachments."}
+        guard let question=OutgoingMessage.text(raw) else{return}
         guard !importing else{error="Wait for your files to finish attaching.";return}
         guard !paused else{error="Resume the chat before sending a message.";return}
         guard question.count<=32_000 else{error="That message is too long. Attach it as a text file or send a smaller excerpt.";return}
@@ -129,7 +129,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let id=UUID();requestID=id;let chatID=chat.id
         if !retry {
             chat.messages.append(Message(role:"user",text:question,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
-            if chat.title == "New chat" {chat.title=String(question.split(separator:"\n").first.map(String.init)?.prefix(60) ?? question.prefix(60))}
+            if chat.title == "New chat" {let named=question.trimmingCharacters(in:.whitespacesAndNewlines);chat.title=String(named.split(separator:"\n").first.map(String.init)?.prefix(60) ?? named.prefix(60))}
             replace(chat);draft=""
         }
         failedQuestion=question;persist()
