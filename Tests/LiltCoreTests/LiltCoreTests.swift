@@ -2216,6 +2216,9 @@ final class LiltCoreTests {
     func testUndoDoesNotRestoreASentQuestion() {
         XCTAssertTrue(ComposerUndo.dropsSentText)
         XCTAssertFalse(ComposerUndo.restoresSentText())
+        XCTAssertTrue(ComposerUndo.clearsUndo(previous: "What is this?", replacement: ""))
+        XCTAssertFalse(ComposerUndo.clearsUndo(previous: "", replacement: ""))
+        XCTAssertFalse(ComposerUndo.clearsUndo(previous: "What is this?", replacement: "What is this? And"))
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)

@@ -1455,6 +1455,10 @@ public enum ComposerUndo {
     /// Replacing the composer from the saved draft must not restore a question that already went out.
     public static let dropsSentText = true
     public static func restoresSentText() -> Bool { !dropsSentText }
+    /// Clearing a written question drops its undo stack so Undo cannot put that question back.
+    public static func clearsUndo(previous: String, replacement: String) -> Bool {
+        dropsSentText && !previous.isEmpty && replacement.isEmpty
+    }
 }
 
 public enum QuestionScroll {
