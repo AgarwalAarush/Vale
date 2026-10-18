@@ -281,7 +281,7 @@ struct CoachView: View {
             if model.paused, model.active != nil {
                 HStack { Text("Paused · mic and sharing off").font(.system(size: 11)).foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.accent) }.padding(.horizontal, 18).padding(.bottom, 6)
             }
-            if model.active?.mode == .learn, !model.settingsInCoach { HStack(spacing: 16) {
+            if model.active?.mode == .learn, !model.settingsInCoach { HStack(spacing: 10) {
                 Button("Hint") { model.nextHint() }.buttonStyle(.plain)
                 Button("Point it out") { model.pointItOut() }.buttonStyle(.plain)
                 Spacer(minLength: 0)
