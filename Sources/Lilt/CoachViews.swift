@@ -237,7 +237,12 @@ struct CoachView: View {
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 8)
             if ShareRow.afterTheComposer, !model.settingsInCoach { ContextStrip(model: model).padding(.bottom, 12) }
         }.modifier(GlassSurface(radius: 20))
-            .dropDestination(for:URL.self){urls,_ in Task{await model.importFiles(urls)};return urls.contains(where:{$0.isFileURL})}
+            .dropDestination(for:URL.self){urls,_ in
+                model.keepDroppedLinks(urls)
+                let files=urls.filter(\.isFileURL)
+                if !files.isEmpty { Task{await model.importFiles(files)} }
+                return DroppedLink.text(from:urls) != nil || !files.isEmpty
+            }
             .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}

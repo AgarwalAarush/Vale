@@ -304,6 +304,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard panel.runModal() == .OK else{return};let urls=panel.urls
         Task{await importFiles(urls)}
     }
+    func keepDroppedLinks(_ urls: [URL]) {
+        guard let links = DroppedLink.text(from: urls) else { return }
+        editDraft(DroppedLink.inserted(into: draft, links: links))
+    }
     func importFiles(_ urls:[URL]) async {
         if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: activeID != nil, importing: importing) { error = refusal; return }
         guard let chatID=activeID,let files=fileStore else{return}

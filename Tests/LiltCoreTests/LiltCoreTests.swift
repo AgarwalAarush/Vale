@@ -1194,6 +1194,9 @@ final class LiltCoreTests {
         let page=URL(string:"https://example.com/notes")!
         let secure=URL(string:"http://example.com/a")!
         XCTAssertEqual(DroppedLink.text(from:[page,secure]),"https://example.com/notes\nhttp://example.com/a")
+        XCTAssertEqual(DroppedLink.inserted(into:"", links:"https://example.com/notes"),"https://example.com/notes")
+        XCTAssertEqual(DroppedLink.inserted(into:"What is this?", links:"https://example.com/notes"),"What is this?\nhttps://example.com/notes")
+        XCTAssertEqual(DroppedLink.inserted(into:"What is this?\n", links:"https://example.com/notes"),"What is this?\nhttps://example.com/notes")
         XCTAssertNil(DroppedLink.text(from:[URL(fileURLWithPath:"/tmp/Notes.md")]))
         XCTAssertNil(DroppedLink.text(from:[URL(string:"javascript:alert(1)")!]))
         XCTAssertNil(DroppedLink.text(from:[]))

@@ -322,6 +322,12 @@ public enum DroppedLink {
         guard !links.isEmpty else { return nil }
         return links.joined(separator: "\n")
     }
+    /// The address is added to what is already written. It does not replace it.
+    public static func inserted(into draft: String, links: String) -> String {
+        if draft.isEmpty { return links }
+        if draft.hasSuffix("\n") { return draft + links }
+        return draft + "\n" + links
+    }
 }
 
 public enum DraftCaret {
