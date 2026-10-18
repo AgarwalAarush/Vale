@@ -8,7 +8,7 @@ struct ContextStrip:View {
     var body:some View{
         VStack(alignment:.leading,spacing:7){
             HStack(spacing:8){
-                Image(systemName:model.context.hasSelection ? "record.circle" : "macwindow").font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
+                Image(systemName:ShareMark.symbol(selected:model.context.hasSelection, live:model.context.live, capturing:model.context.capturing)).font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
                 if model.context.hasSelection{
                     Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).help("Preview exactly what is shared")
                     Spacer(minLength:4)

@@ -1577,8 +1577,10 @@ final class LiltCoreTests {
         XCTAssertEqual(EmptyCoach.kickerSize, 11)
         XCTAssertEqual(EmptyCoach.bodySize, 15)
         XCTAssertEqual(EmptyCoach.blockSpacing, 16)
+        XCTAssertTrue(EmptyCoach.sitsWithComposer(messageCount: 0))
+        XCTAssertFalse(EmptyCoach.sitsWithComposer(messageCount: 1))
         var chat=LearningSession(title:"New chat")
-        XCTAssertTrue(chat.messages.isEmpty)
+        XCTAssertTrue(EmptyCoach.sitsWithComposer(messageCount: chat.messages.count))
         chat.draft="secret draft"
         XCTAssertFalse(chat.webEnabled)
         XCTAssertFalse(chat.matches("secret"))
@@ -2563,6 +2565,13 @@ final class LiltCoreTests {
         XCTAssertFalse(PointControl.enabled(waiting: true))
     }
 
+    func testCapsuleMicStaysOffTheOpenCoach() {
+        XCTAssertFalse(CapsuleMic.shows(coachOpen: true))
+        XCTAssertTrue(CapsuleMic.shows(coachOpen: false))
+        XCTAssertTrue(CapsuleMic.idleIsQuiet(listening: false, speaking: false, busy: false))
+        XCTAssertFalse(CapsuleMic.idleIsQuiet(listening: true, speaking: false, busy: false))
+    }
+
 }
 
 @main struct CoreChecks {
@@ -2803,6 +2812,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Wait stays while a file is added",tests.testWaitStaysWhileAFileIsAdded),
  ("Retry waits until the reply fails",tests.testRetryWaitsUntilTheReplyFails),
  ("Point it out explains a missing window",tests.testPointControlExplainsAMissingWindow),
+ ("The capsule microphone waits while the coach is open",tests.testCapsuleMicStaysOffTheOpenCoach),
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

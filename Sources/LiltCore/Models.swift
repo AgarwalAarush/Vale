@@ -979,6 +979,10 @@ public enum EmptyCoach {
     public static let kickerSize: CGFloat = 11
     public static let bodySize: CGFloat = 15
     public static let blockSpacing: CGFloat = 16
+    /// An empty chat keeps the greeting beside the field. A message returns the thread to the scroll.
+    public static func sitsWithComposer(messageCount: Int) -> Bool {
+        greetingAnchoredToComposer && messageCount == 0
+    }
 }
 
 public enum AttachControl {
@@ -991,6 +995,8 @@ public enum CapsuleMic {
     public static func idleIsQuiet(listening: Bool, speaking: Bool, busy: Bool) -> Bool {
         !listening && !speaking && !busy
     }
+    /// The coach already has the microphone. The capsule shows one only while that panel is hidden.
+    public static func shows(coachOpen: Bool) -> Bool { !coachOpen }
 }
 
 public enum ComposerPrompt {
