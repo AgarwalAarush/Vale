@@ -245,7 +245,6 @@ struct CoachView: View {
                                         }.font(.system(size: 11))
                                     }
                                 }.frame(maxWidth: .infinity, alignment: SpeakerTurn.trails(message.role) ? .trailing : .leading)
-                                    .padding(.vertical, message.role == "user" ? 2 : 0)
                                     .padding(.leading, SpeakerTurn.trails(message.role) ? SpeakerTurn.leadingClearance : (ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0))
                                     .background(.clear)
                                     .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.line).frame(width: ReplyTurn.ruleWidth) } }
@@ -260,7 +259,7 @@ struct CoachView: View {
                         }
                         if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 11)).foregroundStyle(Theme.muted) }.padding(.vertical, 2).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
-                    }.padding(.horizontal, 18).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
+                    }.padding(.horizontal, 18).padding(.bottom, 6).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
                 .onChange(of: model.active?.messages.count) { scrollThread(proxy) }
                 .onChange(of: model.busy) { scrollThread(proxy) }
@@ -319,7 +318,7 @@ struct CoachView: View {
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent, compact: true, quiet: true) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted, compact: true) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
                 }
-            }.padding(.horizontal, 18).padding(.vertical, 8)
+            }.padding(.horizontal, 18).padding(.top, 4).padding(.bottom, 4)
             let idle = !model.paused && !model.importing && !model.voice.starting && !model.voice.listening && !model.busy && !model.voice.speaking && !model.conversation && model.active?.webEnabled != true
             if !idle { Text(model.status).font(.system(size: 11)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.bottom, 6) }
             if ShareRow.afterTheComposer, !model.settingsInCoach { ContextStrip(model: model).padding(.bottom, 12) }
