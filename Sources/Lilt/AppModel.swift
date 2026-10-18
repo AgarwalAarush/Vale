@@ -329,7 +329,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         for i in sessions[index].messages.indices{sessions[index].messages[i].attachments.removeAll{ids.contains($0.id)}}
     }
     func removeFile(_ record:AttachmentRecord){
-        guard let chatID=activeID else{return}
+        guard let chatID=activeID, SentFile.canRemove(id: record.id, session: active) else{return}
         let unsent = active?.pendingAttachments.contains { $0.id == record.id } == true
         if UnsentRemoval.stopsTheReply(waiting: busy, unsent: unsent) { cancel() }
         do{
