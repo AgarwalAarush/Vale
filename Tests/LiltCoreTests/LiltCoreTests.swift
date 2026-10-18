@@ -434,6 +434,10 @@ final class LiltCoreTests {
     func testWebSearchControlIsNamed() {
         XCTAssertEqual(WebSearchLabel.title(enabled:false),"Web search")
         XCTAssertEqual(WebSearchLabel.title(enabled:true),"Web search on")
+        XCTAssertEqual(WebSearchStatus.line(base:"Ready to type", enabled:true, idle:true),"Ready to type · Web search on")
+        XCTAssertEqual(WebSearchStatus.line(base:"Return to send", enabled:true, idle:true),"Return to send · Web search on")
+        XCTAssertEqual(WebSearchStatus.line(base:"Ready to type", enabled:false, idle:true),"Ready to type")
+        XCTAssertEqual(WebSearchStatus.line(base:"Thinking…", enabled:true, idle:false),"Thinking…")
     }
 
     func testPasteKeepsCopiedText() {

@@ -377,6 +377,14 @@ public enum WebSearchLabel {
     }
 }
 
+public enum WebSearchStatus {
+    /// After the person turns web search on, the idle footer says so. A wait, pause, or voice line stays as it is.
+    public static func line(base: String, enabled: Bool, idle: Bool) -> String {
+        guard enabled, idle else { return base }
+        return "\(base) · \(WebSearchLabel.title(enabled: true))"
+    }
+}
+
 public enum ComposerPaste {
     public enum Choice: Equatable, Sendable { case text, files, image }
     public static func choice(text: String?, hasFile: Bool, hasImage: Bool) -> Choice {

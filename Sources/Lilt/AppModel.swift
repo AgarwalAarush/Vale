@@ -73,8 +73,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var hasInput: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty }
     var status: String {
         let line = FooterStatus.line(paused: paused, importing: importing, microphoneStarting: voice.starting, listening: voice.listening, waiting: busy, speaking: voice.speaking, conversation: conversation)
-        if line == "Voice off" { return CompanionStatus(canSend: hasInput && active != nil).line }
-        return line
+        let idle = line == "Voice off"
+        let base = idle ? CompanionStatus(canSend: hasInput && active != nil).line : line
+        return WebSearchStatus.line(base: base, enabled: active?.webEnabled == true, idle: idle)
     }
     init(dataDirectory: URL? = nil,fileRemoval:(@Sendable(URL)throws->Void)?=nil) {
         // Retain the 1.0 storage identifier so the Vale rename never strands chats.
