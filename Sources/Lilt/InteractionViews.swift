@@ -29,7 +29,7 @@ struct GuideCard:View {
     let guide:GuideProgress
     var body:some View{
         VStack(alignment:.leading,spacing:9){
-            HStack{Text("STEP \(guide.index+1) OF \(guide.plan.steps.count)").font(.system(size:9,weight:.medium)).tracking(0.8).foregroundStyle(Theme.accent);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:10)).foregroundStyle(Theme.muted)}
+            HStack{Text("Step \(guide.index+1) of \(guide.plan.steps.count)").font(.system(size:11)).foregroundStyle(Theme.muted);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:11)).foregroundStyle(Theme.muted)}
             Text(GuideStepText.visible(guide.current)).font(.system(size:12,weight:.medium)).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
             HStack(spacing:10){
                 Button("Back"){model.moveGuide(-1)}.buttonStyle(.plain).disabled(guide.index==0)

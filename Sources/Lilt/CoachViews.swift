@@ -228,9 +228,9 @@ struct CoachView: View {
                                         let row = HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,among:message.attachments,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}
                                         if FileScroll.usesScroll(fileCount: message.attachments.count) { ScrollView(.horizontal) { row }.scrollIndicators(.hidden) } else { row }
                                     }
-                                    if message.highlightUnavailable{Label("Highlight unavailable · check your selected window",systemImage:"eye.slash").font(.system(size:10)).foregroundStyle(Theme.muted)}
+                                    if message.highlightUnavailable{Text("Highlight unavailable · check your selected window").font(.system(size:11)).foregroundStyle(Theme.muted)}
                                     if message.screenChanged{
-                                        HStack{Image(systemName:"arrow.clockwise");Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:10)).foregroundStyle(Theme.muted)
+                                        HStack(spacing: 8){Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:11)).foregroundStyle(Theme.muted)
                                     }
                                     if message.role == "assistant" {
                                         let reading = ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking)
@@ -259,7 +259,7 @@ struct CoachView: View {
                                 Button("New chat") { model.prepareChat() }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
                             }.padding(.top, 8)
                         }
-                        if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 13)).foregroundStyle(Theme.muted) }.padding(.vertical, 4).id("thinking") }
+                        if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 11)).foregroundStyle(Theme.muted) }.padding(.vertical, 2).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 18).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
