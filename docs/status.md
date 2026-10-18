@@ -1,5 +1,9 @@
 # Release status
 
+Private candidate Vale 1.2.3 (build 6) includes Cursor's consolidated update and latest reviewed follow-up, corrected runtime wiring, the new icon and a safe replacement installer. The universal build, 234 core checks, 5 updater configuration fixtures and 67 native fixtures (plus a repeat of those same 67) pass. Actual native views were inspected, including the corrected notes state. Genuine provider integration passes 72/73 checks, including files and a guide against a synthetic screen; the web-search check fails with the installed Codex CLI. This is a known limitation, so the public release gate remains unsatisfied. Laptop installation, obsolete-app cleanup and relaunch remain pending laptop execution; this chat controls the Intel macserver. See [laptop update](laptop-update.md) for source reconciliation and current acceptance.
+
+The following is the recorded 1.2.2 baseline, rather than fresh acceptance of the 1.2.3 candidate.
+
 Vale 1.2.2 (build 5) implements the selected-window conversational companion scope. General chat stays the default. Live context refreshes locally on explicit opt-in; questions and guide steps send fresh frames. Conversation provides interruption-safe hands-free turn-taking and typing fallback, with optional language/voice/speed/silence settings. Step guides, stale-screen warnings, panel expansion, and visible context limits are implemented.
 
 The confirmed privacy defects are fixed: Forget filters the target out of the migration backup while preserving unrelated records, file-removal failures propagate into retryable state, pending imports are protected, and open previews release pixels on stop/removal. Generation guards, bounded capture, geometry validation and callback checks prevent stale or unrelated context from being used.
