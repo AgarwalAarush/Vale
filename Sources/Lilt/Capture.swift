@@ -53,10 +53,11 @@ struct ContextSnapshot {
     var changed:(()->Void)?
     var failed:((String)->Void)?
     var hasSelection:Bool{filter != nil || fixtureSource != nil}
+    private var sharedSelection:SharedWindowSelection?{hasSelection ? SharedWindowSelection(id:windowID ?? 0,title:title ?? "Selected window",live:live) : nil}
     var preview:NSImage?{latest?.image}
     override init(){super.init();SCContentSharingPicker.shared.add(self)}
     func choose(live:Bool=false){
-        stop();requestedLive=live
+        requestedLive=live
         var config=SCContentSharingPickerConfiguration();config.allowedPickerModes=[.singleWindow]
         config.excludedBundleIDs=[Bundle.main.bundleIdentifier ?? "local.lilt.companion"]
         SCContentSharingPicker.shared.defaultConfiguration=config;SCContentSharingPicker.shared.isActive=true;SCContentSharingPicker.shared.present()
@@ -107,8 +108,9 @@ struct ContextSnapshot {
                 let config=SCStreamConfiguration();let scale=min(2.0,1600.0/max(rect.width,rect.height))
                 config.width=max(2,Int(rect.width*scale));config.height=max(2,Int(rect.height*scale));config.showsCursor=false;config.ignoreShadowsSingleWindow=true
                 let image=try await SCScreenshotManager.captureImage(contentFilter:filter,configuration:config)
-                guard let data=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else{throw AppError("Couldn’t read the selected window.")}
-                result=ContextSnapshot(data:data,image:NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height)),windowID:selectedID,frame:self.currentFrame(),generation:expected,capturedAt:Date())
+                guard let data=windowPNG(image) else{throw AppError("Couldn’t read the selected window.")}
+                let shown=NSImage(data:data) ?? NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height))
+                result=ContextSnapshot(data:data,image:shown,windowID:selectedID,frame:self.currentFrame(),generation:expected,capturedAt:Date())
             }
             guard !Task.isCancelled,self.generation==expected,result.windowID==selectedID,(selectedID==nil || self.currentFrame() != nil) else{throw AppError("Sharing changed. Ask again with the selected window.")}
             result.generation=expected;result.capturedAt=Date();return result

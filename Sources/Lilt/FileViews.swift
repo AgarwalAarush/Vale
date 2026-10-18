@@ -4,13 +4,14 @@ import LiltCore
 
 struct FileChip: View {
     let record: AttachmentRecord
+    var among: [AttachmentRecord] = []
     @ObservedObject var model: AppModel
     var removable = false
     var body: some View {
         HStack(spacing:8) {
             Button {model.showFile?(record)} label:{
                 HStack(spacing:8){
-                    if let image=model.fileStore?.image(for:record){Image(nsImage:image).resizable().scaledToFill().frame(width:28,height:28).clipShape(RoundedRectangle(cornerRadius:5))}
+                    if let image=model.fileStore?.image(for:record){Image(nsImage:image).resizable().scaledToFit().frame(width:28,height:28).clipShape(RoundedRectangle(cornerRadius:5))}
                     else{Image(systemName:record.kind == .pdf ? "doc.richtext" : "doc.text").font(.system(size:16)).foregroundStyle(Theme.accent).frame(width:28,height:28)}
                     VStack(alignment:.leading,spacing:3){Text(record.name).font(.system(size:11,weight:.medium)).lineLimit(1);Text(record.detail).font(.system(size:9)).foregroundStyle(Theme.muted).lineLimit(1)}
                 }
@@ -52,6 +53,6 @@ struct FilePreviewView: View {
     }
     private var textPreview:String{
         guard let text=try? String(contentsOf:store.url(for:record),encoding:.utf8) else{return "File unavailable."}
-        return String(text.prefix(100_000)) + (text.count>100_000 ? "\n\n[Preview limited to the first 100,000 characters.]" : "")
+        return TextPreview.shown(text)
     }
 }

@@ -26,7 +26,11 @@ private final class SearchEventProbe: @unchecked Sendable {
     private var completion: ((Result<TutorReply, Error>) -> Void)?
     private var work: URL?
     private var shellResolved: String?
+    private var lookupPending = false
+    private var deferredAsk: (prompt: String, images: [Data], search: Bool, completion: (Result<TutorReply, Error>) -> Void)?
     var located:(()->Void)?
+    var lookupEnded:(()->Void)?
+    private(set) var lookupFinished=false
     var executable: String? {
         let custom = UserDefaults.standard.string(forKey: "codexPath")
         let candidates = CodexLocator.candidatePaths(home: FileManager.default.homeDirectoryForCurrentUser, customPath: custom, environmentPath: ProcessInfo.processInfo.environment["PATH"])
@@ -36,27 +40,34 @@ private final class SearchEventProbe: @unchecked Sendable {
     }
     func locateWithLoginShell() {
         let args = CommandLine.arguments
-        guard !args.contains("--self-test"), !args.contains("--integration-test"), executable == nil else { return }
+        guard !args.contains("--self-test"), !args.contains("--integration-test"), executable == nil else { lookupFinished = true; return }
+        lookupPending = true
         DispatchQueue.global(qos: .utility).async { [weak self] in
+            let finish: (String?) -> Void = { path in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if let path, FileManager.default.isExecutableFile(atPath: path) { self.shellResolved = path; self.located?() }
+                    self.lookupPending = false
+                    self.lookupFinished = true
+                    self.lookupEnded?()
+                    self.resumeDeferredAsk()
+                }
+            }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/zsh")
             process.arguments = ["-lc", "command -v codex"]
             let output = Pipe()
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
-            do { try process.run() } catch { return }
+            do { try process.run() } catch { finish(nil); return }
             let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3, execute: timeout)
             process.waitUntilExit()
             timeout.cancel()
             let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
             let path = CodexLocator.shellExecutable(from: text)
-            guard let resolved = path, FileManager.default.isExecutableFile(atPath: resolved) else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.shellResolved = resolved
-                self.located?()
-            }
+            if let resolved = path, FileManager.default.isExecutableFile(atPath: resolved) { finish(resolved) }
+            else { finish(nil) }
         }
     }
     var resources: URL {
@@ -68,7 +79,26 @@ private final class SearchEventProbe: @unchecked Sendable {
         cancel()
         usedWebSearch=false
         if let fixtureReply,(CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")){fixtureReply(prompt,images,search,completion);return}
-        guard let executable else { completion(.failure(AppError("Codex wasn’t found. Choose it in Settings, or install the Codex CLI and run codex login in Terminal.", offersSettings: true))); return }
+        switch CodexStartup.next(executableFound: executable != nil, lookupPending: lookupPending) {
+        case .start: begin(prompt: prompt, images: images, search: search, completion: completion)
+        case .wait: deferredAsk = (prompt, images, search, completion)
+        case .missing: reportMissingCodex(completion)
+        }
+    }
+    private func resumeDeferredAsk() {
+        guard let deferred = deferredAsk else { return }
+        deferredAsk = nil
+        switch CodexStartup.next(executableFound: executable != nil, lookupPending: false) {
+        case .start: begin(prompt: deferred.prompt, images: deferred.images, search: deferred.search, completion: deferred.completion)
+        case .wait: deferredAsk = deferred
+        case .missing: reportMissingCodex(deferred.completion)
+        }
+    }
+    private func reportMissingCodex(_ completion: @escaping (Result<TutorReply, Error>) -> Void) {
+        completion(.failure(AppError("Codex wasn’t found. Choose it in Settings, or install the Codex CLI and run codex login in Terminal.", offersSettings: true)))
+    }
+    private func begin(prompt: String, images: [Data], search: Bool, completion: @escaping (Result<TutorReply, Error>) -> Void) {
+        guard let executable else { reportMissingCodex(completion); return }
         self.completion = completion
         do {
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("lilt-\(UUID().uuidString)")
@@ -78,7 +108,7 @@ private final class SearchEventProbe: @unchecked Sendable {
             let process = Process(); process.executableURL = URL(fileURLWithPath: executable)
             var args = ["exec", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only", "--json", "--color", "never", "-C", work.path]
             for option in ["approval_policy=\"never\"", "forced_login_method=\"chatgpt\"", "model_reasoning_effort=\"low\"", "features.shell_tool=false", "features.unified_exec=false", "features.apps=false", "features.plugins=false", "features.browser_use=false", "features.computer_use=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false", "features.image_generation=false", "features.skill_search=false", "features.skip_host_skill_discovery=true", "features.code_mode_host=false", "features.view_image=false", "features.shell_snapshot=false"] { args += ["-c", option] }
-            args += ["-c", "web_search=\"\(search ? "live" : "disabled")\"", "-c", "features.standalone_web_search=\(search)", "-c", "features.code_mode_host=\(search)"]
+            args += ["-c", "web_search=\"\(search ? "live" : "disabled")\"", "-c", "features.standalone_web_search=\(search)", "-c", "features.code_mode_host=\(RequestTools.allowsCodeExecution(webSearch: search))"]
             args += ["-c", "model_instructions_file=\"\(resources.appendingPathComponent("tutor.md").path)\""]
             let model = UserDefaults.standard.string(forKey: "model") ?? ""
             if !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { args += ["-m", model] }
@@ -88,7 +118,7 @@ private final class SearchEventProbe: @unchecked Sendable {
             process.arguments = args
             var env: [String: String] = [:]
             for key in ["HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CODEX_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY"] { if let value = ProcessInfo.processInfo.environment[key] { env[key] = value } }
-            env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            env["PATH"] = AssistantPath.value(executable: executable)
             process.environment = env
             let input = Pipe(); let out = Pipe(); let err = Pipe()
             process.standardInput = input; process.standardOutput = out; process.standardError = err
@@ -102,10 +132,9 @@ private final class SearchEventProbe: @unchecked Sendable {
                 DispatchQueue.main.async {
                     guard let self, let process, self.process === process else { return }
                     self.usedWebSearch=searchEvents.usedSearch
-                    if finished.terminationStatus == 0 {
-                        do { self.finish(.success(try TutorReply.decode(Data(contentsOf: output)))) }
-                        catch { self.finish(.failure(AppError("The assistant returned an unreadable reply. Your question is saved; try again."))) }
-                    } else { self.finish(.failure(AppError("The connection stopped. Check your Codex sign-in or plan usage in Settings, then retry.", offersSettings: true))) }
+                    if let reply = FinishedReply.decoded(try? Data(contentsOf: output)) { self.finish(.success(reply)) }
+                    else if finished.terminationStatus == 0 { self.finish(.failure(AppError("The assistant returned an unreadable reply. Your question is saved; try again."))) }
+                    else { self.finish(.failure(AppError("The connection stopped. Check your Codex sign-in or plan usage in Settings, then retry.", offersSettings: true))) }
                 }
             }
             try process.run()

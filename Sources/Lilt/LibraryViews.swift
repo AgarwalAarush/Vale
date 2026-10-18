@@ -7,24 +7,24 @@ struct LibraryView: View {
     @State private var deleteID: UUID?
     @State private var renameID: UUID?
     @State private var newTitle=""
-    var filtered:[LearningSession]{model.sessions.filter{$0.matches(query)}}
+    var filtered:[LearningSession]{HistoryLists.sidebar(model.sessions,query:query,searchVisible:true)}
     var body:some View{
         HStack(spacing:0){
             VStack(alignment:.leading,spacing:0){
                 HStack(spacing:10){LogoMark(size:26);Text("Vale").font(.system(size:18,weight:.semibold)).tracking(-0.5)}.padding(.horizontal,22).padding(.top,35).padding(.bottom,28)
-                Button{model.newSession()}label:{Label("New chat",systemImage:"square.and.pencil").font(.system(size:13,weight:.medium)).frame(maxWidth:.infinity,alignment:.leading).padding(12).background(.white.opacity(0.065)).clipShape(RoundedRectangle(cornerRadius:8))}.buttonStyle(.plain).padding(.horizontal,12)
+                Button{model.newSession()}label:{Label("New chat",systemImage:"square.and.pencil").font(.system(size:13,weight:.medium)).frame(maxWidth:.infinity,alignment:.leading).padding(12).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius:8))}.buttonStyle(.plain).padding(.horizontal,12)
                 Button{model.selectedID=nil;model.settings=false}label:{Label("All chats",systemImage:"rectangle.stack").font(.system(size:12)).foregroundStyle(Theme.muted).padding(.horizontal,12).padding(.vertical,13)}.buttonStyle(.plain).padding(.horizontal,12)
                 Text("RECENT").font(.system(size:9,weight:.medium)).tracking(1.2).foregroundStyle(Theme.muted).padding(.horizontal,24).padding(.top,17).padding(.bottom,12)
                 ScrollView{
-                    VStack(spacing:4){ForEach(model.sessions){chat in
+                    VStack(spacing:4){ForEach(filtered){chat in
                         Button{model.selectedID=chat.id;model.settings=false}label:{
-                            HStack(spacing:9){Image(systemName:chat.mode == .learn ? "lightbulb" : "bubble.left").font(.system(size:12)).foregroundStyle(Theme.muted);Text(chat.title).font(.system(size:12)).lineLimit(1);Spacer(minLength:0)}.padding(.horizontal,12).padding(.vertical,10).background(model.selectedID == chat.id && !model.settings ? .white.opacity(0.065) : .clear).clipShape(RoundedRectangle(cornerRadius:8))
+                            HStack(spacing:9){Image(systemName:chat.mode == .learn ? "lightbulb" : HistoryMark.symbol).font(.system(size:12)).foregroundStyle(Theme.muted);Text(chat.title).font(.system(size:12)).lineLimit(1);Spacer(minLength:0)}.padding(.horizontal,12).padding(.vertical,10).background(model.selectedID == chat.id && !model.settings ? Theme.fillRaised : .clear).clipShape(RoundedRectangle(cornerRadius:8))
                         }.buttonStyle(.plain).contextMenu{Button("Rename…"){renameID=chat.id;newTitle=chat.title};Button("Export…"){model.export(chat)};Button("Forget chat…",role:.destructive){deleteID=chat.id}}
                     }}.padding(.horizontal,12)
                 }.scrollIndicators(.hidden)
                 Spacer(minLength:15)
                 Button{model.settings=true}label:{Label("Settings",systemImage:"slider.horizontal.3").font(.system(size:12)).foregroundStyle(Theme.muted)}.buttonStyle(.plain).padding(24)
-            }.frame(width:194).background(Color.black.opacity(0.12))
+            }.frame(width:194).background(Theme.rail)
             Rectangle().fill(Theme.line).frame(width:1)
             Group{
                 if model.settings{SettingsView(model:model)}
@@ -46,7 +46,7 @@ struct LibraryView: View {
         ScrollView{
             VStack(alignment:.leading,spacing:0){
                 HStack{Text("Your chats").font(.system(size:29,weight:.medium)).tracking(-0.8);Spacer();Button("New chat"){model.newSession()}.buttonStyle(QuietButton(filled:true))}.padding(.bottom,23)
-                HStack(spacing:10){Image(systemName:"magnifyingglass").foregroundStyle(Theme.muted);TextField("Search messages, notes, and files",text:$query).textFieldStyle(.plain).font(.system(size:13))}.padding(12).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line)).padding(.bottom,27)
+                HStack(spacing:10){Image(systemName:"magnifyingglass").foregroundStyle(Theme.muted);TextField("Search messages, notes, and files",text:$query).textFieldStyle(.plain).font(.system(size:13))}.padding(12).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).padding(.bottom,27)
                 if filtered.isEmpty{
                     VStack(alignment:.leading,spacing:12){
                         Text(query.isEmpty ? "A place to pick up the thread." : "No chats found.").font(.system(size:18,weight:.medium))
@@ -58,7 +58,7 @@ struct LibraryView: View {
                         HStack(spacing:15){
                             VStack(alignment:.leading,spacing:7){
                                 Text(chat.title).font(.system(size:15,weight:.medium)).lineLimit(1)
-                                Text(chat.messages.last?.text ?? (chat.pendingAttachments.isEmpty ? "Ready when you are." : "\(chat.pendingAttachments.count) files attached")).font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
+                                Text(verbatim: chat.listPreview).font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
                             }
                             Spacer(minLength:20);Text(chat.updated,style:.date).font(.system(size:11)).foregroundStyle(Theme.muted);Image(systemName:"chevron.right").font(.system(size:10)).foregroundStyle(Theme.muted)
                         }.padding(.vertical,18)
@@ -81,6 +81,8 @@ struct SessionDetail: View {
     let session:LearningSession
     let deleteAction:()->Void
     let renameAction:()->Void
+    @State private var note=""
+    @State private var noteID:UUID?
     var body:some View{
         ScrollView{
             VStack(alignment:.leading,spacing:22){
@@ -95,13 +97,16 @@ struct SessionDetail: View {
                 Divider().overlay(Theme.line)
                 VStack(alignment:.leading,spacing:10){
                     Text(session.mode == .learn ? "WHAT CLICKED?" : "NOTES").font(.system(size:10,weight:.medium)).tracking(1.1).foregroundStyle(Theme.muted)
-                    TextEditor(text:Binding(get:{model.sessions.first{$0.id == session.id}?.takeaway ?? ""},set:{model.setTakeaway($0,for:session.id)})).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line)).accessibilityLabel("Chat notes")
+                    TextEditor(text:Binding(get:{model.sessions.first{$0.id == session.id}?.takeaway ?? ""},set:{model.setTakeaway($0,for:session.id)})).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).accessibilityLabel("Chat notes")
                 }
                 if !session.messages.isEmpty{Divider().overlay(Theme.line)}
                 ForEach(session.messages){message in
                     VStack(alignment:.leading,spacing:9){
-                        Text(message.role == "user" ? "YOU" : "LILT").font(.system(size:10,weight:.medium)).tracking(1).foregroundStyle(Theme.muted)
-                        Text(.init(message.text)).font(.system(size:14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading)
+                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size:10,weight:.medium)).tracking(1).foregroundStyle(Theme.muted)
+                        if !message.text.isEmpty { MessageText(message: message).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+                        if StaleWindowAnswer.applies(to: message) { Text(StaleWindowAnswer.notice).font(.system(size: 11)).foregroundStyle(Theme.muted) }
+                        if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
+                        if FailedAnswer.shows(failed: message.answerFailed, waiting: false) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                     }.padding(.vertical,5)
                 }
             }.padding(.horizontal,42).padding(.top,54).padding(.bottom,40)
@@ -110,13 +115,14 @@ struct SessionDetail: View {
 }
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    var embeddedInCoach = false
     @AppStorage("codexPath") private var codexPath = ""
     @AppStorage("model") private var modelName = ""
     @State private var connection = ""
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                Text("Settings").font(.system(size: 28, weight: .medium)).tracking(-0.7)
+                Text("Settings").font(.system(size: embeddedInCoach ? 22 : 28, weight: .medium)).tracking(-0.7)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("ChatGPT via Codex").font(.system(size: 16, weight: .medium))
                     Text(connection.isEmpty ? (model.provider.executable == nil ? "Codex wasn’t found in ~/.local/bin, Homebrew, the app bundle, or your PATH." : "Uses the sign-in saved by your Codex CLI.") : connection).font(.system(size: 12)).foregroundStyle(Theme.muted)
@@ -142,9 +148,9 @@ struct SettingsView: View {
                 DisclosureGroup("Advanced") {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Codex executable").font(.system(size: 11)).foregroundStyle(Theme.muted)
-                        TextField("Auto-detect", text: $codexPath).textFieldStyle(.roundedBorder).font(.system(size: 12))
+                        TextField("Auto-detect", text: $codexPath).font(.system(size: 12)).modifier(QuietField())
                         Text("Model").font(.system(size: 11)).foregroundStyle(Theme.muted)
-                        TextField("Codex default", text: $modelName).textFieldStyle(.roundedBorder).font(.system(size: 12))
+                        TextField("Codex default", text: $modelName).font(.system(size: 12)).modifier(QuietField())
                     }.padding(.top, 15)
                 }.font(.system(size: 12))
                 Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
