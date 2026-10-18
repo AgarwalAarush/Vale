@@ -5,8 +5,8 @@
 <key>CFBundleIdentifier</key><string>local.lilt.companion</string>
 <key>CFBundleName</key><string>Vale</string>
 <key>CFBundleDisplayName</key><string>Vale</string>
-<key>CFBundleVersion</key><string>5</string>
-<key>CFBundleShortVersionString</key><string>1.2.2</string>
+<key>CFBundleVersion</key><string>6</string>
+<key>CFBundleShortVersionString</key><string>1.2.3</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>Vale.icns</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>

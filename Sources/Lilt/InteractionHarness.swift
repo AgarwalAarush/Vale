@@ -27,13 +27,14 @@ extension AppController {
         results["fixture_liveDoesNotPersistCaptureBytes"]=(try FileManager.default.contentsOfDirectory(atPath:model.fileStore!.directory.path))==beforeNames
         model.context.stopLive();let stoppedCount=captureCount;try? await Task.sleep(nanoseconds:2_100_000_000)
         results["fixture_stopLiveClearsPreviewAndStopsRefresh"]=model.context.latest==nil && !model.context.live && model.context.hasSelection && captureCount==stoppedCount
-        model.previewContext();await settle();let preview=NSApp.windows.first{$0.title=="Shared context preview" && $0.isVisible};model.stopSharing();await settle();results["fixture_stopSharingClosesPreviewPixels"]=preview != nil && preview?.isVisible==false && preview?.contentView==nil;selectFixture();openCoach()
+        model.previewContext();await settle();results["fixture_previewRequiresHeldPixels"] = !NSApp.windows.contains{$0.title=="Shared context preview" && $0.isVisible}
+        model.context.startLive();await until{model.context.latest != nil};model.previewContext();await settle();let preview=NSApp.windows.first{$0.title=="Shared context preview" && $0.isVisible};model.stopSharing();await settle();results["fixture_stopSharingClosesPreviewPixels"]=preview != nil && preview?.isVisible==false && preview?.contentView==nil;selectFixture();openCoach()
         model.send("Explain the synthetic window",guideRequested:true);await until{pending != nil}
         results["fixture_requestUsesFreshSelectedFrame"]=selectedFrameSent && model.busy
         results["fixture_onDemandDoesNotKeepPreviewPixels"]=model.context.latest==nil
         await settle();try snapshot(coach,to:output.appendingPathComponent("13-loading.png"))
         bytes=first;let stale=pending;pending=nil;stale?(.success(TutorReply(text:"This reply used the earlier synthetic frame.",point:PointTarget(x:0.35,y:0.3,width:0.3,height:0.4,label:"Fixture shape"),guide:GuidePlan(title:"Old frame",steps:["Read old frame","Act on old frame"]))))
-        await until{!model.busy}
+        await until{model.active?.messages.last?.screenChanged==true}
         results["fixture_changedScreenSuppressesPointAndMarksReply"]=model.active?.messages.last?.screenChanged==true && pointCount==0
         results["fixture_staleScreenCannotInstallNewGuide"]=model.active?.guide==nil
         await settle();try snapshot(coach,to:output.appendingPathComponent("14-window-changed.png"))
@@ -61,8 +62,9 @@ extension AppController {
         model.voice.simulateUtterance("Explain this fixture",token:token);await until{model.voice.speaking}
         results["fixture_turnTakingWaitsDuringReply"]=model.conversation && model.voice.speaking && !model.voice.listening
         let oldPlayback=model.voice.fixturePlaybackToken;model.toggleVoice();let interruptedToken=model.voice.fixtureRecognitionToken;model.voice.simulatePlaybackFinished(token:oldPlayback)
-        results["fixture_interruptStopsPlaybackWithoutOldRearm"]=model.voice.listening && !model.voice.speaking && model.voice.fixtureRecognitionToken==interruptedToken
-        model.voice.simulateUtterance("One more fixture question",token:interruptedToken);await until{model.voice.speaking};let playback=model.voice.fixturePlaybackToken;model.voice.simulatePlaybackFinished(token:playback);await until{model.voice.listening}
+        results["fixture_interruptStopsPlaybackWithoutOldRearm"] = !model.voice.listening && !model.voice.speaking && model.voice.fixtureRecognitionToken==interruptedToken
+        model.setConversation(true);let nextToken=model.voice.fixtureRecognitionToken
+        model.voice.simulateUtterance("One more fixture question",token:nextToken);await until{model.voice.speaking};let playback=model.voice.fixturePlaybackToken;model.voice.simulatePlaybackFinished(token:playback);await until{model.voice.listening}
         results["fixture_conversationRearmsAfterCurrentPlayback"]=model.conversation && model.voice.listening && !model.voice.speaking
         model.context.startLive();await until{model.context.latest != nil};await settle();try snapshot(coach,to:output.appendingPathComponent("17-conversation.png"));try snapshot(capsule,to:output.appendingPathComponent("17b-conversation-capsule.png"))
         let pausedToken=model.voice.fixtureRecognitionToken;model.togglePause();let messages=model.active?.messages.count
@@ -73,17 +75,24 @@ extension AppController {
         results["fixture_permissionDenialKeepsTypedFallback"] = !model.voice.listening && !model.conversation && model.error != nil
         model.editDraft("Typed fallback after permission denial");model.send();await until{!model.busy};results["fixture_typedFallbackRecoversAfterVoiceDenial"]=model.active?.messages.last?.role=="assistant" && model.error==nil
         model.voice.fixturePermission=true
+        model.newSession(title:"Conversation opt-out fixture")
+        var deferredVoice:((Result<TutorReply,Error>)->Void)?
+        model.provider.fixtureReply={_,_,_,completion in deferredVoice=completion}
+        model.setConversation(true);model.voice.simulateUtterance("A delayed spoken question",token:model.voice.fixtureRecognitionToken);await until{deferredVoice != nil}
+        model.setConversation(false);deferredVoice?(.success(TutorReply(text:"The delayed answer remains in the chat.")));await until{!model.busy}
+        results["fixture_conversationOptOutKeepsReplyWithoutRearming"] = model.active?.messages.last?.role=="assistant" && !model.conversation && !model.voice.listening && model.voice.speaking==model.readAloud
+        model.voice.stop()
         model.newSession(title:"Synthetic step-by-step help");selectFixture();let plan=GuidePlan(title:"Understand the diagram",steps:["Find the red circle","Trace its curved boundary","Describe its color and shape"])
         model.provider.fixtureReply={prompt,_,_,complete in complete(.success(TutorReply(text:prompt.contains("Help me with step 2") ? "Follow the curved edge. Every point stays the same distance from the center." : "Start by locating the red circle.",point:PointTarget(x:0.35,y:0.3,width:0.3,height:0.4,label:"Synthetic circle"),guide:plan)))}
-        model.draft="Help me understand the circle";model.startGuide();await until{!model.busy}
+        model.draft="Help me understand the circle";model.startGuide();await until{model.active?.guide?.plan==plan}
         results["fixture_guideStartsWithValidatedPlan"]=model.active?.guide?.index==0 && model.active?.guide?.plan==plan
         results["fixture_stableSelectedFrameAllowsValidatedPoint"]=pointCount>0
-        let beforeStep=captureCount;model.moveGuide(1);await until{!model.busy};model.persist()
+        let beforeStep=captureCount;model.moveGuide(1);await until{!model.busy && !model.context.capturing};await settle();model.persist()
         results["fixture_nextGuideStepCapturesFreshContext"]=model.active?.guide?.index==1 && captureCount>beforeStep
         let saved=try SessionStore(directory:output.appendingPathComponent("test-library")).load().first{$0.id==model.activeID}
         results["fixture_guideProgressPersists"]=saved?.guide?.index==1
         await settle();try snapshot(coach,to:output.appendingPathComponent("19-step-guide.png"))
-        let pointsBefore=pointCount;model.context.installFixture(pointVisible:false){captureCount+=1;return snapshotFor(first)};model.pointItOut();await until{!model.busy};results["fixture_occludedPointIsSuppressedAndExplained"]=pointCount==pointsBefore && model.active?.messages.last?.highlightUnavailable==true
+        let pointsBefore=pointCount;model.context.installFixture(pointVisible:false){captureCount+=1;return snapshotFor(first)};model.pointItOut();await until{model.active?.messages.last?.highlightUnavailable==true};results["fixture_occludedPointIsSuppressedAndExplained"]=pointCount==pointsBefore && model.active?.messages.last?.highlightUnavailable==true
         await settle();try snapshot(coach,to:output.appendingPathComponent("20-occluded-highlight.png"));selectFixture()
         model.endGuide();if model.expanded{model.expandCoach?();await settle()}
         model.updateActive{$0.messages=(0..<30).map{Message(role:"user",text:"Generated earlier context message \($0)")}}
@@ -103,7 +112,7 @@ extension AppController {
         if CommandLine.arguments.contains("--integration-test"){
             model.newSession(title:"Real provider · synthetic window");selectFixture();model.provider.fixtureReply=nil
             model.draft="This is a synthetic test window showing a red circle. Give a concise three-step guide to describe this shape and its color, one step at a time."
-            model.startGuide();await waitForReply();results["realProviderGuideWithSyntheticScreen"]=model.active?.messages.last?.role=="assistant" && model.active?.guide?.plan.isValid==true
+            model.startGuide();await waitForReply();await until{model.active?.guide?.plan.isValid==true};results["realProviderGuideWithSyntheticScreen"]=model.active?.messages.last?.role=="assistant" && model.active?.guide?.plan.isValid==true
             await settle();try snapshot(coach,to:output.appendingPathComponent("24-real-guide-synthetic-screen.png"))
         }
     }

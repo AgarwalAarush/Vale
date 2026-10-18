@@ -32,14 +32,14 @@ struct LibraryView: View {
                 else{home}
             }.frame(maxWidth:.infinity,maxHeight:.infinity)
         }.foregroundStyle(Theme.ink).background(Theme.background).preferredColorScheme(.dark)
-        .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
+        .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
         .confirmationDialog("Forget this chat and its uploaded files?",isPresented:Binding(get:{deleteID != nil},set:{if !$0{deleteID=nil}}),titleVisibility:.visible){
             Button("Forget chat",role:.destructive){if let id=deleteID{model.delete(id)};deleteID=nil}
             Button("Cancel",role:.cancel){deleteID=nil}
         }.alert("Rename chat",isPresented:Binding(get:{renameID != nil},set:{if !$0{renameID=nil}})){
             TextField("Chat title",text:$newTitle)
             Button("Cancel",role:.cancel){renameID=nil}
-            Button("Save"){if let id=renameID{model.rename(id,to:newTitle)};renameID=nil}
+            Button("Save") { guard let id = renameID, ChatTitle.saved(newTitle) != nil else { return }; model.rename(id, to: newTitle); renameID = nil }.disabled(ChatTitle.saved(newTitle) == nil)
         }
     }
     var home:some View{
@@ -58,7 +58,7 @@ struct LibraryView: View {
                         HStack(spacing:15){
                             VStack(alignment:.leading,spacing:7){
                                 Text(chat.title).font(.system(size:15,weight:.medium)).lineLimit(1)
-                                Text(verbatim: chat.listPreview).font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
+                                Text(verbatim: ChatListLine.text(from: chat.historyPreview(matching: query)) ?? "Ready when you are.").font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
                             }
                             Spacer(minLength:20);Text(chat.updated,style:.date).font(.system(size:11)).foregroundStyle(Theme.muted);Image(systemName:"chevron.right").font(.system(size:10)).foregroundStyle(Theme.muted)
                         }.padding(.vertical,18)
@@ -83,42 +83,85 @@ struct SessionDetail: View {
     let renameAction:()->Void
     @State private var note=""
     @State private var noteID:UUID?
+    @State private var storedNote=""
     var body:some View{
         ScrollView{
             VStack(alignment:.leading,spacing:22){
                 HStack(alignment:.top){
-                    VStack(alignment:.leading,spacing:9){Text(session.title).font(.system(size:27,weight:.medium)).tracking(-0.7);Text("\(session.mode == .learn ? "Learn" : "Assistant") · \(session.messages.filter{$0.role == "user"}.count) \(session.messages.filter{$0.role == "user"}.count == 1 ? "message" : "messages")").font(.system(size:11)).foregroundStyle(Theme.muted)}
+                    VStack(alignment:.leading,spacing:9){let count=ChatSummary.messageCount(session.messages);Text(session.title).font(.system(size:27,weight:.medium)).tracking(-0.7);Text("\(session.mode.label) · \(count) \(count == 1 ? "message" : "messages")").font(.system(size:11)).foregroundStyle(Theme.muted)}
                     Spacer()
                     Menu{Button("Rename…",action:renameAction);Button("Export chat…"){model.export(session)};Button("Forget chat…",role:.destructive,action:deleteAction)}label:{Image(systemName:"ellipsis").frame(width:25,height:25)}.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
                 if let error=model.error{VStack(alignment:.leading,spacing:10){Text(error).font(.system(size:12)).foregroundStyle(.orange).textSelection(.enabled).fixedSize(horizontal:false,vertical:true);if model.errorOffersSettings{Button("Open Settings"){model.openSettings()}.buttonStyle(.plain).font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent)};if model.deletionToRetry==session.id{Button("Retry Forget"){model.delete(session.id)}.buttonStyle(QuietButton())}}}
                 Button(session.id == model.activeID ? "Return to chat" : "Continue chat"){if session.id == model.activeID{model.showCoach?()}else{model.resume(session.id)}}.buttonStyle(QuietButton(filled:true))
-                if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,model:model)}}}.scrollIndicators(.hidden)}
+                if let draft = session.unsentDraft {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("UNSENT").font(.system(size: 10, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
+                        Text(verbatim: draft).font(.system(size: 14)).lineSpacing(4).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if let steps = session.guide?.savedSteps {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("STEPS").font(.system(size: 10, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
+                        Text(steps).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,among:session.files,model:model)}}}.scrollIndicators(.hidden).fixedSize(horizontal:false,vertical:true)}
                 Divider().overlay(Theme.line)
                 VStack(alignment:.leading,spacing:10){
                     Text(session.mode == .learn ? "WHAT CLICKED?" : "NOTES").font(.system(size:10,weight:.medium)).tracking(1.1).foregroundStyle(Theme.muted)
-                    TextEditor(text:Binding(get:{model.sessions.first{$0.id == session.id}?.takeaway ?? ""},set:{model.setTakeaway($0,for:session.id)})).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).accessibilityLabel("Chat notes")
+                    TextEditor(text:$note).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).accessibilityLabel("Chat notes")
+                        .onAppear {
+                            let hasLocalEdit = noteID == session.id && note != storedNote
+                            note = NoteEdit.next(local: note, stored: session.takeaway, sameSession: hasLocalEdit)
+                            storedNote = session.takeaway; noteID = session.id
+                        }
+                        .onChange(of: session.id) { note = session.takeaway; storedNote = session.takeaway; noteID = session.id }
+                        .onChange(of: session.takeaway) {
+                            // Adopt external updates only when no newer local text is waiting.
+                            if note == storedNote { note = session.takeaway }
+                            storedNote = session.takeaway
+                        }
+                        .onChange(of: note) {
+                            guard noteID == session.id else { return }
+                            storedNote = note
+                            if note != session.takeaway { model.setTakeaway(note, for: session.id) }
+                        }
                 }
                 if !session.messages.isEmpty{Divider().overlay(Theme.line)}
                 ForEach(session.messages){message in
+                    HStack(alignment: .top, spacing: 0) {
+                    if SpeakerTurn.trails(message.role) { Spacer(minLength: SpeakerTurn.leadingClearance).layoutPriority(-1) }
                     VStack(alignment:.leading,spacing:9){
-                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 11, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
-                        if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+                        MessageHeading(message: message)
+                        if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: HistoryReply.usesIntrinsicHeight) }
+                        if !message.attachments.isEmpty { MessageAttachments(model: model, session: session, records: message.attachments) }
                         if StaleWindowAnswer.applies(to: message) { Text(StaleWindowAnswer.notice).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                         if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                         if FailedAnswer.shows(failed: message.answerFailed, waiting: false) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
-                    }.padding(.vertical,5)
+                    }.layoutPriority(1).padding(.vertical,5)
+                        .padding(.leading, ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0)
+                        .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.8)).frame(width: ReplyTurn.ruleWidth) } }
+                    }
                 }
             }.padding(.horizontal,42).padding(.top,54).padding(.bottom,40)
         }.scrollIndicators(.hidden)
     }
 }
+private final class SignInWait: @unchecked Sendable {
+    private let lock = NSLock()
+    private var timedOut = false
+    func markTimedOut() { lock.lock(); timedOut = true; lock.unlock() }
+    func didTimeOut() -> Bool { lock.lock(); defer { lock.unlock() }; return timedOut }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     var embeddedInCoach = false
     @AppStorage("codexPath") private var codexPath = ""
     @AppStorage("model") private var modelName = ""
     @State private var connection = ""
+    @State private var signInToken = UUID()
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
@@ -154,19 +197,28 @@ struct SettingsView: View {
                     }.padding(.top, 15)
                 }.font(.system(size: 12))
                 Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                Text("Vale 1.2.2 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
+                Text("Vale\((Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String).map { " \($0)" } ?? "") · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
             }.padding(.horizontal, 42).padding(.top, 54).padding(.bottom, 40)
         }.scrollIndicators(.hidden)
     }
     func checkConnection() {
         guard let path = model.provider.executable else { connection = "Codex wasn’t found. Choose its path below."; return }
         connection = "Checking…"
+        let token = UUID(); signInToken = token
         let process = Process(); process.executableURL = URL(fileURLWithPath: path); process.arguments = ["login", "status"]
         let pipe = Pipe(); process.standardOutput = pipe; process.standardError = pipe
+        let wait = SignInWait()
         process.terminationHandler = { process in
             let data = pipe.fileHandleForReading.readDataToEndOfFile(); let text = String(data: data, encoding: .utf8) ?? ""
-            DispatchQueue.main.async { connection = process.terminationStatus == 0 ? (text.contains("ChatGPT") ? "Signed in with ChatGPT." : "Codex is signed in.") : "Not signed in. Run codex login in Terminal." }
+            let message = SignInCheck.result(status: process.terminationStatus, output: text, timedOut: wait.didTimeOut())
+            DispatchQueue.main.async { if signInToken == token { connection = message } }
         }
-        do { try process.run() } catch { connection = "Couldn’t launch Codex. Check the executable path." }
+        do { try process.run() } catch { connection = "Couldn’t launch Codex. Check the executable path."; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + SignInCheck.limit) {
+            guard signInToken == token, process.isRunning else { return }
+            wait.markTimedOut()
+            connection = SignInCheck.result(status: 0, output: "", timedOut: true)
+            process.terminate()
+        }
     }
 }

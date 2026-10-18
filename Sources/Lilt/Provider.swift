@@ -70,11 +70,6 @@ private final class SearchEventProbe: @unchecked Sendable {
             else { finish(nil) }
         }
     }
-    var resources: URL {
-        let bundled = Bundle.main.resourceURL!
-        if FileManager.default.fileExists(atPath: bundled.appendingPathComponent("tutor.md").path) { return bundled }
-        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Resources")
-    }
     func ask(prompt: String, images: [Data] = [], search: Bool = false, completion: @escaping (Result<TutorReply, Error>) -> Void) {
         cancel()
         usedWebSearch=false
@@ -99,6 +94,9 @@ private final class SearchEventProbe: @unchecked Sendable {
     }
     private func begin(prompt: String, images: [Data], search: Bool, completion: @escaping (Result<TutorReply, Error>) -> Void) {
         guard let executable else { reportMissingCodex(completion); return }
+        guard let resources=InstructionFile.directory(bundleResources:Bundle.main.resourceURL,workingDirectory:URL(fileURLWithPath:FileManager.default.currentDirectoryPath,isDirectory:true)) else{
+            completion(.failure(AppError("The assistant’s instructions are missing, so there’s no answer yet. Reinstall Vale and try again.")));return
+        }
         self.completion = completion
         do {
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("lilt-\(UUID().uuidString)")
@@ -110,8 +108,7 @@ private final class SearchEventProbe: @unchecked Sendable {
             for option in ["approval_policy=\"never\"", "forced_login_method=\"chatgpt\"", "model_reasoning_effort=\"low\"", "features.shell_tool=false", "features.unified_exec=false", "features.apps=false", "features.plugins=false", "features.browser_use=false", "features.computer_use=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false", "features.image_generation=false", "features.skill_search=false", "features.skip_host_skill_discovery=true", "features.code_mode_host=false", "features.view_image=false", "features.shell_snapshot=false"] { args += ["-c", option] }
             args += ["-c", "web_search=\"\(search ? "live" : "disabled")\"", "-c", "features.standalone_web_search=\(search)", "-c", "features.code_mode_host=\(RequestTools.allowsCodeExecution(webSearch: search))"]
             args += ["-c", "model_instructions_file=\"\(resources.appendingPathComponent("tutor.md").path)\""]
-            let model = UserDefaults.standard.string(forKey: "model") ?? ""
-            if !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { args += ["-m", model] }
+            if let model=ModelChoice.argument(UserDefaults.standard.string(forKey:"model") ?? ""){args += ["-m",model]}
             args += ["--output-schema", resources.appendingPathComponent("reply.schema.json").path, "-o", output.path]
             for (index,image) in images.enumerated() { let file = work.appendingPathComponent("context-\(index).png"); try image.write(to:file); args += ["--image",file.path] }
             args += ["-"]
@@ -128,8 +125,8 @@ private final class SearchEventProbe: @unchecked Sendable {
             err.fileHandleForReading.readabilityHandler = { handle in _ = handle.availableData }
             self.process = process; self.completion = completion
             process.terminationHandler = { [weak self, weak process] finished in
-                out.fileHandleForReading.readabilityHandler = nil; err.fileHandleForReading.readabilityHandler = nil
                 DispatchQueue.main.async {
+                    out.fileHandleForReading.readabilityHandler = nil; err.fileHandleForReading.readabilityHandler = nil
                     guard let self, let process, self.process === process else { return }
                     self.usedWebSearch=searchEvents.usedSearch
                     if let reply = FinishedReply.decoded(try? Data(contentsOf: output)) { self.finish(.success(reply)) }
@@ -138,8 +135,16 @@ private final class SearchEventProbe: @unchecked Sendable {
                 }
             }
             try process.run()
-            DispatchQueue.global(qos: .userInitiated).async {
-                try? input.fileHandleForWriting.write(contentsOf: Data(prompt.utf8)); try? input.fileHandleForWriting.close()
+            let bytes=Data(prompt.utf8)
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                do{try input.fileHandleForWriting.write(contentsOf:bytes);try input.fileHandleForWriting.close()}
+                catch{
+                    try? input.fileHandleForWriting.close()
+                    DispatchQueue.main.async{
+                        guard let self,self.process === process else{return}
+                        process.terminate();self.finish(.failure(AppError("Your question couldn’t be sent completely. It is saved; try again.")))
+                    }
+                }
             }
             let timeout = DispatchWorkItem { [weak self] in
                 guard let self, self.process === process else { return }
@@ -151,6 +156,7 @@ private final class SearchEventProbe: @unchecked Sendable {
     func ask(prompt: String, image: Data?, completion: @escaping (Result<TutorReply, Error>) -> Void) { ask(prompt:prompt,images:image.map { [$0] } ?? [],completion:completion) }
     func cancel() {
         timeout?.cancel(); timeout = nil
+        deferredAsk=nil
         let old = process; process = nil; completion = nil
         if old?.isRunning == true { old?.terminate() }
         cleanup()

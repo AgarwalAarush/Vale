@@ -25,9 +25,15 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var settings = false
     @Published var settingsInCoach = false
     @Published var coachOpen = false
+    @Published var composerFocus = 0
+    var commitComposer: (() -> Void)?
     var sentAt = Date.distantPast
     @Published var onboarding = false // Kept for old preference compatibility; no setup gate.
-    @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet { UserDefaults.standard.set(readAloud, forKey: "readAloud"); if !readAloud && !conversation { voice.stopSpeaking() } } }
+    @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet {
+        UserDefaults.standard.set(readAloud, forKey: "readAloud")
+        if let text = ReadAloud.replyToSpeak(messages: active?.messages ?? [], enabled: readAloud, alreadySpeaking: voice.speaking) { voice.speak(text) }
+        else if !readAloud && !conversation { voice.stopSpeaking() }
+    } }
     let context = WindowContext()
     let voice = VoiceController()
     let provider = TutorProvider()
@@ -44,6 +50,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var failedQuestion: String?
     private var guideEpoch = UUID()
     private var spokenDraftPrefix = ""
+    private var spokenReplyGeneration = UUID()
     private var conversationTask:Task<Void,Never>?
     @Published var shortcutWarning:String?
     var showCoach: (() -> Void)?
@@ -62,6 +69,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var contextName: String? { context.title }
     var pendingFiles: [AttachmentRecord] { active?.pendingAttachments ?? [] }
     var hasInput: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty }
+    var canRetry: Bool { ReplyRetry.isAvailable(busy: busy, hasFailedQuestion: failedQuestion != nil, lastRole: active?.messages.last?.role) }
     var status: String {
         let line = FooterStatus.line(paused: paused, importing: importing, microphoneStarting: voice.starting, listening: voice.listening, waiting: busy, speaking: voice.speaking, conversation: conversation)
         if line == "Voice off" { return CompanionStatus(canSend: hasInput && active != nil).line }
@@ -100,7 +108,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func showError(_ message: String, settings: Bool = false) { settingsForNextError = settings; error = message }
     func prepareChat() {
         guard active == nil else { showCoach?(); return }
-        if let recent=LaunchSelection.resumeID(in: sessions) { resume(recent.id) }
+        if let recent=LaunchSelection.resumeID(in: sessions) { resume(recent) }
         else { newSession() }
     }
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
@@ -138,12 +146,14 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func togglePause() {if paused {paused=false; lastTick=Date(); error=nil} else{tick();suspend()};persist()}
     func suspend() {paused=true;conversation=false;conversationTask?.cancel();voice.stop();cancel();context.stop();hideOverlay?();persist()}
     func complete() {
-        tick();updateActive{$0.completed=true};suspend();selectedID=activeID;activeID=nil
+        tick();updateActive{$0=LaunchSelection.chatAfterClose($0)};suspend();selectedID=activeID;activeID=nil
         loading=true;draft="";loading=false;persist();showLibrary?()
     }
     func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
     func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false,preserveDraft:Bool=false) {
+        if override == nil && !spoken { commitComposer?() }
         guard var chat=active else{return}
+        let composerBeforeSend = draft
         let raw = override ?? draft
         let kept = OutgoingMessage.text(raw)
         let hasFiles = !chat.pendingAttachments.isEmpty
@@ -156,15 +166,33 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard question.count<=32_000 else{error="That message is too long. Attach it as a text file or send a smaller excerpt.";return}
         cancel();voice.stopListening();error=nil;busy=true;sentAt=Date()
         let id=UUID();requestID=id;let chatID=chat.id
+        let previousTitle = chat.title
         if !retry {
+            let naming = stored.isEmpty ? (chat.pendingAttachments.first?.name ?? "") : stored
             chat.messages.append(Message(role:"user",text:stored,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
-            if chat.title == "New chat", !stored.isEmpty { let heading = ChatHeading.from(stored); if !heading.isEmpty { chat.title = heading } }
+            if chat.title == "New chat", !naming.isEmpty { let heading = ChatHeading.from(naming); if !heading.isEmpty { chat.title = heading } }
             replace(chat);if !CommandPrompt.keepsComposerDraft(sendsOwnPrompt:preserveDraft){draft=""}
+        } else if let index = chat.messages.indices.last, chat.messages[index].role == "user" {
+            chat.messages[index].answerFailed = false; chat.messages[index].replyStopped = false; replace(chat)
         }
-        failedQuestion=question;persist()
+        guard persist() else {
+            busy = false
+            if !retry {
+                let restored = SendSave.restore(previousTitle: previousTitle, messages: active?.messages ?? [], pending: active?.pendingAttachments ?? [], question: stored, draft: composerBeforeSend)
+                updateActive { $0.title = restored.title; $0.messages = restored.messages; $0.pendingAttachments = restored.pending; $0.draft = restored.draft }
+                loading = true; draft = restored.draft; loading = false
+            }
+            return
+        }
+        failedQuestion=question
+        if ComposerFocus.returns(afterSending: override == nil && !spoken && !pointing && !reveal && !guideRequested) { composerFocus += 1 }
         var history=chat
         if history.messages.last?.role=="user", history.messages.last?.text==stored { history.messages.removeLast() }
-        let records=chat.files;let files=fileStore;let wantsSearch=chat.webEnabled
+        let newest = (chat.messages.last { $0.role == "user" }?.attachments ?? []).map(\.id) + chat.pendingAttachments.map(\.id)
+        let records=FileBudget.ordered(chat.files, newest: newest);let files=fileStore;let wantsSearch=chat.webEnabled
+        let wantsGuide = guideRequested || GuideRequest.explicit(question)
+        let startedGuide = guideEpoch
+        let requestedSpeechGeneration = spokenReplyGeneration
         captureTask=Task { [weak self] in
             guard let self else{return}
             var handedOff=false
@@ -176,18 +204,18 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             }
             var snapshot:ContextSnapshot?
             do {
-                if self.context.hasSelection {snapshot=try await self.context.capture()}
+                if self.context.hasSelection {snapshot=try await self.context.captureForQuestion()}
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
-                let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records) ?? FileContext()}.value
+                let leadingImages = snapshot == nil ? 0 : 1
+                let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records, leadingImages: leadingImages) ?? FileContext()}.value
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
                 var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
                 if QuestionPreview.shouldCloseOpenedPreview(questionWasSent: true) { self.closePreview?() }
-                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:guideRequested)
+                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:wantsGuide)
                 handedOff=true
                 self.provider.ask(prompt:prompt,images:images,search:wantsSearch) { [weak self] result in
-                    guard let self,self.requestID==id,self.activeID==chatID else{return}
-                    Task{[weak self]in
-                        guard let self,self.requestID==id,self.activeID==chatID else{return}
+                    Task { @MainActor [weak self] in
+                        guard let self, ReplyDelivery.shouldApply(request: id, current: self.requestID, chat: chatID, active: self.activeID) else{return}
                         switch result{
                         case .success(let reply):
                             guard self.requestID==id,self.activeID==chatID else{return}
@@ -199,22 +227,25 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             self.persist()
                             var fresh:ContextSnapshot?
                             if snapshot != nil,self.context.hasSelection{fresh=try? await self.context.capture()}
+                            guard ReplyDelivery.shouldApply(request: id, current: self.requestID, chat: chatID, active: self.activeID) else { return }
                             let matches: Bool? = snapshot == nil ? nil : fresh.map { snapshot!.evidence.reflectsSameView($0.evidence) }
                             let changed = WindowCheck.changed(matches: matches)
                             let checked=shown.withWindowChanged(changed)
                             let canPoint:Bool
                             if let point=reply.point,let snapshot,let fresh,let frame=snapshot.frame,!changed{canPoint=snapshot.evidence.matches(fresh.evidence) && self.context.pointIsVisible(point,frame:frame,windowID:snapshot.windowID)}else{canPoint=false}
+                            let installGuide = GuideInstall.shouldInstall(requested: wantsGuide, windowChanged: changed, stillCurrent: self.guideEpoch == startedGuide)
                             self.updateChat(chatID){chat in
                                 guard let index=chat.messages.firstIndex(where:{$0.id==answerID}) else{return}
                                 chat.messages[index].text=checked.text
                                 chat.messages[index].screenChanged=checked.windowChanged
                                 chat.messages[index].highlightUnavailable = WindowCheck.highlightUnavailable(askedToPoint: reply.point != nil, compared: fresh != nil, changed: changed, canPoint: canPoint)
-                                if let plan=reply.guide,guideRequested,!changed{chat.guide=GuideProgress(plan:plan)}
+                                if let plan=reply.guide,installGuide{chat.guide=GuideProgress(plan:plan)}
                             }
                             guard self.requestID==id,self.activeID==chatID else{self.persist();return}
-                            if guideRequested,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
-                            if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(checked.text)}
-                            else if changed,(self.readAloud || spoken || self.conversation){self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
+                            if installGuide,reply.guide != nil,!self.expanded{self.expandCoach?()}
+                            let shouldSpeak = self.readAloud || self.conversation || (spoken && self.spokenReplyGeneration == requestedSpeechGeneration)
+                            if !changed,shouldSpeak{self.voice.speak(checked.text)}
+                            else if changed,shouldSpeak{self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
                             if canPoint,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
                             self.persist()
@@ -247,8 +278,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func setConversation(_ enabled:Bool){
         conversationTask?.cancel();conversation=enabled
-        if enabled{guard !paused,active != nil else{conversation=false;return};cancel();spokenDraftPrefix=draft.isEmpty ? "" : draft+" ";voice.start()}
-        else{voice.stop();cancel()}
+        if !enabled { spokenReplyGeneration=UUID();voice.stop(); return }
+        guard !paused,active != nil else{conversation=false;return}
+        guard ConversationOptIn.startsListeningNow(busy: busy, speaking: voice.speaking) else { return }
+        cancel();spokenDraftPrefix=draft.isEmpty ? "" : draft+" ";voice.start()
     }
     private func listenForNextTurn(){
         conversationTask?.cancel();guard conversation,!paused,active != nil else{return}
@@ -259,7 +292,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             self.spokenDraftPrefix=self.draft.isEmpty ? "" : self.draft+" ";self.voice.start()
         }
     }
-    func editDraft(_ text:String){conversation=false;conversationTask?.cancel();if voice.listening || voice.starting{voice.stopListening()};draft=text}
+    func editDraft(_ text:String){guard DraftEcho.isTyping(text, stored:draft) else{return};if conversation{spokenReplyGeneration=UUID()};conversation=false;conversationTask?.cancel();if voice.listening || voice.starting{voice.stopListening()};draft=text}
+    func stopIfSeparate() { if SendGesture.stops(elapsed: Date().timeIntervalSince(sentAt)) { stopResponse() } }
     func stopResponse(){
         let waiting = busy
         conversation=false; conversationTask?.cancel(); voice.stop(); cancel()
@@ -281,19 +315,17 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func moveGuide(_ delta:Int){
         guard let guide=active?.guide,!busy,!paused else{return}
-        let index=max(0,min(guide.plan.steps.count-1,guide.index+delta));updateActive{$0.guide?.index=index};persist()
-        send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true)
+        guard !importing else { error="Wait for your files to finish attaching."; return }
+        let requested=max(0,min(guide.plan.steps.count-1,guide.index+delta))
+        let index=GuideStep.indexToSave(current:guide.index,requested:requested,questionStarts:true);updateActive{$0.guide?.index=index};persist()
+        send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true,preserveDraft:true)
     }
-    func endGuide(){updateActive{$0.guide=nil};persist()}
-    func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true)}
+    func endGuide(){guideEpoch=UUID();updateActive{$0.guide=nil};persist()}
+    func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,pointing:PointRequest.wasPointing(question),retry:true)}
     func stopSharing(){context.stop()}
     func previewContext(){
-        let chatID=activeID;let generation=context.generation
-        Task{[weak self]in
-            guard let self else{return}
-            do{let snapshot=try await self.context.capture();guard self.activeID==chatID,self.context.generation==generation else{return};self.showPreview?(snapshot.image)}
-            catch{guard self.activeID==chatID,self.context.generation==generation else{return};self.error="That window couldn’t be captured. Choose it again."}
-        }
+        guard HeldPreview.canShow(held: context.preview != nil), let image=context.preview else { return }
+        showPreview?(image)
     }
     func attachFiles(){
         if active == nil {prepareChat()}
@@ -302,26 +334,53 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard panel.runModal() == .OK else{return};let urls=panel.urls
         Task{await importFiles(urls)}
     }
+    func importDroppedFiles(_ urls: [URL]) {
+        if let text = DroppedLink.text(from: urls) { editDraft(draft.isEmpty ? text : draft + "\n" + text) }
+        let held = urls.filter { ScopedRead.needsAccess(isFileURL: $0.isFileURL) && $0.startAccessingSecurityScopedResource() }
+        Task {
+            defer { for url in held { url.stopAccessingSecurityScopedResource() } }
+            if urls.contains(where: \.isFileURL) { await importFiles(urls) }
+        }
+    }
     func importFiles(_ urls:[URL]) async {
         if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: activeID != nil, importing: importing) { error = refusal; return }
         guard let chatID=activeID,let files=fileStore else{return}
         let valid=urls.filter(\.isFileURL)
-        guard (active?.files.count ?? 0)+valid.count<=8 else{error="Attach up to 8 files in a chat. Remove a file or start a new chat.";return}
+        let existing = active?.files.count ?? 0
+        guard existing+valid.count<=8 else{error="Attach up to 8 files in a chat. Remove a file or start a new chat.";return}
         importing=true;defer{importing=false}
-        let outcomes=await Task.detached(priority:.userInitiated){valid.map{url -> ImportOutcome in do{return ImportOutcome(record:try files.importFile(url))}catch{return ImportOutcome(error:"\(url.lastPathComponent): \(error.localizedDescription)")}}}.value
+        let extraRoom = 8-existing-valid.count
+        let outcomes=await Task.detached(priority:.userInitiated){ () -> [ImportOutcome] in
+            var room = extraRoom; var outcomes: [ImportOutcome] = []
+            for url in valid {
+                do {
+                    let records = try files.importDroppedFile(url, extraRoom: room)
+                    room -= max(0, records.count-1)
+                    outcomes += records.map { ImportOutcome(record: $0) }
+                } catch { outcomes.append(ImportOutcome(error: "\(url.lastPathComponent): \(error.localizedDescription)")) }
+            }
+            return outcomes
+        }.value
         guard let index=sessions.firstIndex(where:{$0.id==chatID}) else{
             var retained:[AttachmentRecord]=[]
             for item in outcomes{if let record=item.record{do{try files.remove(record)}catch{retained.append(record)}}}
             if !retained.isEmpty{var recovery=LearningSession(title:"Files awaiting removal");recovery.pendingAttachments=retained;sessions.insert(recovery,at:0);persist();error="Some imported files couldn’t be removed. They were kept in Files awaiting removal so you can retry Forget."};return
         }
         sessions[index].pendingAttachments+=outcomes.compactMap(\.record);sessions[index].updated=Date()
-        if let failure=outcomes.compactMap(\.error).first{error=failure}
+        if let failure=ImportReport.summary(outcomes.compactMap(\.error)){error=failure}
         persist()
     }
     func pasteImage(_ data:Data){
-        guard let files=fileStore,active != nil else{return}
+        if let refusal=AttachmentRefusal.message(libraryAvailable:fileStore != nil,hasChat:active != nil,importing:importing){error=refusal;return}
+        guard let files=fileStore else{return}
         guard (active?.files.count ?? 0)<8 else{error="Attach up to 8 files in a chat.";return}
         do{let record=try files.importData(data,name:"Pasted image.png",fileExtension:"png");updateActive{$0.pendingAttachments.append(record)};persist()}catch{self.error=error.localizedDescription}
+    }
+    func pastePDF(_ data: Data) {
+        if let refusal=AttachmentRefusal.message(libraryAvailable:fileStore != nil,hasChat:active != nil,importing:importing){error=refusal;return}
+        guard let files=fileStore else{return}
+        guard (active?.files.count ?? 0)<8 else{error="Attach up to 8 files in a chat.";return}
+        do{let record=try files.importData(data,name:"Pasted.pdf",fileExtension:"pdf");updateActive{$0.pendingAttachments.append(record)};persist()}catch{self.error=error.localizedDescription}
     }
     private func removeReferences(_ ids:Set<UUID>,from id:UUID){
         guard let index=sessions.firstIndex(where:{$0.id==id}) else{return}
@@ -329,7 +388,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         for i in sessions[index].messages.indices{sessions[index].messages[i].attachments.removeAll{ids.contains($0.id)}}
     }
     func removeFile(_ record:AttachmentRecord){
-        guard let chatID=activeID else{return}
+        guard let chatID=activeID, let chat=active, SentFile.canRemove(id: record.id, session: chat) else{return}
         let unsent = active?.pendingAttachments.contains { $0.id == record.id } == true
         if UnsentRemoval.stopsTheReply(waiting: busy, unsent: unsent) { cancel() }
         do{
@@ -337,7 +396,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             removeReferences([record.id],from:chatID);filesRemoved?([record.id]);persist()
         }catch{self.error="Couldn’t remove \(record.name). It is still attached; try removing it again."}
     }
-    func rename(_ id:UUID,to title:String){let cleaned=title.trimmingCharacters(in:.whitespacesAndNewlines);guard !cleaned.isEmpty,let index=sessions.firstIndex(where:{$0.id==id})else{return};sessions[index].title=String(cleaned.prefix(100));persist()}
+    func rename(_ id:UUID,to title:String){guard let cleaned=ChatTitle.saved(title),let index=sessions.firstIndex(where:{$0.id==id})else{return};sessions[index].title=cleaned;persist()}
     func setTakeaway(_ text:String,for id:UUID){if let i=sessions.firstIndex(where:{$0.id==id}){sessions[i].takeaway=text;scheduleSave()}}
     @Published var deletionToRetry:UUID?
     func delete(_ id:UUID){
@@ -365,7 +424,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let current = ExportedChat.latest(id: chat.id, in: sessions, shown: chat)
         let panel=NSSavePanel();panel.allowedContentTypes=[UTType(filenameExtension:"md") ?? .plainText];panel.nameFieldStringValue=ExportFile.suggestedName(for: current.title)
         guard panel.runModal() == .OK,let url=panel.url else{return}
-        do{try SessionStore.export(current).write(to:url,atomically:true,encoding:.utf8)}catch{self.error="Couldn’t export your chat."}
+        do{try SessionStore.export(ExportedChat.latest(id: chat.id, in: sessions, shown: chat)).write(to:url,atomically:true,encoding:.utf8)}catch{self.error="Couldn’t export your chat."}
     }
     func updateActive(_ change:(inout LearningSession)->Void){guard let i=sessions.firstIndex(where:{$0.id==activeID})else{return};change(&sessions[i])}
     func updateChat(_ id: UUID, _ change: (inout LearningSession) -> Void) {
@@ -381,5 +440,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     private func replace(_ chat:LearningSession){if let i=sessions.firstIndex(where:{$0.id==chat.id}){sessions[i]=chat}}
     private func scheduleSave(){saveWork?.cancel();let work=DispatchWorkItem{[weak self]in self?.persist()};saveWork=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.5,execute:work)}
-    func persist(){do{sessions.sort{$0.updated>$1.updated};try store?.save(sessions)}catch{self.error="Couldn’t save your chat. Check available disk space."}}
+    @discardableResult func persist()->Bool {
+        guard let store else { error="The chat library is unavailable. Restore the library folder before starting."; return false }
+        do{sessions.sort{$0.updated>$1.updated};try store.save(sessions);return true}
+        catch{self.error="Couldn’t save your chat. Check available disk space.";return false}
+    }
 }

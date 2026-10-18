@@ -27,7 +27,7 @@ import LiltCore
     var failed:((String)->Void)?
     var playbackFinished:(()->Void)?
     var playbackInterrupted:(()->Void)?
-    var language:String{let value=UserDefaults.standard.string(forKey:"speechLocale") ?? "";return value.isEmpty ? Locale.current.identifier : value}
+    var language:String{SpeechLocale.identifier(preferred:UserDefaults.standard.string(forKey:"speechLocale") ?? "",current:Locale.current.identifier)}
     var silenceSeconds:Double{let value=UserDefaults.standard.double(forKey:"speechPause");return value==0 ? 2.2 : max(1.2,min(4,value))}
     override init(){super.init();synth.delegate=self}
     func start(){
@@ -53,10 +53,15 @@ import LiltCore
         self.recognizer=recognizer
         let request=SFSpeechAudioBufferRecognitionRequest();request.shouldReportPartialResults=true;request.requiresOnDeviceRecognition=recognizer.supportsOnDeviceRecognition
         self.request=request;finalText="";let id=UUID();generation=id
-        let node=engine.inputNode;let format=node.outputFormat(forBus:0)
-        guard format.sampleRate>0,format.channelCount>0 else{failed?("No microphone is available. You can still type.");return}
+        let node=engine.inputNode
+        engine.prepare()
+        let format=node.outputFormat(forBus:0)
+        guard MicFormat.canUse(sampleRate:format.sampleRate,channels:Int(format.channelCount)) else{stopListening();failed?("No microphone is available. You can still type.");return}
         intake.allow()
         node.installTap(onBus:0,bufferSize:1024,format:format){[intake] buffer,_ in guard intake.isAccepting else{return};request.append(buffer)};hasTap=true
+        do{try engine.start()}catch{stopListening();failed?("Couldn’t start the microphone. You can still type.");return}
+        guard RecognitionStart.canListen(engineRunning:engine.isRunning) else{stopListening();failed?("Couldn’t start the microphone. You can still type.");return}
+        listening=true
         recognition=recognizer.recognitionTask(with:request){result,error in DispatchQueue.main.async{
             guard self.generation==id,self.listening else{return}
             if let result{
@@ -66,7 +71,6 @@ import LiltCore
                 if result.isFinal{self.finishUtterance()}
             }else if error != nil{self.stopListening();self.failed?("Dictation stopped. Your draft is preserved; send it or try again.")}
         }}
-        do{engine.prepare();try engine.start();listening=true}catch{stopListening();failed?("Couldn’t start the microphone. You can still type.")}
     }
     func finishUtterance(){
         guard listening else{return};let text=finalText.trimmingCharacters(in:.whitespacesAndNewlines);stopListening()
@@ -74,15 +78,18 @@ import LiltCore
     }
     func stopListening(){
         generation=UUID();silence?.cancel();silence=nil;starting=false
+        intake.stop()
         if engine.isRunning{engine.stop()};if hasTap{engine.inputNode.removeTap(onBus:0);hasTap=false}
         request?.endAudio();recognition?.cancel();recognition=nil;request=nil;recognizer=nil;listening=false
     }
     func speak(_ text:String){
+        let spoken=SpokenReply.text(from:text)
+        guard !spoken.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return}
         stopListening();stopSpeaking();playbackGeneration=UUID();spokenText=text;speaking=true
         if fixtures{return}
-        let spoken=text.replacingOccurrences(of:#"\[([^\]]+)\]\([^\)]+\)"#,with:"$1",options:.regularExpression).replacingOccurrences(of:"`",with:"").replacingOccurrences(of:"**",with:"")
         let utterance=AVSpeechUtterance(string:spoken);let selected=UserDefaults.standard.string(forKey:"speechVoice") ?? ""
         utterance.voice=AVSpeechSynthesisVoice(identifier:selected) ?? AVSpeechSynthesisVoice(language:language)
+        guard utterance.voice != nil else{spokenText=nil;speaking=false;return}
         let rate=UserDefaults.standard.double(forKey:"speechRate");utterance.rate=Float(rate==0 ? 0.49 : max(0.35,min(0.6,rate)))
         activeUtterance=utterance;synth.speak(utterance)
     }

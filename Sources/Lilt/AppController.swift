@@ -102,21 +102,26 @@ final class FloatingPanel: NSPanel {
         return panel
     }
     func openCoach() {
-        guard model.active != nil else { model.prepareChat(); return }
+        if model.active == nil, model.error == nil { model.prepareChat(); return }
+        guard LaunchPresentation.presentsCoach(hasActiveChat: model.active != nil, hasError: model.error != nil) else { return }
         model.coachOpen=true
         library?.orderOut(nil)
         seatCapsule()
         capsule.orderFrontRegardless(); coach.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self, let root = self.coach.contentView else { return }
-            func editor(_ view: NSView) -> NSView? {
-                if view.identifier?.rawValue == "lilt.composer" { return view }
-                for child in view.subviews { if let result = editor(child) { return result } }; return nil
-            }
-            if let input = editor(root) { self.coach.makeFirstResponder(input) }
-        }
+        focusComposer(attemptsLeft: ComposerFocus.attempts)
     }
-    func openLibrary() { model.coachOpen = false; coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
+    private func focusComposer(attemptsLeft: Int) {
+        guard let root = coach?.contentView else { return }
+        func editor(_ view: NSView) -> NSView? {
+            if view.identifier?.rawValue == "lilt.composer" { return view }
+            for child in view.subviews { if let found = editor(child) { return found } }
+            return nil
+        }
+        if let input = editor(root) { coach.makeFirstResponder(input); return }
+        guard ComposerFocus.shouldRetry(found: false, attemptsLeft: attemptsLeft) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now()+0.05) { [weak self] in self?.focusComposer(attemptsLeft: attemptsLeft-1) }
+    }
+    func openLibrary() { bringLibraryOnScreen(); model.coachOpen = false; coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     private func toggleCoachSize(){
         model.expanded.toggle();let visible=NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
         let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
@@ -186,14 +191,17 @@ final class FloatingPanel: NSPanel {
     func point(_ point: PointTarget, snapshot: ContextSnapshot) {
         clearAnnotation()
         guard point.isValid, let bounds = snapshot.frame, snapshot.generation == model.context.generation,model.context.pointIsVisible(point,frame:bounds,windowID:snapshot.windowID) else { return }
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? 900
-        let frame = NSRect(x: bounds.minX + CGFloat(point.x) * bounds.width - 6, y: primaryHeight - bounds.minY - CGFloat(point.y + point.height) * bounds.height - 6, width: CGFloat(point.width) * bounds.width + 12, height: CGFloat(point.height) * bounds.height + 12)
+        let frames=NSScreen.screens.map{DisplayFrame(x:$0.frame.origin.x,y:$0.frame.origin.y,width:$0.frame.width,height:$0.frame.height)}
+        let primaryHeight=HighlightPlacement.primaryHeight(frames) ?? NSScreen.screens.first?.frame.height ?? 900
+        let itemTop=bounds.minY+CGFloat(point.y)*bounds.height
+        let itemHeight=CGFloat(point.height)*bounds.height
+        let frame = NSRect(x: bounds.minX + CGFloat(point.x) * bounds.width - 6, y: HighlightPlacement.appKitOriginY(cgMinY:itemTop,cgHeight:itemHeight,primaryHeight:primaryHeight) - 6, width: CGFloat(point.width) * bounds.width + 12, height: CGFloat(point.height) * bounds.height + 12)
         let window = NSWindow(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.backgroundColor = .clear; window.isOpaque = false; window.hasShadow = false; window.ignoresMouseEvents = true; window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]; window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: RoundedRectangle(cornerRadius: 7).stroke(Theme.accent, lineWidth: 2).padding(4).background(Theme.accent.opacity(0.06)).accessibilityLabel(point.label))
         annotation = window; window.orderFrontRegardless()
-        let created = Date(); let expectedGeneration = snapshot.generation; let expectedFrame = snapshot.frame; let expectedData = snapshot.data
+        let created = Date(); let expectedGeneration = snapshot.generation; let expectedFrame = snapshot.frame
         var checkingFrame = false
         annotationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -206,7 +214,9 @@ final class FloatingPanel: NSPanel {
                         guard let self, let window, self.annotation === window else { return }
                         let fresh = try? await self.model.context.capture()
                         guard self.annotation === window else { return }
-                        if fresh?.data != expectedData { self.clearAnnotation() }
+                        let unchanged = fresh.map { snapshot.evidence.reflectsSameView($0.evidence) } ?? false
+                        let visible = self.model.context.pointIsVisible(point, frame: bounds, windowID: snapshot.windowID, ignoring: CGWindowID(window.windowNumber))
+                        if PointHighlight.shouldClear(windowUnchanged: unchanged, visible: visible) { self.clearAnnotation() }
                     }
                 }
             }
@@ -214,18 +224,26 @@ final class FloatingPanel: NSPanel {
     }
     func clearAnnotation() { annotationTimer?.invalidate(); annotationTimer = nil; annotation?.orderOut(nil); annotation = nil }
     private func preview(_ image: NSImage) {
+        closeOldestScreenPreviewIfNeeded(addingFile: false)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 520), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Shared context preview"; window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .darkAqua); window.backgroundColor = Theme.windowBackground
         let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self;contextPreviews.append(window)
         window.center(); auxiliary.append(window); window.makeKeyAndOrderFront(nil)
-        if auxiliary.count > 3 { auxiliary.removeFirst().close() }
     }
     private func previewFile(_ record:AttachmentRecord) {
         guard let files=model.fileStore else{return}
         let window=NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:550),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
-        window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua)
+        closeOldestScreenPreviewIfNeeded(addingFile: true)
+        window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua);window.backgroundColor=Theme.windowBackground
         let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550));window.center()
-        auxiliary.append(window);window.makeKeyAndOrderFront(nil);if auxiliary.count>3{auxiliary.removeFirst().close()}
+        let visible=coach.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
+        let origin=FilePreviewPlace.origin(screenX:visible.minX,screenY:visible.minY,screenWidth:visible.width,screenHeight:visible.height,previewWidth:800,previewHeight:550,coachX:coach.frame.minX,coachWidth:coach.frame.width)
+        window.setFrameOrigin(NSPoint(x:origin.x,y:origin.y))
+        auxiliary.append(window);window.makeKeyAndOrderFront(nil)
+    }
+    private func closeOldestScreenPreviewIfNeeded(addingFile: Bool) {
+        let kinds=auxiliary.map { window in contextPreviews.contains { $0 === window } ? PreviewRoom.Kind.screen : .file }
+        if let index=PreviewRoom.indexToClose(existing:kinds,adding:addingFile ? .file : .screen) { auxiliary[index].close() }
     }
     func windowWillClose(_ notification:Notification){
         guard let window=notification.object as? NSWindow else{return}
@@ -263,7 +281,7 @@ final class FloatingPanel: NSPanel {
         openCoach()
     }
     @objc private func menuCoach() { openCoach() }
-    @objc private func menuLibrary() { openLibrary() }
+    @objc private func menuLibrary() { model.showHistory() }
     @objc private func menuPause() { if model.active != nil { model.togglePause() } }
     @objc private func menuSettings() { model.settings = true; openLibrary() }
     @objc private func menuQuit() { NSApp.terminate(nil) }

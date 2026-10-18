@@ -83,13 +83,15 @@ struct ContextSnapshot {
         SCContentSharingPicker.shared.isActive=false;changed?()
     }
     nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didCancelFor stream:SCStream?){DispatchQueue.main.async{self.requestedLive=false}}
-    nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){DispatchQueue.main.async{self.stop();self.failed?("Couldn’t open window sharing. Keep typing or attach an image.")}}
+    nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){DispatchQueue.main.async{self.requestedLive=false;self.failed?(SharingPicker.failureMessage(keeping:self.sharedSelection))}}
     nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didUpdateWith filter:SCContentFilter,for stream:SCStream?){
         DispatchQueue.main.async{
+            let wantsLive=self.requestedLive
+            self.stopLive();self.inFlight?.cancel();self.inFlight=nil;self.captureID=UUID();self.capturing=false
             self.filter=filter;self.generation=UUID();self.latest=nil;self.lastCapture=nil
-            if #available(macOS 15.2,*),let window=filter.includedWindows.first{self.windowID=window.windowID;self.title="\(window.owningApplication?.applicationName ?? "Selected") window"}
+            if #available(macOS 15.2,*),let window=filter.includedWindows.first{self.windowID=window.windowID;self.title=SharedWindowLabel.text(windowTitle:window.title,applicationName:window.owningApplication?.applicationName)}
             else{self.windowID=nil;self.title="Selected window"}
-            self.changed?();if self.requestedLive{self.requestedLive=false;self.startLive()}
+            self.requestedLive=false;self.changed?();if wantsLive{self.startLive()}
         }
     }
     func capture()async throws->ContextSnapshot{
@@ -106,7 +108,7 @@ struct ContextSnapshot {
                 guard let filter else{throw AppError("Choose a window to share first.")}
                 let rect=filter.contentRect;guard rect.width>1,rect.height>1 else{throw AppError("The selected window is unavailable.")}
                 let config=SCStreamConfiguration();let scale=min(2.0,1600.0/max(rect.width,rect.height))
-                config.width=max(2,Int(rect.width*scale));config.height=max(2,Int(rect.height*scale));config.showsCursor=false;config.ignoreShadowsSingleWindow=true
+                config.width=CaptureSize.even(rect.width*scale);config.height=CaptureSize.even(rect.height*scale);config.showsCursor=false;config.ignoreShadowsSingleWindow=true
                 let image=try await SCScreenshotManager.captureImage(contentFilter:filter,configuration:config)
                 guard let data=windowPNG(image) else{throw AppError("Couldn’t read the selected window.")}
                 let shown=NSImage(data:data) ?? NSImage(cgImage:image,size:NSSize(width:image.width,height:image.height))
@@ -124,6 +126,17 @@ struct ContextSnapshot {
         if fixtureSource != nil{fixtureFrame=result.frame}
         return result
     }
+    func captureForQuestion()async throws->ContextSnapshot{
+        var waits=0
+        while let existing=inFlight,!RequestCapture.useFrame(joinedExisting:true,waitsSoFar:waits){
+            let token=captureID
+            _ = try? await existing.value
+            try Task.checkCancellation()
+            if captureID==token{inFlight=nil;capturing=false}
+            waits+=1
+        }
+        return try await capture()
+    }
     func currentFrame()->CGRect?{
         if fixtureSource != nil{return fixtureOnScreen ? fixtureFrame : nil}
         guard let windowID,let entries=CGWindowListCopyWindowInfo(.optionIncludingWindow,windowID) as? [[String:Any]],let row=entries.first,row[kCGWindowIsOnscreen as String] as? Bool == true,let bounds=row[kCGWindowBounds as String] as? [String:Any],let frame=CGRect(dictionaryRepresentation:bounds as CFDictionary),frame.width>0,frame.height>0 else{return nil};return frame
@@ -140,6 +153,15 @@ struct ContextSnapshot {
         }
         let box=CGRect(x:frame.minX+point.x*frame.width,y:frame.minY+point.y*frame.height,width:point.width*frame.width,height:point.height*frame.height).intersection(frame)
         return PointVisibility.isVisible(targetID:windowID,box:box,frontToBack:windows)
+    }
+    private func windowPNG(_ image:CGImage)->Data?{
+        let primary=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:])
+        if let data=WindowImage.png(primary:primary,flattened:nil){return data}
+        let width=image.width,height=image.height
+        guard width>0,height>0,let context=CGContext(data:nil,width:width,height:height,bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else{return nil}
+        context.draw(image,in:CGRect(x:0,y:0,width:width,height:height))
+        guard let flattened=context.makeImage() else{return nil}
+        return WindowImage.png(primary:nil,flattened:NSBitmapImageRep(cgImage:flattened).representation(using:.png,properties:[:]))
     }
     // App-owned generated fixtures only; unavailable in normal launches.
     func installFixture(windowID:CGWindowID=42,frame:CGRect=CGRect(x:100,y:100,width:400,height:260),timeout:Double=6,onScreen:Bool=true,pointVisible:Bool=true,source:@escaping ()async throws->ContextSnapshot){

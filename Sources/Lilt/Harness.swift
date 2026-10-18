@@ -41,6 +41,18 @@ extension AppController {
             model.send("Cancellation probe");model.cancel();await settle();results["cancelDiscardsPendingCompletion"] = !model.busy && model.active?.messages.last?.role == "user";model.updateActive{$0.messages=[];$0.title="New chat"}
             let fixtures=try makeFixtures(in:output);await model.importFiles(fixtures)
             results["multipleImagePDFTextImports"]=model.pendingFiles.count==4
+            let faultDirectory=output.appendingPathComponent("send-save-fault-\(UUID().uuidString)")
+            let faulted=AppModel(dataDirectory:faultDirectory);faulted.voice.enableFixtures();faulted.newSession(title:"Save failure fixture")
+            faulted.draft="My personal unsent draft";faulted.pasteImage(try Data(contentsOf:fixtures[0]));faulted.persist()
+            var faultRequests=0;faulted.provider.fixtureReply={_,_,_,_ in faultRequests+=1}
+            let faultFile=faultDirectory.appendingPathComponent("sessions.json");let preserved=try Data(contentsOf:faultFile)
+            try FileManager.default.removeItem(at:faultFile);try FileManager.default.createDirectory(at:faultFile,withIntermediateDirectories:false)
+            faulted.send("A generated command prompt",preserveDraft:true)
+            results["failedSendRestoresPersonalDraftAndPendingFile"] = !faulted.busy && faultRequests==0 && faulted.active?.messages.isEmpty==true && faulted.pendingFiles.count==1 && faulted.draft=="My personal unsent draft" && faulted.active?.draft==faulted.draft
+            try FileManager.default.removeItem(at:faultFile);try preserved.write(to:faultFile,options:.atomic);faulted.persist()
+            let recovered=try SessionStore(directory:faultDirectory).load().first
+            results["failedSendDraftAndFilesSurviveStorageRecovery"] = recovered?.draft=="My personal unsent draft" && recovered?.pendingAttachments.count==1 && recovered?.messages.isEmpty==true
+            faulted.suspend()
             do{_=try model.fileStore!.importData(Data([0,1,2,3]),name:"archive.zip",fileExtension:"zip");results["unsupportedBinaryRejected"]=false}catch{results["unsupportedBinaryRejected"]=true}
             await model.importFiles(Array(repeating:fixtures[0],count:5));results["fileLimitPreservesExistingAttachments"]=model.pendingFiles.count==4 && model.error != nil;model.error=nil
             model.pasteImage(try Data(contentsOf:fixtures[0]));results["pastedImageImports"]=model.pendingFiles.count==5 && model.pendingFiles.last?.name == "Pasted image.png"
@@ -75,10 +87,16 @@ extension AppController {
             }
             let id=model.activeID!;model.draft="A draft to preserve";model.persist();model.complete()
             results["closeChatHidesFloatingWindows"] = !coach.isVisible && !capsule.isVisible
+            let relaunched=AppModel(dataDirectory:output.appendingPathComponent("test-library"))
+            relaunched.voice.enableFixtures();var launchPresented=false;relaunched.showCoach={launchPresented=true};relaunched.prepareChat()
+            results["coldLaunchResumesClosedChatAndDraft"] = launchPresented && relaunched.activeID==id && relaunched.draft=="A draft to preserve" && relaunched.active?.files.count==4
+            relaunched.suspend()
             model.setTakeaway("A circle and a square; HARBOR-73; bring a notebook.",for:id);model.persist();await settle();try snapshot(library,to:output.appendingPathComponent("08-chat-history.png"))
             model.resume(id);results["resumeRestoresFilesAndDraft"]=model.active?.files.count==4 && model.draft == "A draft to preserve"
             model.rename(id,to:"Images and planning notes");results["renameAndSearch"] = model.active?.title == "Images and planning notes" && model.active?.matches("Brief.pdf")==true
-            if let image=model.active?.files.first(where:{$0.kind == .image}){model.removeFile(image);results["removeDeletesManagedFile"]=model.fileStore?.image(for:image)==nil && model.active?.files.count==3}
+            if let image=model.active?.files.first(where:{$0.kind == .image}){model.removeFile(image);results["sentFileStaysWithItsQuestion"]=model.fileStore?.image(for:image) != nil && model.active?.files.count==4}
+            model.pasteImage(try Data(contentsOf:fixtures[0]))
+            if let unsent=model.pendingFiles.last{model.removeFile(unsent);results["removeDeletesUnsentManagedFile"]=model.fileStore?.image(for:unsent)==nil && model.pendingFiles.isEmpty && model.active?.files.count==4}
             model.showLibrary?();model.settings=true;await settle();try snapshot(library,to:output.appendingPathComponent("09-settings-updates.png"))
             func scrollSettings(_ view:NSView)->Bool {
                 if let scroll=view as? NSScrollView,scroll.convert(.zero,to:library.contentView).x>190,let document=scroll.documentView{
@@ -89,7 +107,7 @@ extension AppController {
             _=scrollSettings(library.contentView!);await settle();try snapshot(library,to:output.appendingPathComponent("09b-update-controls.png"))
             results["unconfiguredUpdaterStaysInactive"] = !model.updates.canCheck && model.updates.configuration==nil
             results["stableWindowSizes"]=library.contentView?.bounds.size==NSSize(width:900,height:650) && capsule.frame.size==NSSize(width:430,height:62) && coach.frame.size==NSSize(width:410,height:480)
-            results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==3}
+            results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==4}
             model.error="The connection stopped. Your message and attachments are saved.";openCoach();await settle();try snapshot(coach,to:output.appendingPathComponent("10-recovery.png"))
             if CommandLine.arguments.contains("--integration-test"){
                 model.newSession(title:"Web search verification");model.setWeb(true)

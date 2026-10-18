@@ -10,12 +10,12 @@ struct ContextStrip:View {
             HStack(spacing:8){
                 Image(systemName:ShareMark.symbol(selected:model.context.hasSelection, live:model.context.live, capturing:model.context.capturing)).font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
                 if model.context.hasSelection{
-                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).help("Preview exactly what is shared")
+                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).disabled(!HeldPreview.canShow(held:model.context.preview != nil)).help(model.context.preview != nil ? "Preview exactly what is shared" : "No preview is held")
                     Spacer(minLength:4)
                     Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
                     IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
                 }else{
-                    Button(ShareControl.title){model.context.choose()}.buttonStyle(QuietButton()).font(.system(size:11)).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
+                    Button{model.context.choose()}label:{Label(ShareControl.title,systemImage:"macwindow").font(.system(size:12,weight:.medium))}.buttonStyle(QuietButton()).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
                     Spacer();Text("Optional").font(.system(size:10)).foregroundStyle(Theme.muted)
                 }
             }
@@ -24,7 +24,7 @@ struct ContextStrip:View {
                     Text(model.context.live ? "Live locally · sent when you ask" : "Captured when you ask")
                     Spacer(minLength:3)
                     if model.context.capturing{Text("Refreshing…").foregroundStyle(Theme.accent)}
-                    else if let date=model.context.lastCapture{Text("\(max(0,Int(Date().timeIntervalSince(date))))s ago").monospacedDigit()}
+                    else if CaptureAge.shows(live:model.context.live,hasCapture:model.context.lastCapture != nil),let date=model.context.lastCapture{Text("\(max(0,Int(Date().timeIntervalSince(date))))s ago").monospacedDigit()}
                 }.font(.system(size:9)).foregroundStyle(Theme.muted)
             }
         }.padding(.horizontal,12).padding(.vertical,8).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius:9)).padding(.horizontal,18)
@@ -36,7 +36,7 @@ struct GuideCard:View {
     var body:some View{
         VStack(alignment:.leading,spacing:9){
             HStack{Text("STEP \(guide.index+1) OF \(guide.plan.steps.count)").font(.system(size:9,weight:.medium)).tracking(0.8).foregroundStyle(Theme.accent);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:10)).foregroundStyle(Theme.muted)}
-            Text(guide.current).font(.system(size:12,weight:.medium)).lineLimit(3).frame(maxWidth:.infinity,alignment:.leading)
+            Text(GuideStepText.visible(guide.current)).font(.system(size:12,weight:.medium)).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
             HStack(spacing:10){
                 Button("Back"){model.moveGuide(-1)}.buttonStyle(.plain).disabled(guide.index==0)
                 Button("Point it out"){model.pointItOut()}.buttonStyle(.plain).disabled(!model.context.hasSelection)

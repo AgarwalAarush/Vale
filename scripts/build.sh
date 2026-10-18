@@ -8,23 +8,52 @@ export SWIFTPM_MODULECACHE_OVERRIDE="$LILT_CACHE"
 mkdir -p "$LILT_APP/Contents/MacOS" "$LILT_APP/Contents/Resources" "$LILT_APP/Contents/Frameworks" "$LILT_CACHE"
 swift -module-cache-path "$LILT_CACHE" scripts/icon.swift "$PWD/Resources"
 iconutil -c icns Resources/Vale.iconset -o Resources/Vale.icns
-swift build -c release --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$LILT_CACHE"
+LILT_NATIVE_BUILD_ARGS=(-c release --scratch-path .build --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$LILT_CACHE")
+swift build "${LILT_NATIVE_BUILD_ARGS[@]}"
+LILT_NATIVE_BIN_PATH="$(swift build "${LILT_NATIVE_BUILD_ARGS[@]}" --show-bin-path)"
+if [[ ! -f "$LILT_NATIVE_BIN_PATH/Lilt" ]]; then
+  print -u2 "SwiftPM did not produce the native executable at $LILT_NATIVE_BIN_PATH/Lilt."
+  exit 1
+fi
 LILT_NATIVE_ARCH="$(uname -m)"
 case "${VALE_ARCH:-native}" in
-  universal) LILT_OTHER_ARCH="$([[ "$LILT_NATIVE_ARCH" == arm64 ]] && print x86_64 || print arm64)" ;;
-  arm64|x86_64) LILT_OTHER_ARCH="${VALE_ARCH}" ;;
-  native) LILT_OTHER_ARCH="$LILT_NATIVE_ARCH" ;;
+  universal)
+    LILT_OTHER_ARCH="$([[ "$LILT_NATIVE_ARCH" == arm64 ]] && print x86_64 || print arm64)"
+    LILT_EXPECTED_ARCHS=(arm64 x86_64)
+    ;;
+  arm64|x86_64)
+    LILT_OTHER_ARCH="${VALE_ARCH}"
+    LILT_EXPECTED_ARCHS=("$LILT_OTHER_ARCH")
+    ;;
+  native)
+    LILT_OTHER_ARCH="$LILT_NATIVE_ARCH"
+    LILT_EXPECTED_ARCHS=("$LILT_NATIVE_ARCH")
+    ;;
   *) print -u2 "Choose VALE_ARCH=native, arm64, x86_64, or universal."; exit 1 ;;
 esac
 if [[ "$LILT_OTHER_ARCH" != "$LILT_NATIVE_ARCH" ]]; then
-  swift build -c release --triple "$LILT_OTHER_ARCH-apple-macosx14.0" --scratch-path ".build-$LILT_OTHER_ARCH" --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$PWD/.build/module-cache-$LILT_OTHER_ARCH"
+  LILT_OTHER_BUILD_ARGS=(-c release --triple "$LILT_OTHER_ARCH-apple-macosx14.0" --scratch-path ".build-$LILT_OTHER_ARCH" --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$PWD/.build/module-cache-$LILT_OTHER_ARCH")
+  swift build "${LILT_OTHER_BUILD_ARGS[@]}"
+  LILT_OTHER_BIN_PATH="$(swift build "${LILT_OTHER_BUILD_ARGS[@]}" --show-bin-path)"
+  if [[ ! -f "$LILT_OTHER_BIN_PATH/Lilt" ]]; then
+    print -u2 "SwiftPM did not produce the $LILT_OTHER_ARCH executable at $LILT_OTHER_BIN_PATH/Lilt."
+    exit 1
+  fi
 fi
 if [[ "${VALE_ARCH:-native}" == universal ]]; then
-  lipo -create .build/release/Lilt ".build-$LILT_OTHER_ARCH/$LILT_OTHER_ARCH-apple-macosx/release/Lilt" -output "$LILT_APP/Contents/MacOS/Lilt"
+  lipo -create "$LILT_NATIVE_BIN_PATH/Lilt" "$LILT_OTHER_BIN_PATH/Lilt" -output "$LILT_APP/Contents/MacOS/Lilt"
 elif [[ "$LILT_OTHER_ARCH" != "$LILT_NATIVE_ARCH" ]]; then
-  cp ".build-$LILT_OTHER_ARCH/$LILT_OTHER_ARCH-apple-macosx/release/Lilt" "$LILT_APP/Contents/MacOS/Lilt"
+  cp "$LILT_OTHER_BIN_PATH/Lilt" "$LILT_APP/Contents/MacOS/Lilt"
 else
-  cp .build/release/Lilt "$LILT_APP/Contents/MacOS/Lilt"
+  cp "$LILT_NATIVE_BIN_PATH/Lilt" "$LILT_APP/Contents/MacOS/Lilt"
+fi
+LILT_ACTUAL_ARCH_LIST="$(lipo -archs "$LILT_APP/Contents/MacOS/Lilt")"
+LILT_ACTUAL_ARCHS=(${=LILT_ACTUAL_ARCH_LIST})
+LILT_SORTED_ACTUAL_ARCHS=("${(@o)LILT_ACTUAL_ARCHS}")
+LILT_SORTED_EXPECTED_ARCHS=("${(@o)LILT_EXPECTED_ARCHS}")
+if [[ "${(j: :)LILT_SORTED_ACTUAL_ARCHS}" != "${(j: :)LILT_SORTED_EXPECTED_ARCHS}" ]]; then
+  print -u2 "Architecture mismatch: requested ${(j: :)LILT_EXPECTED_ARCHS}; built $LILT_ACTUAL_ARCH_LIST. Refusing to package $LILT_APP."
+  exit 1
 fi
 cp Resources/Info.plist "$LILT_APP/Contents/Info.plist"
 cp Resources/tutor.md Resources/reply.schema.json Resources/Vale.png Resources/Vale.icns "$LILT_APP/Contents/Resources/"
