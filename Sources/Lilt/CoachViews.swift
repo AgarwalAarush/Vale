@@ -307,8 +307,8 @@ struct CoachView: View {
                     }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || !PausedTyping.allowsQuestion(paused: model.paused) || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
                 HStack(spacing: ComposerRows.spacing) {
-                    IconButton(symbol: "plus", label: AttachControl.title, compact: true) { model.attachFiles() }.disabled(model.importing)
-                    IconButton(symbol:"globe",label:WebSearchLabel.title(enabled: model.active?.webEnabled == true),tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted, compact: true){model.setWeb(!(model.active?.webEnabled ?? false))}.disabled(!WebToggle.changes(waiting: model.busy))
+                    IconButton(symbol: "plus", label: AttachControl.title, compact: true, quiet: true) { model.attachFiles() }.disabled(model.importing)
+                    IconButton(symbol:"globe",label:WebSearchLabel.title(enabled: model.active?.webEnabled == true),tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted, compact: true, quiet: true){model.setWeb(!(model.active?.webEnabled ?? false))}.disabled(!WebToggle.changes(waiting: model.busy))
                     if !GuideControl.inTheMenu {
                     IconButton(symbol:"list.number",label:GuideControl.title, compact: true){
                         if GuideStart.needsConfirmation(draft: model.draft, attachmentCount: model.pendingFiles.count) { confirmGuide = true } else { model.startGuide() }
