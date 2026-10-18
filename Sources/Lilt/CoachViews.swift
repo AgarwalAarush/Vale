@@ -210,7 +210,7 @@ struct CoachView: View {
                             if session.messages.isEmpty, !EmptyCoach.sitsWithComposer(messageCount: session.messages.count) { EmptyGreeting(model: model, session: session) }
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 4) {
                                         if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 7)).foregroundStyle(Theme.muted.opacity(0.55)) }
                                         Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10)).foregroundStyle(Theme.muted)
                                         if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 10)).foregroundStyle(Theme.muted) }
@@ -233,7 +233,7 @@ struct CoachView: View {
                                     }
                                     if message.role == "assistant" {
                                         let reading = ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking)
-                                        HStack(spacing: 14) {
+                                        HStack(spacing: 10) {
                                             Button(ReplyPlayback.label(reading: reading)) {
                                                 if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
                                             }.buttonStyle(.plain).foregroundStyle(reading ? Theme.accent : Theme.muted)
