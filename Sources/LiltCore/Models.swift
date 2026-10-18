@@ -18,6 +18,16 @@ public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public var storageName: String { id.uuidString + (kind == .image ? ".png" : kind == .pdf ? ".pdf" : ".txt") }
 }
 
+/// A dropped folder is not a file that is too large.
+public enum AttachmentFileKind {
+    public static let maxBytes = 25_000_000
+    public static func refusal(isRegularFile: Bool, byteCount: Int?) -> String? {
+        guard isRegularFile, let byteCount, byteCount >= 0 else { return "Choose a file, not a folder." }
+        if byteCount > maxBytes { return "Choose a file under 25 MB." }
+        return nil
+    }
+}
+
 public struct Message: Codable, Identifiable, Equatable {
     public var id: UUID
     public var role: String

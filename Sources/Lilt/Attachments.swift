@@ -28,12 +28,14 @@ final class AttachmentStore: Sendable {
     }
     func importFile(_ url: URL) throws -> AttachmentRecord {
         let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
-        guard (attributes[.type] as? FileAttributeType) == .typeRegular, let bytes=attributes[.size] as? NSNumber, bytes.intValue <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
+        let isRegular=(attributes[.type] as? FileAttributeType) == .typeRegular
+        let bytes=(attributes[.size] as? NSNumber)?.intValue
+        if let refusal=AttachmentFileKind.refusal(isRegularFile:isRegular,byteCount:bytes){throw AppError(refusal)}
         let data=try Data(contentsOf:url,options:.mappedIfSafe)
         return try importData(data,name:url.lastPathComponent,fileExtension:url.pathExtension.lowercased())
     }
     func importData(_ data: Data, name: String, fileExtension ext: String) throws -> AttachmentRecord {
-        guard data.count <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
+        if let refusal=AttachmentFileKind.refusal(isRegularFile:true,byteCount:data.count){throw AppError(refusal)}
         let kind: AttachmentRecord.Kind
         var stored=data; var detail=""
         if ext == "pdf" {
