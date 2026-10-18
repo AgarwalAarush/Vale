@@ -15,7 +15,7 @@ struct ContextStrip:View {
                     Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
                     IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
                 }else{
-                    Button("Share a window"){model.context.choose()}.buttonStyle(.plain).font(.system(size:11)).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
+                    Button(ShareControl.title){model.context.choose()}.buttonStyle(QuietButton()).font(.system(size:11)).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
                     Spacer();Text("Optional").font(.system(size:10)).foregroundStyle(Theme.muted)
                 }
             }

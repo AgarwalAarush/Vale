@@ -12,7 +12,7 @@ struct FileContext: Sendable {
 final class AttachmentStore: Sendable {
     let directory: URL
     private let unlink:@Sendable(URL)throws->Void
-    static let maxBytes = 25_000_000
+    static let maxBytes = AttachmentFileKind.maxBytes
     static let textExtensions = Set(["txt","md","markdown","csv","json","jsonl","yaml","yml","xml","html","css","js","jsx","ts","tsx","py","swift","rs","go","java","c","h","cpp","hpp","sql","sh","toml","log","tex","rtf"])
     init(directory: URL,unlink:(@Sendable(URL)throws->Void)?=nil) throws {
         self.unlink=unlink ?? {try FileManager.default.removeItem(at:$0)}
@@ -20,6 +20,12 @@ final class AttachmentStore: Sendable {
         try FileManager.default.createDirectory(at: self.directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
     }
     func url(for record: AttachmentRecord) -> URL { directory.appendingPathComponent(record.storageName) }
+    static func readablePDF(_ pdf: PDFDocument) -> PDFDocument? {
+        let wasLocked=pdf.isLocked
+        let unlockSucceeded=wasLocked && pdf.unlock(withPassword:"")
+        guard PdfAccess.shouldAccept(wasLocked:wasLocked, unlockSucceeded:unlockSucceeded), pdf.pageCount>0 else { return nil }
+        return pdf
+    }
     func importFile(_ url: URL) throws -> AttachmentRecord {
         let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
         guard (attributes[.type] as? FileAttributeType) == .typeRegular, let bytes=attributes[.size] as? NSNumber, bytes.intValue <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
@@ -31,7 +37,7 @@ final class AttachmentStore: Sendable {
         let kind: AttachmentRecord.Kind
         var stored=data; var detail=""
         if ext == "pdf" {
-            guard let pdf=PDFDocument(data:data), !pdf.isLocked, pdf.pageCount > 0 else { throw AppError("This PDF is locked or unreadable.") }
+            guard let pdf=PDFDocument(data:data), Self.readablePDF(pdf) != nil else { throw AppError("This PDF is locked or unreadable.") }
             kind = .pdf; detail="\(pdf.pageCount) \(pdf.pageCount == 1 ? "page" : "pages")"
         } else if let source=CGImageSourceCreateWithData(data as CFData,nil),CGImageSourceGetType(source) != nil,CGImageSourceGetCount(source)>0 {
             let options: [CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
@@ -52,7 +58,7 @@ final class AttachmentStore: Sendable {
         let file=url(for:record);guard FileManager.default.fileExists(atPath:file.path) else{return};try unlink(file)
     }
     func image(for record: AttachmentRecord) -> NSImage? { record.kind == .image ? NSImage(contentsOf:url(for:record)) : nil }
-    func context(for records: [AttachmentRecord]) throws -> FileContext {
+    func context(for records: [AttachmentRecord], leadingImages: Int = 0) throws -> FileContext {
         var result=FileContext()
         var textBudget=100_000
         for record in records {
