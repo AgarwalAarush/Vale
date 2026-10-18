@@ -209,7 +209,7 @@ struct CoachView: View {
                         if let session = model.active {
                             if session.messages.isEmpty, !EmptyCoach.sitsWithComposer(messageCount: session.messages.count) { EmptyGreeting(model: model, session: session) }
                             ForEach(session.messages) { message in
-                                VStack(alignment: .leading, spacing: 7) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 6) {
                                         if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 7)).foregroundStyle(Theme.muted.opacity(0.55)) }
                                         Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10)).foregroundStyle(Theme.muted)
