@@ -64,7 +64,7 @@ struct CapsuleView: View {
                 Divider()
                 Button("Settings…") { model.showCoach?(); model.openSettingsInCoach() }
                 Button("Quit Vale") { NSApplication.shared.terminate(nil) }
-            } label: { Image(systemName: "ellipsis").font(.system(size: 15)).frame(width: 20, height: 28) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("More options")
+            } label: { Image(systemName: "ellipsis").font(.system(size: 13)).foregroundStyle(Theme.muted).frame(width: 20, height: 28) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("More options")
         }.padding(.horizontal, 20).frame(height: 62).modifier(CapsuleChrome(enabled: !chromeless))
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}
@@ -129,7 +129,6 @@ struct CompanionView: View {
         VStack(spacing: 0) {
             CapsuleView(model: model, openCoach: { model.coachOpen = true; relayout() }, close: close, chromeless: true)
             if model.companionExpanded {
-                Rectangle().fill(Theme.line).frame(height: 0.7).padding(.horizontal, 16)
                 CoachView(model: model, close: close, hidesHeader: true)
             }
         }
@@ -281,7 +280,7 @@ struct CoachView: View {
                 HStack { Button("Retry message") { model.retry() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent); Spacer(minLength: 0) }.padding(.horizontal, 18).padding(.bottom, 8)
             }
             if model.paused, model.active != nil {
-                HStack { Text("Paused · mic and sharing off").font(.system(size: 11)).foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.accent) }.padding(.horizontal, 20).padding(.bottom, 10)
+                HStack { Text("Paused · mic and sharing off").font(.system(size: 11)).foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.accent) }.padding(.horizontal, 18).padding(.bottom, 6)
             }
             if model.active?.mode == .learn, !model.settingsInCoach { HStack(spacing: 16) {
                 Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb") }.buttonStyle(.plain)
