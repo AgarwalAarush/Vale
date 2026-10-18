@@ -196,12 +196,14 @@ struct DraftEditor: NSViewRepresentable {
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage
         if editor.string != text {
             let selection = editor.selectedRange()
+            let previous = editor.string.utf16.count
             let dropUndo = ComposerUndo.clearsUndo(previous: editor.string, replacement: text)
             editor.undoManager?.disableUndoRegistration()
             editor.string = text
             editor.undoManager?.enableUndoRegistration()
             if dropUndo { editor.undoManager?.removeAllActions() }
-            editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
+            let caret = DraftCaret.location(previousUTF16: previous, nextUTF16: text.utf16.count, caret: selection.location)
+            editor.setSelectedRange(NSRange(location: caret, length: 0))
         }
         onMeasuredHeight?(Self.measuredHeight(editor))
     }
