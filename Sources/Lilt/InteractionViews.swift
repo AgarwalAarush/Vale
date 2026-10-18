@@ -30,7 +30,7 @@ struct GuideCard:View {
     var body:some View{
         VStack(alignment:.leading,spacing:9){
             HStack{Text("Step \(guide.index+1) of \(guide.plan.steps.count)").font(.system(size:11)).foregroundStyle(Theme.muted);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:11)).foregroundStyle(Theme.muted)}
-            Text(GuideStepText.visible(guide.current)).font(.system(size:12,weight:.medium)).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
+            Text(GuideStepText.visible(guide.current)).font(.system(size:12)).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
             HStack(spacing:10){
                 Button("Back"){model.moveGuide(-1)}.buttonStyle(.plain).foregroundStyle(Theme.muted).disabled(guide.index==0)
                 Button("Point it out"){model.pointItOut()}.buttonStyle(.plain).foregroundStyle(Theme.muted).disabled(!model.context.hasSelection)

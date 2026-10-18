@@ -215,7 +215,7 @@ struct CoachView: View {
                                         Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10)).foregroundStyle(Theme.muted)
                                         if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 10)).foregroundStyle(Theme.muted) }
                                     }
-                                    if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
+                                    if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(4).tint(Theme.accent).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
                                     ForEach(message.attachments.filter(SentPicture.shows)) { record in
                                         if let image = model.fileStore?.image(for: record) {
                                             Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading).clipShape(RoundedRectangle(cornerRadius: 8))
