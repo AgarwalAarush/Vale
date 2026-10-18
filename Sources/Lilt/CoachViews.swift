@@ -109,7 +109,7 @@ struct CapsuleView: View {
         case "bars":
             AudioMark(active: model.voice.listening || model.voice.speaking)
         default:
-            Image(systemName: model.context.live ? "record.circle.fill" : "macwindow").font(.system(size: 10)).foregroundStyle(Theme.accent)
+            Image(systemName: model.context.live ? "record.circle.fill" : "macwindow").font(.system(size: 10)).foregroundStyle(model.context.live ? Theme.accent : Theme.muted)
         }
     }
 }
@@ -358,8 +358,7 @@ struct MessageText: View {
                 ForEach(Array(ReplyCode.segments(prepared).enumerated()), id: \.offset) { _, segment in
                     if segment.code {
                         Text(segment.text).font(.system(size: 13, design: .monospaced)).textSelection(.enabled)
-                            .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Theme.fill).clipShape(RoundedRectangle(cornerRadius: 8))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     } else if needsLiteral(segment.text) {
                         Text(segment.text)
                     } else {

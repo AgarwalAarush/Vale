@@ -13,19 +13,13 @@ struct ContextStrip:View {
                     Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).disabled(!HeldPreview.canShow(held: model.context.preview != nil)).help("Preview exactly what is shared")
                     Spacer(minLength:4)
                     Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
-                    IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
+                    if model.context.capturing { Text("Refreshing…").font(.system(size: 10)).foregroundStyle(Theme.accent) }
+                    else if CaptureAge.shows(live: model.context.live, hasCapture: model.context.lastCapture != nil), let date = model.context.lastCapture { Text("\(max(0, Int(Date().timeIntervalSince(date))))s").font(.system(size: 10)).foregroundStyle(Theme.muted).monospacedDigit() }
+                    IconButton(symbol:"xmark",label:"Stop window sharing", compact: true){model.stopSharing()}
                 }else{
                     Button(ShareControl.title){model.context.choose()}.buttonStyle(.plain).font(.system(size:12, weight: .medium)).foregroundStyle(Theme.muted).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
                     Spacer(minLength: 0)
                 }
-            }
-            if model.context.hasSelection{
-                HStack(spacing:5){
-                    Text(model.context.live ? "Live locally · sent when you ask" : "Captured when you ask")
-                    Spacer(minLength:3)
-                    if model.context.capturing{Text("Refreshing…").foregroundStyle(Theme.accent)}
-                    else if CaptureAge.shows(live: model.context.live, hasCapture: model.context.lastCapture != nil), let date=model.context.lastCapture{Text("\(max(0,Int(Date().timeIntervalSince(date))))s ago").monospacedDigit()}
-                }.font(.system(size:9)).foregroundStyle(Theme.muted)
             }
         }.padding(.horizontal,18).padding(.vertical,4)
     }
