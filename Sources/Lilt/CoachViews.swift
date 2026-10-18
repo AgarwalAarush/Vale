@@ -78,6 +78,7 @@ struct CoachView: View {
     @State private var walkthrough = false
     @State private var confirmGuide = false
     @State private var copiedReply: UUID?
+    @State private var composerHeight: CGFloat = CGFloat(ComposerHeight.minimum)
     var body: some View {
         let sendReady = model.hasInput && !model.paused && model.active != nil && !model.importing
         let showSendHint = sendReady && !model.busy && !model.voice.listening && !model.voice.speaking && !model.voice.starting && !model.conversation
@@ -213,7 +214,7 @@ struct CoachView: View {
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text(WaitingField.shown(waiting: model.busy)).font(.system(size: 15, weight: ComposerPrompt.usesMediumWeight ? .medium : .regular)).foregroundStyle(Theme.muted.opacity(ComposerPrompt.opacity)).padding(.top, ComposerPrompt.topInset).padding(.leading, ComposerPrompt.leadingInset).allowsHitTesting(false) }
-                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { commitComposerMarkedText(); if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
+                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { commitComposerMarkedText(); if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}, onMeasuredHeight: { measured in let next = CGFloat(ComposerHeight.clamped(Double(measured))); if composerHeight != next { composerHeight = next } }).frame(height: composerHeight)
                 }.help("Return sends. Shift–Return adds a line.")
                 HStack(spacing: ComposerRows.spacing) {
                     IconButton(symbol: "plus", label: AttachControl.title) { model.attachFiles() }.disabled(model.importing)

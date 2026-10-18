@@ -203,11 +203,16 @@ struct DraftEditor: NSViewRepresentable {
             if dropUndo { editor.undoManager?.removeAllActions() }
             editor.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
         }
+        onMeasuredHeight?(Self.measuredHeight(editor))
     }
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: DraftEditor
         init(_ parent: DraftEditor) { self.parent = parent }
-        func textDidChange(_ notification: Notification) { if let editor = notification.object as? NSTextView { parent.text = editor.string } }
+        func textDidChange(_ notification: Notification) {
+            guard let editor = notification.object as? NSTextView else { return }
+            parent.text = editor.string
+            parent.onMeasuredHeight?(DraftEditor.measuredHeight(editor))
+        }
     }
 }
 
