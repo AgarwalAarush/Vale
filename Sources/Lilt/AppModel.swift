@@ -51,6 +51,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var loading = false
     private var observerTokens: [AnyCancellable] = []
     private var failedQuestion: String?
+    var hasFailedQuestion: Bool { failedQuestion != nil }
     private var guideEpoch = UUID()
     private var spokenDraftPrefix = ""
     private var conversationTask:Task<Void,Never>?
