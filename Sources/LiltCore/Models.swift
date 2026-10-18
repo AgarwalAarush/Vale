@@ -1480,6 +1480,8 @@ public enum FailedAnswer {
     /// A question whose reply failed, once the wait has ended.
     public static let label = "No answer"
     public static func shows(failed: Bool, waiting: Bool) -> Bool { failed && !waiting }
+    /// An answer that arrived is not a failed question.
+    public static func stillFailed(hadFailed: Bool, answerArrived: Bool) -> Bool { hadFailed && !answerArrived }
 }
 
 public enum ComposerUndo {

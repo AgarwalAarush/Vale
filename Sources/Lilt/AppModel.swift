@@ -207,6 +207,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             let shown=ShownAnswer(text:reply.text);let answerID=UUID()
                             self.busy=false;self.failedQuestion=nil
                             self.updateChat(chatID){chat in
+                                if let index = chat.messages.lastIndex(where: { $0.role == "user" }) {
+                                    chat.messages[index].answerFailed = FailedAnswer.stillFailed(hadFailed: chat.messages[index].answerFailed, answerArrived: true)
+                                }
                                 chat.messages.append(Message(role:"assistant",text:shown.text,id:answerID));chat.updated=Date()
                             }
                             self.persist()
