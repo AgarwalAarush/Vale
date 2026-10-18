@@ -131,15 +131,7 @@ struct CoachView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         if let session = model.active {
-                            if session.messages.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: EmptyCoach.kickerSize, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
-                                    Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
-                                    Text(session.mode == .learn ? "Think it through with a little guidance." : OpeningLine.assistant).font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted).lineSpacing(3)
-                                    if EmptyThread.showsPlace { Text(EmptyThread.line).font(.system(size: 12)).foregroundStyle(Theme.muted) }
-                                    if CodexNotice.shows(executableKnown: model.provider.executable != nil, lookupFinished: model.provider.lookupFinished) { CodexSignInCard(model: model) }
-                                }.padding(.top, 16)
-                            }
+                            if session.messages.isEmpty, !EmptyCoach.sitsWithComposer(messageCount: session.messages.count) { EmptyGreeting(model: model, session: session) }
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack(spacing: 6) {
@@ -188,6 +180,7 @@ struct CoachView: View {
                 .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
             }.frame(maxHeight: .infinity)
+            if let session = model.active, EmptyCoach.sitsWithComposer(messageCount: session.messages.count) { EmptyGreeting(model: model, session: session) }
             }
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
@@ -283,6 +276,23 @@ struct MessageText: View {
 
 private extension View {
     func stayInTheCoach() -> some View { self }
+}
+
+struct EmptyGreeting: View {
+    @ObservedObject var model: AppModel
+    let session: LearningSession
+    var body: some View {
+        VStack(alignment: .leading, spacing: EmptyCoach.blockSpacing) {
+            Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: EmptyCoach.kickerSize, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
+            Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
+            Text(session.mode == .learn ? "Think it through with a little guidance." : OpeningLine.assistant).font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted).lineSpacing(3)
+            if EmptyThread.showsPlace { Text(EmptyThread.line).font(.system(size: 12)).foregroundStyle(Theme.muted) }
+            if CodexNotice.shows(executableKnown: model.provider.executable != nil, lookupFinished: model.provider.lookupFinished) { CodexSignInCard(model: model) }
+        }
+        .padding(.horizontal, 18)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 struct CodexSignInCard: View {

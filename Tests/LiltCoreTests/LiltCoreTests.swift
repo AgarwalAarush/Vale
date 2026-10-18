@@ -1577,8 +1577,10 @@ final class LiltCoreTests {
         XCTAssertEqual(EmptyCoach.kickerSize, 11)
         XCTAssertEqual(EmptyCoach.bodySize, 15)
         XCTAssertEqual(EmptyCoach.blockSpacing, 16)
+        XCTAssertTrue(EmptyCoach.sitsWithComposer(messageCount: 0))
+        XCTAssertFalse(EmptyCoach.sitsWithComposer(messageCount: 1))
         var chat=LearningSession(title:"New chat")
-        XCTAssertTrue(chat.messages.isEmpty)
+        XCTAssertTrue(EmptyCoach.sitsWithComposer(messageCount: chat.messages.count))
         chat.draft="secret draft"
         XCTAssertFalse(chat.webEnabled)
         XCTAssertFalse(chat.matches("secret"))

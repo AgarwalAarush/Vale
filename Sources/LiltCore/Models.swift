@@ -979,6 +979,10 @@ public enum EmptyCoach {
     public static let kickerSize: CGFloat = 11
     public static let bodySize: CGFloat = 15
     public static let blockSpacing: CGFloat = 16
+    /// An empty chat keeps the greeting beside the field. A message returns the thread to the scroll.
+    public static func sitsWithComposer(messageCount: Int) -> Bool {
+        greetingAnchoredToComposer && messageCount == 0
+    }
 }
 
 public enum AttachControl {
