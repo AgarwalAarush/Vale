@@ -66,6 +66,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var expanded=false
     var showFile: ((AttachmentRecord) -> Void)?
     var closePreview: (() -> Void)?
+    var focusComposer: (() -> Void)?
     var active: LearningSession? { sessions.first { $0.id == activeID } }
     var selected: LearningSession? { sessions.first { $0.id == selectedID } }
     var contextName: String? { context.title }
@@ -171,7 +172,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if !retry {
             chat.messages.append(Message(role:"user",text:stored,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
             if chat.title == "New chat", !stored.isEmpty { let heading = ChatHeading.from(stored); if !heading.isEmpty { chat.title = heading } }
-            replace(chat);if !CommandPrompt.keepsComposerDraft(sendsOwnPrompt:preserveDraft){draft=""}
+            replace(chat)
+            let cleared = !CommandPrompt.keepsComposerDraft(sendsOwnPrompt: preserveDraft)
+            if cleared { draft = "" }
+            if ComposerFocus.returns(afterSending: cleared) { focusComposer?() }
         }
         failedQuestion=question;persist()
         var history=chat

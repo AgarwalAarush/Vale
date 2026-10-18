@@ -60,6 +60,7 @@ final class FloatingPanel: NSPanel {
         model.expandCoach = { [weak self] in self?.toggleCoachSize() }
         model.showFile = { [weak self] record in self?.previewFile(record) }
         model.closePreview = { [weak self] in self?.contextPreviews.forEach { $0.close() } }
+        model.focusComposer = { [weak self] in DispatchQueue.main.async { self?.focusComposer() } }
         if testing { Task { await runHarness() } } else { model.prepareChat(); if model.active == nil { openCoach() } }
     }
     private func setupWindows() {
@@ -107,14 +108,22 @@ final class FloatingPanel: NSPanel {
         library?.orderOut(nil)
         seatCapsule()
         capsule.orderFrontRegardless(); coach.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self, let root = self.coach.contentView else { return }
-            func editor(_ view: NSView) -> NSView? {
-                if view.identifier?.rawValue == "lilt.composer" { return view }
-                for child in view.subviews { if let result = editor(child) { return result } }; return nil
-            }
-            if let input = editor(root) { self.coach.makeFirstResponder(input) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.focusComposer() }
+    }
+    /// After a question leaves the field, the keyboard returns there. The field may not exist on the first try.
+    private func focusComposer(attemptsLeft: Int = ComposerFocus.attempts) {
+        guard ComposerFocus.shouldRetry(found: false, attemptsLeft: attemptsLeft) else { return }
+        if let root = coach.contentView, let field = Self.composerField(in: root) {
+            coach.makeFirstResponder(field)
+            return
         }
+        let remaining = attemptsLeft - 1
+        DispatchQueue.main.async { [weak self] in self?.focusComposer(attemptsLeft: remaining) }
+    }
+    private static func composerField(in view: NSView) -> NSView? {
+        if view.identifier?.rawValue == "lilt.composer" { return view }
+        for child in view.subviews { if let result = composerField(in: child) { return result } }
+        return nil
     }
     func openLibrary() { model.coachOpen = false; coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     private func toggleCoachSize(){
