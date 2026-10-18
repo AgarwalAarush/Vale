@@ -212,7 +212,7 @@ struct CoachView: View {
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack(spacing: 6) {
-                                        if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.accent.opacity(0.8)) }
+                                        if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.muted) }
                                         Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted)
                                         if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted.opacity(0.85)) }
                                     }
@@ -402,7 +402,7 @@ struct CodexSignInCard: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(notice.title).font(.system(size: 13, weight: .semibold))
             Text(notice.detail).font(.system(size: 12)).foregroundStyle(Theme.ink).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-            Button("Settings") { model.openSettingsInCoach() }.buttonStyle(QuietButton())
+            Button("Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)

@@ -12,12 +12,12 @@ struct FileChip: View {
             Button {model.showFile?(record)} label:{
                 HStack(spacing:8){
                     if let image=model.fileStore?.image(for:record){Image(nsImage:image).resizable().scaledToFit().frame(width:28,height:28).clipShape(RoundedRectangle(cornerRadius:5))}
-                    else{Image(systemName:record.kind == .pdf ? PdfChip.symbol : "doc.text").font(.system(size:16)).foregroundStyle(Theme.accent).frame(width:28,height:28)}
+                    else{Image(systemName:record.kind == .pdf ? PdfChip.symbol : "doc.text").font(.system(size:14)).foregroundStyle(Theme.muted).frame(width:22,height:22)}
                     VStack(alignment:.leading,spacing:3){Text(record.name).font(.system(size:11,weight:.medium)).lineLimit(1);Text(FileCopy.line(for: record, among: among)).font(.system(size:9)).foregroundStyle(Theme.muted).lineLimit(1)}
                 }
             }.buttonStyle(.plain).help("Preview \(record.name)")
             if removable{Button{model.removeFile(record)}label:{Image(systemName:"xmark").font(.system(size:8)).frame(width:18,height:22)}.buttonStyle(.plain).foregroundStyle(Theme.muted).help("Remove \(record.name)").accessibilityLabel("Remove \(record.name)")}
-        }.padding(8).frame(maxWidth:210,alignment:.leading).background(.white.opacity(0.04)).clipShape(RoundedRectangle(cornerRadius:9))
+        }.padding(.vertical, 4).frame(maxWidth:210,alignment:.leading)
     }
 }
 struct PDFPreview: View {
