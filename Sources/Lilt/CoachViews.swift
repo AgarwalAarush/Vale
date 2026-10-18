@@ -243,7 +243,7 @@ struct CoachView: View {
                 if !files.isEmpty { Task{await model.importFiles(files)} }
                 return DroppedLink.text(from:urls) != nil || !files.isEmpty
             }
-            .environment(\.openURL,OpenURLAction{url in ["https","http"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded})
+            .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}
                 Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
