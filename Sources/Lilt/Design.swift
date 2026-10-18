@@ -105,6 +105,37 @@ final class ComposerTextView: NSTextView {
         if event.keyCode == 53 { escape?(); return }
         super.keyDown(with: event)
     }
+    override func resignFirstResponder() -> Bool {
+        commitMarkedTextIfNeeded()
+        return super.resignFirstResponder()
+    }
+    /// A word still being composed is part of the question. Leaving it marked drops it when the field is cleared.
+    func commitMarkedTextIfNeeded() {
+        guard ComposerSubmit.commitsMarkedTextBeforeSend(hasMarkedText: hasMarkedText()) else { return }
+        let range = markedRange()
+        guard range.location != NSNotFound, range.length > 0 else { unmarkText(); return }
+        let committed = (string as NSString).substring(with: range)
+        let location = range.location
+        unmarkText()
+        let current = string as NSString
+        let length = (committed as NSString).length
+        let kept = location + length <= current.length && current.substring(with: NSRange(location: location, length: length)) == committed
+        if !kept {
+            insertText(committed, replacementRange: NSRange(location: min(location, current.length), length: 0))
+        }
+    }
+}
+
+func commitComposerMarkedText() {
+    for window in NSApp.windows {
+        guard let root = window.contentView else { continue }
+        func walk(_ view: NSView) -> ComposerTextView? {
+            if let editor = view as? ComposerTextView { return editor }
+            for child in view.subviews { if let found = walk(child) { return found } }
+            return nil
+        }
+        walk(root)?.commitMarkedTextIfNeeded()
+    }
 }
 struct DraftEditor: NSViewRepresentable {
     @Binding var text: String

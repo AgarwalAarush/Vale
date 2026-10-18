@@ -211,7 +211,7 @@ struct CoachView: View {
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text(WaitingField.shown(waiting: model.busy)).font(.system(size: 15, weight: ComposerPrompt.usesMediumWeight ? .medium : .regular)).foregroundStyle(Theme.muted.opacity(ComposerPrompt.opacity)).padding(.top, ComposerPrompt.topInset).padding(.leading, ComposerPrompt.leadingInset).allowsHitTesting(false) }
-                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
+                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { commitComposerMarkedText(); if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
                 }.help("Return sends. Shift–Return adds a line.")
                 HStack(spacing: ComposerRows.spacing) {
                     IconButton(symbol: "plus", label: AttachControl.title) { model.attachFiles() }.disabled(model.importing)
@@ -227,7 +227,7 @@ struct CoachView: View {
                     Button {
                         if model.busy {
                             if SendGesture.stops(elapsed: Date().timeIntervalSince(model.sentAt)) { model.stopResponse() }
-                        } else { model.send() }
+                        } else { commitComposerMarkedText(); model.send() }
                     } label: {
                         let filled = SendMark.filled(hasInput: model.hasInput, busy: model.busy, hasChat: model.active != nil, importing: model.importing)
                         Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(filled ? Color.black.opacity(0.82) : Theme.muted).frame(width: 30, height: 30).background(Theme.accent.opacity(filled ? 1 : 0.12)).clipShape(Circle())
