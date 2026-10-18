@@ -270,7 +270,7 @@ struct CoachView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 12)).foregroundStyle(Theme.ink); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)).foregroundStyle(Theme.muted) }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
                     HStack(spacing: 14) {
-                        if model.errorOffersSettings { Button("Open Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
+                        if model.errorOffersSettings { Button("Open Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
                         if model.context.hasSelection { Button("Change window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
                     }
                 }.padding(.horizontal, 18).padding(.bottom, 8)

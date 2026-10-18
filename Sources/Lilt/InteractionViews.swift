@@ -10,7 +10,7 @@ struct ContextStrip:View {
             HStack(spacing:8){
                 Image(systemName:ShareMark.symbol(selected:model.context.hasSelection, live:model.context.live, capturing:model.context.capturing)).font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
                 if model.context.hasSelection{
-                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).disabled(!HeldPreview.canShow(held: model.context.preview != nil)).help("Preview exactly what is shared")
+                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).foregroundStyle(Theme.muted).lineLimit(1)}.buttonStyle(.plain).disabled(!HeldPreview.canShow(held: model.context.preview != nil)).help("Preview exactly what is shared")
                     Spacer(minLength:4)
                     Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
                     if model.context.capturing { Text("Refreshing…").font(.system(size: 10)).foregroundStyle(Theme.accent) }
