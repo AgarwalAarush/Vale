@@ -316,7 +316,7 @@ struct CoachView: View {
                     }
                     Spacer()
                     Button{model.setConversation(!model.conversation)}label:{Text(ConversationControl.title(on: model.conversation)).font(.system(size:11)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
-                    if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent, compact: true) { model.stopResponse() } }
+                    if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent, compact: true, quiet: true) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted, compact: true) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
                 }
             }.padding(.horizontal, 18).padding(.vertical, 8)
