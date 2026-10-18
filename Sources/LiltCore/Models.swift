@@ -107,7 +107,7 @@ public struct LearningSession: Codable, Identifiable, Equatable {
     }
     /// History row. A chat with no messages still shows an unsent draft instead of an empty state.
     public var listPreview: String {
-        if let last = messages.last { return last.text }
+        if let last = messages.last { return ChatListLine.text(from: last.text) ?? last.text }
         if let draft = unsentDraft, let line = draft.split(whereSeparator: \.isNewline).first {
             return String(line).trimmingCharacters(in: .whitespacesAndNewlines)
         }

@@ -715,6 +715,9 @@ final class LiltCoreTests {
 
     func testChatListShowsTheAnswerWhenTheFirstLineIsBlank() {
         XCTAssertEqual(ChatListLine.text(from:"\n\nThe result is 4."),"The result is 4.")
+        var answered=LearningSession(title:"Math")
+        answered.messages=[Message(role:"assistant",text:"\n\nThe result is 4.")]
+        XCTAssertEqual(answered.listPreview,"The result is 4.")
         XCTAssertEqual(ChatListLine.text(from:"The result is 4."),"The result is 4.")
         XCTAssertEqual(ChatListLine.text(from:"  Keep this line"),"Keep this line")
         XCTAssertNil(ChatListLine.text(from:"\n  \n"))
