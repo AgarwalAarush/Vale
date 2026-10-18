@@ -5,7 +5,7 @@ struct CapsuleView: View {
     @ObservedObject var model: AppModel
     var openCoach: () -> Void
     var body: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 12) {
             if CapsuleFace.nameLeads {
                 Button(action: openCoach) {
                     HStack(spacing: 12) {
@@ -127,11 +127,11 @@ struct CoachView: View {
             } else {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 16) {
                         if let session = model.active {
                             if session.messages.isEmpty {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: EmptyCoach.kickerSize, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
+                                    Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: EmptyCoach.kickerSize, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
                                     Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
                                     Text(session.mode == .learn ? "Think it through with a little guidance." : OpeningLine.assistant).font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted).lineSpacing(3)
                                     if EmptyThread.showsPlace { Text(EmptyThread.line).font(.system(size: 12)).foregroundStyle(Theme.muted) }
@@ -142,10 +142,10 @@ struct CoachView: View {
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack(spacing: 6) {
                                         if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.accent) }
-                                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted)
+                                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 11, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
                                         if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted) }
                                     }
-                                    if !message.text.isEmpty { MessageText(message: message).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
+                                    if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
                                     if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                                     if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                                     if !message.attachments.isEmpty {
@@ -181,7 +181,7 @@ struct CoachView: View {
                         }
                         if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 5).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
-                    }.padding(.horizontal, 20).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
+                    }.padding(.horizontal, 18).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
                 .onChange(of: model.active?.messages.count) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: model.busy) { proxy.scrollTo("bottom", anchor: .bottom) }
@@ -207,7 +207,7 @@ struct CoachView: View {
             if !model.pendingFiles.isEmpty {ScrollView(.horizontal){HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,model:model,removable:true)}}.padding(.horizontal,18)}.scrollIndicators(.hidden).stayInTheCoach().padding(.bottom,10)}
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
-                    if model.draft.isEmpty { Text(WaitingField.shown(waiting: model.busy)).font(.system(size: 14, weight: ComposerPrompt.usesMediumWeight ? .medium : .regular)).foregroundStyle(Theme.muted.opacity(ComposerPrompt.opacity)).padding(.top, ComposerPrompt.topInset).padding(.leading, ComposerPrompt.leadingInset).allowsHitTesting(false) }
+                    if model.draft.isEmpty { Text(WaitingField.shown(waiting: model.busy)).font(.system(size: 15, weight: ComposerPrompt.usesMediumWeight ? .medium : .regular)).foregroundStyle(Theme.muted.opacity(ComposerPrompt.opacity)).padding(.top, ComposerPrompt.topInset).padding(.leading, ComposerPrompt.leadingInset).allowsHitTesting(false) }
                     DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}).frame(height: 61)
                 }.help("Return sends. Shift–Return adds a line.")
                 HStack(spacing: ComposerRows.spacing) {
@@ -232,7 +232,7 @@ struct CoachView: View {
             }.padding(9).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.16), lineWidth: 0.8)).padding(.horizontal, 18)
             HStack {
-                Text(model.status).font(.system(size: 10)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
+                Text(model.status).font(.system(size: 11, weight: .medium)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                 Spacer()
                 Button{model.setConversation(!model.conversation)}label:{Label(model.conversation ? "End conversation" : "Conversation",systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 8)

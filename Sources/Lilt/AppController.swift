@@ -117,7 +117,12 @@ final class FloatingPanel: NSPanel {
         model.expanded.toggle();let visible=NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
         let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
         let origin=NSPoint(x:max(visible.minX+16,min(coach.frame.maxX-size.width,visible.maxX-size.width-16)),y:max(visible.minY+20,min(coach.frame.minY,visible.maxY-size.height-20)))
-        coach.setFrame(NSRect(origin:origin,size:size),display:true,animate:true)
+        let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = reduce ? 0 : 0.22
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            coach.animator().setFrame(NSRect(origin: origin, size: size), display: true)
+        }
     }
     private func setupMenu() {
         let main = NSMenu()
