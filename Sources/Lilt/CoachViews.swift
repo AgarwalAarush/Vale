@@ -45,7 +45,7 @@ struct CoachView: View {
                 Menu {
                     Toggle("Read typed replies aloud", isOn: $model.readAloud)
                     Button("New chat") {model.newSession()}
-                    Button("Point it out") {model.pointItOut()}.disabled(!model.context.hasSelection || model.busy)
+                    Button("Point it out") {model.pointItOut()}.disabled(!PointControl.enabled(waiting: model.busy))
                     if model.active?.mode == .learn { Button("Show a full walkthrough…") { walkthrough = true }.disabled(model.active?.messages.isEmpty != false || model.busy) }
                     Menu("Focus timer") {Button("30 minutes"){model.setFocus(minutes:30)};Button("60 minutes"){model.setFocus(minutes:60)};Button("No timer"){model.setFocus(minutes:0)}}
                     Button("Close chat") { model.complete() }.disabled(model.active == nil)

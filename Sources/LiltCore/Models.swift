@@ -114,6 +114,11 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum PointControl {
+    /// Point it out stays available so a missing window can explain itself. It waits while a reply is on the way.
+    public static func enabled(waiting: Bool) -> Bool { !waiting }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL
