@@ -28,7 +28,7 @@ struct GuideCard:View {
     @ObservedObject var model:AppModel
     let guide:GuideProgress
     var body:some View{
-        VStack(alignment:.leading,spacing:9){
+        VStack(alignment:.leading,spacing:6){
             HStack{Text("Step \(guide.index+1) of \(guide.plan.steps.count)").font(.system(size:11)).foregroundStyle(Theme.muted);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:11)).foregroundStyle(Theme.muted)}
             Text(GuideStepText.visible(guide.current)).font(.system(size:12)).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
             HStack(spacing:10){
@@ -38,7 +38,7 @@ struct GuideCard:View {
                 if guide.index+1<guide.plan.steps.count{Button("Next step"){model.moveGuide(1)}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
                 else{Button("Finish guide"){model.endGuide()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
             }.font(.system(size:11)).disabled(model.busy || model.paused)
-        }.padding(.vertical, 8).padding(.leading, 12).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.line).frame(width: 2) }.padding(.horizontal,18).padding(.top,8)
+        }.padding(.vertical, 4).padding(.leading, 12).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.line).frame(width: 2) }.padding(.horizontal,18).padding(.top,4)
     }
 }
 struct VoiceSettings:View {
