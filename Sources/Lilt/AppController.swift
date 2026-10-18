@@ -103,7 +103,8 @@ final class FloatingPanel: NSPanel {
         return panel
     }
     func openCoach() {
-        guard model.active != nil else { model.prepareChat(); return }
+        if model.active == nil { model.prepareChat() }
+        guard LaunchPresentation.presentsCoach(hasActiveChat: model.active != nil, hasError: model.error != nil) else { return }
         model.coachOpen=true
         library?.orderOut(nil)
         seatCapsule()
