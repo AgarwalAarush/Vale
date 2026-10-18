@@ -156,7 +156,7 @@ struct CoachView: View {
                                                 if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
                                             }
                                             IconButton(symbol: copiedReply == message.id ? "checkmark" : "doc.on.doc", label: copiedReply == message.id ? "Copied" : ReplyActions.copy, tint: copiedReply == message.id ? Theme.accent : Theme.muted) {
-                                                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string)
+                                                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(ReplyCopy.text(from: message.text), forType: .string)
                                                 let id = message.id; copiedReply = id
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if copiedReply == id { copiedReply = nil } }
                                             }

@@ -1445,6 +1445,20 @@ public enum ReplyActions {
     public static func titles() -> [String] { [read, copy] }
 }
 
+public enum ReplyCopy {
+    /// Copy keeps the words on screen, including an address the reply shows. A code block stays as written.
+    public static func text(from source: String) -> String {
+        let shown = ReplyAddress.forDisplay(source)
+        return ReplyCode.segments(shown).map { segment in
+            segment.code ? segment.text : visible(segment.text)
+        }.joined()
+    }
+    private static func visible(_ prose: String) -> String {
+        let links = prose.replacingOccurrences(of: #"\[([^\]]+)\]\([^\)]+\)"#, with: "$1", options: .regularExpression)
+        return links.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
+    }
+}
+
 public enum FailedAnswer {
     /// A question whose reply failed, once the wait has ended.
     public static let label = "No answer"

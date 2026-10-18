@@ -1921,6 +1921,11 @@ final class LiltCoreTests {
 
     func testReplyShowsTheAddress() {
         XCTAssertEqual(ReplyAddress.forDisplay("See [the guide](https://example.com/guide)."), "See [the guide (https://example.com/guide)](https://example.com/guide).")
+        XCTAssertEqual(ReplyCopy.text(from: "See [the guide](https://example.com/guide)."), "See the guide (https://example.com/guide).")
+        XCTAssertEqual(ReplyCopy.text(from: "Write [me](mailto:a@b.com)."), "Write me (a@b.com).")
+        XCTAssertEqual(ReplyCopy.text(from: "Use `save` now."), "Use save now.")
+        XCTAssertEqual(ReplyCopy.text(from: "A plain reply."), "A plain reply.")
+        XCTAssertTrue(ReplyCopy.text(from: "```\n[the guide](https://example.com)\n```").contains("[the guide](https://example.com)"))
         XCTAssertEqual(ReplyAddress.forDisplay("See [https://example.com](https://example.com)."), "See [https://example.com](https://example.com).")
         XCTAssertEqual(ReplyAddress.forDisplay("Write [me](mailto:a@b.com)."), "Write [me (a@b.com)](mailto:a@b.com).")
         XCTAssertEqual(ReplyAddress.forDisplay("Line one.\n[docs](https://ex.com)\n"), "Line one.\n[docs (https://ex.com)](https://ex.com)\n")
