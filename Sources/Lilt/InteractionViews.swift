@@ -33,7 +33,7 @@ struct GuideCard:View {
             Text(GuideStepText.visible(guide.current)).font(.system(size:12,weight:.medium)).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
             HStack(spacing:10){
                 Button("Back"){model.moveGuide(-1)}.buttonStyle(.plain).foregroundStyle(Theme.muted).disabled(guide.index==0)
-                Button("Point it out"){model.pointItOut()}.buttonStyle(.plain).disabled(!model.context.hasSelection)
+                Button("Point it out"){model.pointItOut()}.buttonStyle(.plain).foregroundStyle(Theme.muted).disabled(!model.context.hasSelection)
                 Spacer()
                 if guide.index+1<guide.plan.steps.count{Button("Next step"){model.moveGuide(1)}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
                 else{Button("Finish guide"){model.endGuide()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}

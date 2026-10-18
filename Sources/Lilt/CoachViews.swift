@@ -191,7 +191,7 @@ struct CoachView: View {
                 IconButton(symbol: CoachDismiss.symbol, label: CoachDismiss.label, action: close)
             }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11) }
             if !ShareRow.afterTheComposer { ContextStrip(model:model) }
-            if let warning=model.shortcutWarning{Text(warning).font(.system(size:11)).foregroundStyle(Theme.ink).padding(.horizontal,18).padding(.top,8)}
+            if let warning=model.shortcutWarning{Text(warning).font(.system(size:11)).foregroundStyle(Theme.muted).padding(.horizontal,18).padding(.top,8)}
             if model.active?.showsEarlierContextNotice == true {
                 HStack(alignment:.firstTextBaseline,spacing:8){Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain)}.font(.system(size:11)).foregroundStyle(Theme.muted).padding(.horizontal,18).padding(.top,8)
             }
@@ -212,7 +212,7 @@ struct CoachView: View {
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack(spacing: 6) {
                                         if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.muted) }
-                                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted)
+                                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10)).foregroundStyle(Theme.muted)
                                         if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 10)).foregroundStyle(Theme.muted) }
                                     }
                                     if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
