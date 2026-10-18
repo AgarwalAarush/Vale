@@ -15,7 +15,7 @@ struct ContextStrip:View {
                     Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
                     IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
                 }else{
-                    Button(ShareControl.title){model.context.choose()}.buttonStyle(QuietButton()).font(.system(size:11)).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
+                    Button(ShareControl.title){model.context.choose()}.buttonStyle(.plain).font(.system(size:12, weight: .medium)).foregroundStyle(Theme.muted).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
                     Spacer();Text("Optional").font(.system(size:10)).foregroundStyle(Theme.muted)
                 }
             }
@@ -44,7 +44,7 @@ struct GuideCard:View {
                 if guide.index+1<guide.plan.steps.count{Button("Next step →"){model.moveGuide(1)}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
                 else{Button("Finish guide"){model.endGuide()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
             }.font(.system(size:10)).disabled(model.busy || model.paused)
-        }.padding(12).background(Theme.accent.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.accent.opacity(0.16),lineWidth:0.7)).padding(.horizontal,18).padding(.top,10)
+        }.padding(.vertical, 8).padding(.leading, 12).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.45)).frame(width: 2) }.padding(.horizontal,18).padding(.top,8)
     }
 }
 struct VoiceSettings:View {

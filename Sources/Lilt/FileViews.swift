@@ -17,7 +17,7 @@ struct FileChip: View {
                 }
             }.buttonStyle(.plain).help("Preview \(record.name)")
             if removable{Button{model.removeFile(record)}label:{Image(systemName:"xmark").font(.system(size:8)).frame(width:18,height:22)}.buttonStyle(.plain).foregroundStyle(Theme.muted).help("Remove \(record.name)").accessibilityLabel("Remove \(record.name)")}
-        }.padding(8).frame(maxWidth:210,alignment:.leading).background(.white.opacity(0.04)).clipShape(RoundedRectangle(cornerRadius:9)).overlay(RoundedRectangle(cornerRadius:9).strokeBorder(Theme.line,lineWidth:0.6))
+        }.padding(8).frame(maxWidth:210,alignment:.leading).background(.white.opacity(0.04)).clipShape(RoundedRectangle(cornerRadius:9))
     }
 }
 struct PDFPreview: View {

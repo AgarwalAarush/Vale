@@ -249,7 +249,7 @@ struct CoachView: View {
                                     .padding(message.role == "user" ? 12 : 0)
                                     .padding(.leading, SpeakerTurn.trails(message.role) ? SpeakerTurn.leadingClearance : (ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0))
                                     .background(message.role == "user" ? Theme.fill : .clear)
-                                    .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.8)).frame(width: ReplyTurn.ruleWidth) } }
+                                    .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.45)).frame(width: ReplyTurn.ruleWidth) } }
                                     .replyClip(message.role)
                                     .id(message.id)
                             }
@@ -259,7 +259,7 @@ struct CoachView: View {
                                 Button("New chat") { model.prepareChat() }.buttonStyle(QuietButton(filled: true))
                             }.padding(.top, 24)
                         }
-                        if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 9, weight: .medium)).tracking(1).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 5).id("thinking") }
+                        if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 13)).foregroundStyle(Theme.muted) }.padding(.vertical, 4).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 18).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
@@ -275,7 +275,7 @@ struct CoachView: View {
                         if model.errorOffersSettings { Button("Open Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
                         if model.context.hasSelection { Button("Change window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
                     }
-                }.padding(11).background(Color.orange.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 9)).padding(.horizontal, 18).padding(.bottom, 10)
+                }.padding(.horizontal, 18).padding(.bottom, 8)
             }
             if ReplyRetry.isAvailable(busy: model.busy, hasFailedQuestion: model.hasFailedQuestion, lastRole: model.active?.messages.last?.role) {
                 HStack { Button("Retry message") { model.retry() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent); Spacer(minLength: 0) }.padding(.horizontal, 18).padding(.bottom, 8)
@@ -292,11 +292,21 @@ struct CoachView: View {
                 let row = HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,among:model.pendingFiles,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}.padding(.horizontal,18)
                 if FileScroll.usesScroll(fileCount: model.pendingFiles.count) { ScrollView(.horizontal){ row }.scrollIndicators(.hidden).stayInTheCoach().padding(.bottom,10) } else { row.stayInTheCoach().padding(.bottom,10) }
             }
-            VStack(spacing: 3) {
-                ZStack(alignment: .topLeading) {
-                    if model.draft.isEmpty { Text(WaitingField.shown(waiting: model.busy)).font(.system(size: 15, weight: ComposerPrompt.usesMediumWeight ? .medium : .regular)).foregroundStyle(Theme.muted.opacity(ComposerPrompt.opacity)).padding(.top, ComposerPrompt.topInset).padding(.leading, ComposerPrompt.leadingInset).allowsHitTesting(false) }
-                    DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { commitComposerMarkedText(); if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}, onMeasuredHeight: { measured in let next = CGFloat(ComposerHeight.clamped(Double(measured))); if composerHeight != next { composerHeight = next } }).frame(height: composerHeight)
-                }.help("Return sends. Shift–Return adds a line.")
+            VStack(alignment: .leading, spacing: ComposerRows.spacing) {
+                HStack(alignment: .bottom, spacing: 8) {
+                    ZStack(alignment: .topLeading) {
+                        if model.draft.isEmpty { Text(WaitingField.shown(waiting: model.busy)).font(.system(size: 15, weight: ComposerPrompt.usesMediumWeight ? .medium : .regular)).foregroundStyle(Theme.muted.opacity(ComposerPrompt.opacity)).padding(.top, ComposerPrompt.topInset).padding(.leading, ComposerPrompt.leadingInset).allowsHitTesting(false) }
+                        DraftEditor(text: Binding(get:{model.draft},set:{model.editDraft($0)}), submit: { commitComposerMarkedText(); if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles:{urls in Task{await model.importFiles(urls)}}, pasteImage:{model.pasteImage($0)}, onMeasuredHeight: { measured in let next = CGFloat(ComposerHeight.clamped(Double(measured))); if composerHeight != next { composerHeight = next } }).frame(height: composerHeight)
+                    }.frame(maxWidth: .infinity, alignment: .leading).help("Return sends. Shift–Return adds a line.")
+                    Button {
+                        if model.busy {
+                            if SendGesture.stops(elapsed: Date().timeIntervalSince(model.sentAt)) { model.stopResponse() }
+                        } else { commitComposerMarkedText(); model.send() }
+                    } label: {
+                        let filled = SendMark.filled(hasInput: model.hasInput, busy: model.busy, hasChat: model.active != nil, importing: model.importing)
+                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(filled ? Color.black.opacity(0.82) : Theme.muted).frame(width: 30, height: 30).background(Theme.accent.opacity(filled ? 1 : 0.12)).clipShape(Circle())
+                    }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || !PausedTyping.allowsQuestion(paused: model.paused) || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
+                }
                 HStack(spacing: ComposerRows.spacing) {
                     IconButton(symbol: "plus", label: AttachControl.title) { model.attachFiles() }.disabled(model.importing)
                     IconButton(symbol:"globe",label:WebSearchLabel.title(enabled: model.active?.webEnabled == true),tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}.disabled(!WebToggle.changes(waiting: model.busy))
@@ -308,22 +318,14 @@ struct CoachView: View {
                     Spacer()
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
-                    Button {
-                        if model.busy {
-                            if SendGesture.stops(elapsed: Date().timeIntervalSince(model.sentAt)) { model.stopResponse() }
-                        } else { commitComposerMarkedText(); model.send() }
-                    } label: {
-                        let filled = SendMark.filled(hasInput: model.hasInput, busy: model.busy, hasChat: model.active != nil, importing: model.importing)
-                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(filled ? Color.black.opacity(0.82) : Theme.muted).frame(width: 30, height: 30).background(Theme.accent.opacity(filled ? 1 : 0.12)).clipShape(Circle())
-                    }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || !PausedTyping.allowsQuestion(paused: model.paused) || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
-            }.padding(9).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.16), lineWidth: 0.8)).padding(.horizontal, 18)
+            }.padding(.horizontal, 18).padding(.vertical, 8)
             HStack {
-                Text(model.status).font(.system(size: 11)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
+                let idle = !model.paused && !model.importing && !model.voice.starting && !model.voice.listening && !model.busy && !model.voice.speaking && !model.conversation && model.active?.webEnabled != true
+                if !idle { Text(model.status).font(.system(size: 11)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted) }
                 Spacer()
                 Button{model.setConversation(!model.conversation)}label:{Label(ConversationControl.title(on: model.conversation),systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
-            }.padding(.horizontal, 21).padding(.top, 6).padding(.bottom, 6)
+            }.padding(.horizontal, 21).padding(.top, 4).padding(.bottom, 6)
             if ShareRow.afterTheComposer, !model.settingsInCoach { ContextStrip(model: model).padding(.bottom, 12) }
         }.modifier(CapsuleChrome(enabled: !hidesHeader))
             .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
