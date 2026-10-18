@@ -213,7 +213,7 @@ struct CoachView: View {
                                     HStack(spacing: 6) {
                                         if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.muted) }
                                         Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted)
-                                        if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted.opacity(0.85)) }
+                                        if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 10)).foregroundStyle(Theme.muted) }
                                     }
                                     if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
                                     ForEach(message.attachments.filter(SentPicture.shows)) { record in
@@ -283,10 +283,10 @@ struct CoachView: View {
                 HStack { Text("Paused · mic and sharing off").font(.system(size: 11)).foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.accent) }.padding(.horizontal, 18).padding(.bottom, 6)
             }
             if model.active?.mode == .learn, !model.settingsInCoach { HStack(spacing: 16) {
-                Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb") }.buttonStyle(.plain)
-                Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays") }.buttonStyle(.plain)
+                Button("Hint") { model.nextHint() }.buttonStyle(.plain)
+                Button("Point it out") { model.pointItOut() }.buttonStyle(.plain)
                 Spacer(minLength: 0)
-            }.font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused || model.active == nil).padding(.horizontal, 22).padding(.bottom, 8) }
+            }.font(.system(size: 12)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused || model.active == nil).padding(.horizontal, 18).padding(.bottom, 6) }
             if !model.pendingFiles.isEmpty {
                 let row = HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,among:model.pendingFiles,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}.padding(.horizontal,18)
                 if FileScroll.usesScroll(fileCount: model.pendingFiles.count) { ScrollView(.horizontal){ row }.scrollIndicators(.hidden).stayInTheCoach().padding(.bottom,10) } else { row.stayInTheCoach().padding(.bottom,10) }

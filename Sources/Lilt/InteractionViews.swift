@@ -38,7 +38,7 @@ struct GuideCard:View {
                 if guide.index+1<guide.plan.steps.count{Button("Next step"){model.moveGuide(1)}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
                 else{Button("Finish guide"){model.endGuide()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
             }.font(.system(size:11)).disabled(model.busy || model.paused)
-        }.padding(.vertical, 8).padding(.leading, 12).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.45)).frame(width: 2) }.padding(.horizontal,18).padding(.top,8)
+        }.padding(.vertical, 8).padding(.leading, 12).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.line).frame(width: 2) }.padding(.horizontal,18).padding(.top,8)
     }
 }
 struct VoiceSettings:View {
