@@ -320,6 +320,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func stopSharing(){context.stop()}
     func previewContext(){
+        guard HeldPreview.canShow(held: context.preview != nil) else { return }
         let chatID=activeID;let generation=context.generation
         Task{[weak self]in
             guard let self else{return}
