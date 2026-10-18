@@ -174,7 +174,7 @@ struct CoachView: View {
                                     .padding(.leading, SpeakerTurn.trails(message.role) ? SpeakerTurn.leadingClearance : (ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0))
                                     .background(message.role == "user" ? Theme.fill : .clear)
                                     .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.8)).frame(width: ReplyTurn.ruleWidth) } }
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .replyClip(message.role)
                                     .id(message.id)
                             }
                         } else {
@@ -340,5 +340,11 @@ struct CodexSignInCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accent.opacity(0.35), lineWidth: 0.8))
         .accessibilityElement(children: .contain)
+    }
+}
+
+private extension View {
+    @ViewBuilder func replyClip(_ role: String) -> some View {
+        if ReplyControls.clips(role) { self.clipShape(RoundedRectangle(cornerRadius: 10)) } else { self }
     }
 }
