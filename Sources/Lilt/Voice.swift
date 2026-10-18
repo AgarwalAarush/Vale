@@ -78,10 +78,10 @@ import LiltCore
         request?.endAudio();recognition?.cancel();recognition=nil;request=nil;recognizer=nil;listening=false
     }
     func speak(_ text:String){
+        guard SpeechStart.speaks(text) else { return }
         stopListening();stopSpeaking();playbackGeneration=UUID();spokenText=text;speaking=true
         if fixtures{return}
-        let spoken=text.replacingOccurrences(of:#"\[([^\]]+)\]\([^\)]+\)"#,with:"$1",options:.regularExpression).replacingOccurrences(of:"`",with:"").replacingOccurrences(of:"**",with:"")
-        let utterance=AVSpeechUtterance(string:spoken);let selected=UserDefaults.standard.string(forKey:"speechVoice") ?? ""
+        let utterance=AVSpeechUtterance(string:SpeechStart.spoken(text));let selected=UserDefaults.standard.string(forKey:"speechVoice") ?? ""
         utterance.voice=AVSpeechSynthesisVoice(identifier:selected) ?? AVSpeechSynthesisVoice(language:language)
         let rate=UserDefaults.standard.double(forKey:"speechRate");utterance.rate=Float(rate==0 ? 0.49 : max(0.35,min(0.6,rate)))
         activeUtterance=utterance;synth.speak(utterance)
