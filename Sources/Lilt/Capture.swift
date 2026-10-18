@@ -94,7 +94,20 @@ struct ContextSnapshot {
     }
     func capture()async throws->ContextSnapshot{
         guard hasSelection else{throw AppError("Choose a window to share first.")}
-        if let task=inFlight{return try await task.value}
+        var waits=0
+        while let running=inFlight {
+            if RequestCapture.useFrame(joinedExisting:true, waitsSoFar:waits) {
+                let result=try await running.value
+                latest=live ? result : nil
+                lastCapture=result.capturedAt
+                if fixtureSource != nil { fixtureFrame=result.frame }
+                return result
+            }
+            waits+=1
+            let seen=captureID
+            _ = try? await running.value
+            if inFlight == nil || captureID == seen { break }
+        }
         let expected=generation;let selectedID=windowID;let filter=self.filter;let source=fixtureSource;let token=UUID();let timeout=captureTimeout;captureID=token;capturing=true
         let task=Task{[weak self] () async throws->ContextSnapshot in
             try await boundedCapture(seconds:timeout){[weak self]in
