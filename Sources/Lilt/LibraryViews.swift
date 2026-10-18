@@ -140,12 +140,16 @@ struct SettingsView: View {
     @State private var connection = ""
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                Text("Settings").font(.system(size: embeddedInCoach ? 22 : 28, weight: .medium)).tracking(-0.7)
+            VStack(alignment: .leading, spacing: embeddedInCoach ? 18 : 26) {
+                Text("Settings").font(.system(size: embeddedInCoach ? 15 : 28, weight: embeddedInCoach ? .regular : .medium)).tracking(embeddedInCoach ? 0 : -0.7)
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("ChatGPT via Codex").font(.system(size: 16, weight: .medium))
+                    Text("ChatGPT via Codex").font(.system(size: embeddedInCoach ? 13 : 16, weight: embeddedInCoach ? .regular : .medium))
                     Text(connection.isEmpty ? (model.provider.executable == nil ? "Codex wasn’t found in ~/.local/bin, Homebrew, the app bundle, or your PATH." : "Uses the sign-in saved by your Codex CLI.") : connection).font(.system(size: 12)).foregroundStyle(Theme.muted)
-                    Button("Check connection") { checkConnection() }.buttonStyle(QuietButton())
+                    if embeddedInCoach {
+                        Button("Check connection") { checkConnection() }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.muted)
+                    } else {
+                        Button("Check connection") { checkConnection() }.buttonStyle(QuietButton())
+                    }
                     Text("To sign in, run codex login in Terminal.").font(.system(size: 11)).foregroundStyle(Theme.muted).textSelection(.enabled)
                 }
                 Divider().overlay(Theme.line)
@@ -154,14 +158,18 @@ struct SettingsView: View {
                 VoiceSettings()
                 Divider().overlay(Theme.line)
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Your context, your choice").font(.system(size: 16, weight: .medium))
+                    Text("Your context, your choice").font(.system(size: embeddedInCoach ? 13 : 16, weight: embeddedInCoach ? .regular : .medium))
                     Text("Your messages, uploaded files, and the window you explicitly share are sent when you ask. Live refresh keeps only the latest selected-window preview in memory, every two seconds. Images are sent when you ask, not on every refresh. A selected window includes whichever page is visible inside it.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
                     Text("Chats and uploaded files are retained locally. Forget removes a chat and its files. Captured screens and microphone recordings are not saved to chat history.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
                 }
                 VStack(alignment:.leading,spacing:12){
-                    Text("Updates").font(.system(size:16,weight:.medium))
+                    Text("Updates").font(.system(size: embeddedInCoach ? 13 : 16, weight: embeddedInCoach ? .regular : .medium))
                     Text(model.updates.status).font(.system(size:12)).foregroundStyle(Theme.muted).lineSpacing(4)
-                    Button("Check for Updates…"){model.updates.check()}.buttonStyle(QuietButton()).disabled(!model.updates.canCheck)
+                    if embeddedInCoach {
+                        Button("Check for Updates…"){model.updates.check()}.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.muted).disabled(!model.updates.canCheck)
+                    } else {
+                        Button("Check for Updates…"){model.updates.check()}.buttonStyle(QuietButton()).disabled(!model.updates.canCheck)
+                    }
                 }
                 Divider().overlay(Theme.line)
                 DisclosureGroup("Advanced") {
@@ -174,7 +182,7 @@ struct SettingsView: View {
                 }.font(.system(size: 12))
                 Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
                 Text("Vale 1.2.2 · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
-            }.padding(.horizontal, 42).padding(.top, 54).padding(.bottom, 40)
+            }.padding(.horizontal, embeddedInCoach ? 18 : 42).padding(.top, embeddedInCoach ? 4 : 54).padding(.bottom, embeddedInCoach ? 24 : 40)
         }.scrollIndicators(.hidden)
     }
     func checkConnection() {
