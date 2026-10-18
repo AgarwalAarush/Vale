@@ -28,3 +28,5 @@ The installer must stage and verify the new app before replacing installed copie
 ## Laptop handoff
 
 Extract `dist/Vale-1.2.3-laptop-setup.zip` on the laptop and open `Install Vale.command`. The command runs the staged installer with `--replace`; it requires no Swift, Python, lipo or developer tools. Respond personally to any normal macOS security confirmation. This chat has no laptop filesystem/app execution access and has not downloaded, installed, removed or relaunched anything there. The macserver's older installed Lilt is also untouched.
+
+The 5,928,468-byte ZIP was extracted into an isolated temporary directory. Every file and symlink matched staging, the extracted signature and both architectures passed, executable installer permissions and shell syntax passed, manifest hashes matched, and the extracted installer passed a read-only replacement dry run. Evidence: `artifacts/laptop-package-1.2.3-checks.json` and `artifacts/installer-1.2.3-extracted-dry-run.log`. ZIP SHA-256: `68e43db90d0a636df86e439bf6ee03080866667f74d5fb6e90559938c2cc77e7`. This verifies the prepared handoff, not installation or retention on the laptop.
