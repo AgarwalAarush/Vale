@@ -103,7 +103,7 @@ struct SessionDetail: View {
                 ForEach(session.messages){message in
                     VStack(alignment:.leading,spacing:9){
                         Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 11, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
-                        if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+                        if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).fixedSize(horizontal: false, vertical: HistoryReply.usesIntrinsicHeight).frame(maxWidth: .infinity, alignment: .leading) }
                         if StaleWindowAnswer.applies(to: message) { Text(StaleWindowAnswer.notice).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                         if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                         if FailedAnswer.shows(failed: message.answerFailed, waiting: false) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
