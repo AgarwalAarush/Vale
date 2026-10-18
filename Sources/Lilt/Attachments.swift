@@ -51,7 +51,7 @@ final class AttachmentStore: Sendable {
             guard let words=RichText.textToStore(NSAttributedString(rtf:data,documentAttributes:nil)?.string), let encoded=words.data(using:.utf8) else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
             kind = .text; stored=encoded; detail="RTF"
         } else if Self.textExtensions.contains(ext) || ext.isEmpty {
-            guard let text=String(data:data,encoding:.utf8), !text.contains("\0") else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
+            guard let text=TextFile.decode(data) else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
             guard let encoded=text.data(using:.utf8) else { throw AppError("That text couldn’t be read.") }
             kind = .text; stored=encoded; detail=ext.isEmpty ? "Text" : ext.uppercased()
         } else { throw AppError("Supported files: images, PDFs, text, and code. This file type isn’t supported yet.") }
