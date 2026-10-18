@@ -164,6 +164,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let stored = kept ?? (hasFiles ? "" : nil)
         guard let stored else { return }
         let question = kept ?? AttachmentQuestion.modelPrompt
+        let askedForGuide = guideRequested || GuideRequest.explicit(question)
         guard !question.isEmpty else { return }
         guard !importing else { error = "Wait for your files to finish attaching."; return }
         if !PausedTyping.allowsQuestion(paused: paused) { error = "Resume the chat before sending a message."; return }
@@ -221,7 +222,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
                 var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
                 if QuestionPreview.shouldCloseOpenedPreview(questionWasSent: true) { self.closePreview?() }
-                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:guideRequested)
+                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:askedForGuide)
                 handedOff=true
                 self.provider.ask(prompt:prompt,images:images,search:wantsSearch) { [weak self] result in
                     guard let self,self.requestID==id,self.activeID==chatID else{return}
@@ -251,10 +252,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                                 chat.messages[index].text=checked.text
                                 chat.messages[index].screenChanged=checked.windowChanged
                                 chat.messages[index].highlightUnavailable = WindowCheck.highlightUnavailable(askedToPoint: reply.point != nil, compared: fresh != nil, changed: changed, canPoint: canPoint)
-                                if let plan=reply.guide,guideRequested,!changed{chat.guide=GuideProgress(plan:plan)}
+                                let keepGuide=GuideInstall.shouldInstall(requested:askedForGuide,windowChanged:changed,stillCurrent:true)
+                                if let plan=reply.guide,keepGuide{chat.guide=GuideProgress(plan:plan)}
                             }
                             guard self.requestID==id,self.activeID==chatID else{self.persist();return}
-                            if guideRequested,reply.guide != nil,!changed,!self.expanded{self.expandCoach?()}
+                            if GuideInstall.shouldInstall(requested:askedForGuide,windowChanged:changed,stillCurrent:true),reply.guide != nil,!self.expanded{self.expandCoach?()}
                             if !changed,(self.readAloud || spoken || self.conversation){self.voice.speak(checked.text)}
                             else if changed,(self.readAloud || spoken || self.conversation){self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
