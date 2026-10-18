@@ -36,7 +36,7 @@ final class AttachmentStore: Sendable {
         guard data.count <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
         let kind: AttachmentRecord.Kind
         var stored=data; var detail=""
-        if ext == "pdf" {
+        if FileSignature.treatAsPDF(fileExtension: ext, data: data, isTextExtension: Self.textExtensions.contains(ext)) {
             guard let pdf=PDFDocument(data:data), Self.readablePDF(pdf) != nil else { throw AppError("This PDF is locked or unreadable.") }
             kind = .pdf; detail=PdfChip.detail(pages: pdf.pageCount)
         } else if let source=CGImageSourceCreateWithData(data as CFData,nil),CGImageSourceGetType(source) != nil,CGImageSourceGetCount(source)>0 {
