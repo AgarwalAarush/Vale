@@ -97,7 +97,26 @@ struct SessionDetail: View {
                 Divider().overlay(Theme.line)
                 VStack(alignment:.leading,spacing:10){
                     Text(session.mode == .learn ? "WHAT CLICKED?" : "NOTES").font(.system(size:10,weight:.medium)).tracking(1.1).foregroundStyle(Theme.muted)
-                    TextEditor(text:Binding(get:{model.sessions.first{$0.id == session.id}?.takeaway ?? ""},set:{model.setTakeaway($0,for:session.id)})).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).accessibilityLabel("Chat notes")
+                    TextEditor(text:Binding(
+                        get: {
+                            let stored = model.sessions.first { $0.id == session.id }?.takeaway ?? ""
+                            return NoteEdit.next(local: note, stored: stored, sameSession: noteID == session.id)
+                        },
+                        set: { typed in
+                            note = typed
+                            noteID = session.id
+                            model.setTakeaway(typed, for: session.id)
+                        }
+                    )).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).accessibilityLabel("Chat notes")
+                    .onAppear {
+                        guard noteID != session.id else { return }
+                        note = session.takeaway
+                        noteID = session.id
+                    }
+                    .onChange(of: session.id) {
+                        note = model.sessions.first { $0.id == session.id }?.takeaway ?? ""
+                        noteID = session.id
+                    }
                 }
                 if !session.messages.isEmpty{Divider().overlay(Theme.line)}
                 ForEach(session.messages){message in
