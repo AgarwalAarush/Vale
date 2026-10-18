@@ -193,12 +193,12 @@ struct CoachView: View {
             if !ShareRow.afterTheComposer { ContextStrip(model:model) }
             if let warning=model.shortcutWarning{Text(warning).font(.system(size:11)).foregroundStyle(Theme.ink).padding(.horizontal,18).padding(.top,8)}
             if model.active?.showsEarlierContextNotice == true {
-                HStack(alignment:.firstTextBaseline,spacing:8){Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:11)).foregroundStyle(Theme.muted).padding(.horizontal,18).padding(.top,8)
+                HStack(alignment:.firstTextBaseline,spacing:8){Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain)}.font(.system(size:11)).foregroundStyle(Theme.muted).padding(.horizontal,18).padding(.top,8)
             }
             if let guide=model.active?.guide, !model.settingsInCoach {GuideCard(model:model,guide:guide)}
             if model.settingsInCoach {
                 HStack {
-                    Button("Back to chat") { model.settingsInCoach = false }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent).accessibilityLabel("Back to chat")
+                    Button("Back to chat") { model.settingsInCoach = false }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent).accessibilityLabel("Back to chat")
                     Spacer()
                 }.padding(.horizontal, 18).padding(.bottom, 4)
                 SettingsView(model: model, embeddedInCoach: true).frame(maxHeight: .infinity)
@@ -255,7 +255,7 @@ struct CoachView: View {
                         } else {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Ready when you are.").font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted)
-                                Button("New chat") { model.prepareChat() }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
+                                Button("New chat") { model.prepareChat() }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent)
                             }.padding(.top, 8)
                         }
                         if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 11)).foregroundStyle(Theme.muted) }.padding(.vertical, 2).id("thinking") }
@@ -399,9 +399,9 @@ struct CodexSignInCard: View {
     var body: some View {
         let notice = CodexSignInNotice.beforeFirstSend(executableFound: model.provider.executable != nil)
         VStack(alignment: .leading, spacing: 8) {
-            Text(notice.title).font(.system(size: 13, weight: .semibold))
-            Text(notice.detail).font(.system(size: 12)).foregroundStyle(Theme.ink).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-            Button("Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
+            Text(notice.title).font(.system(size: 12)).foregroundStyle(Theme.ink)
+            Text(notice.detail).font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+            Button("Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
