@@ -194,7 +194,7 @@ struct CoachView: View {
             if !ShareRow.afterTheComposer { ContextStrip(model:model) }
             if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
             if model.active?.showsEarlierContextNotice == true {
-                HStack(alignment:.top,spacing:7){Image(systemName:"clock.arrow.circlepath");Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:10)).foregroundStyle(Theme.muted).padding(.horizontal,20).padding(.top,10)
+                HStack(alignment:.firstTextBaseline,spacing:8){Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:11)).foregroundStyle(Theme.muted).padding(.horizontal,18).padding(.top,8)
             }
             if let guide=model.active?.guide, !model.settingsInCoach {GuideCard(model:model,guide:guide)}
             if model.settingsInCoach {
@@ -254,10 +254,10 @@ struct CoachView: View {
                                     .id(message.id)
                             }
                         } else {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Ready when you are.").font(.system(size: 23, weight: .medium)).tracking(-0.5)
-                                Button("New chat") { model.prepareChat() }.buttonStyle(QuietButton(filled: true))
-                            }.padding(.top, 24)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Ready when you are.").font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted)
+                                Button("New chat") { model.prepareChat() }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
+                            }.padding(.top, 8)
                         }
                         if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 13)).foregroundStyle(Theme.muted) }.padding(.vertical, 4).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
@@ -324,7 +324,7 @@ struct CoachView: View {
                 let idle = !model.paused && !model.importing && !model.voice.starting && !model.voice.listening && !model.busy && !model.voice.speaking && !model.conversation && model.active?.webEnabled != true
                 if !idle { Text(model.status).font(.system(size: 11)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted) }
                 Spacer()
-                Button{model.setConversation(!model.conversation)}label:{Label(ConversationControl.title(on: model.conversation),systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
+                Button{model.setConversation(!model.conversation)}label:{Text(ConversationControl.title(on: model.conversation)).font(.system(size:11)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 4).padding(.bottom, 6)
             if ShareRow.afterTheComposer, !model.settingsInCoach { ContextStrip(model: model).padding(.bottom, 12) }
         }.modifier(CapsuleChrome(enabled: !hidesHeader))
@@ -384,8 +384,7 @@ struct EmptyGreeting: View {
     @ObservedObject var model: AppModel
     let session: LearningSession
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(session.mode == .learn ? "What are we working through?" : "How can I help?").font(.system(size: 17, weight: .medium))
+        VStack(alignment: .leading, spacing: 6) {
             Text(session.mode == .learn ? "Think it through with a little guidance." : OpeningLine.assistant).font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted).lineSpacing(2)
             if EmptyThread.showsPlace { Text(EmptyThread.line).font(.system(size: EmptyCoach.kickerSize)).foregroundStyle(Theme.muted) }
             if CodexNotice.shows(executableKnown: model.provider.executable != nil, lookupFinished: model.provider.lookupFinished) { CodexSignInCard(model: model) }
