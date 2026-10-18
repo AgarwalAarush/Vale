@@ -87,6 +87,7 @@ final class ComposerTextView: NSTextView {
         let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL]
         let hasFile=urls?.isEmpty==false
         let plain=board.string(forType:.string)
+        let html=board.string(forType:.html)
         let image=board.data(forType:.png) ?? board.data(forType:.tiff)
         switch ComposerPaste.choice(text:plain,hasFile:hasFile,hasImage:image != nil) {
         case .files:
@@ -94,6 +95,10 @@ final class ComposerTextView: NSTextView {
         case .image:
             if let image,let pasteImage {pasteImage(image);return}
         case .text:
+            if let words=ClipboardHTML.text(html:html, plain:plain) {
+                insertText(words, replacementRange: selectedRange())
+                return
+            }
             super.paste(sender);return
         }
         let pdf=board.data(forType:NSPasteboard.PasteboardType("com.adobe.pdf"))
