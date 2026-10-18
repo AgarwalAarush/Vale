@@ -220,7 +220,7 @@ final class FloatingPanel: NSPanel {
     private func preview(_ image: NSImage) {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 520), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Shared context preview"; window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .darkAqua); window.backgroundColor = Theme.windowBackground
-        let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self
+        let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(8).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self
         evictPreviewRoom(adding: .screen)
         window.center(); contextPreviews.append(window); auxiliary.append(window); window.makeKeyAndOrderFront(nil)
     }
