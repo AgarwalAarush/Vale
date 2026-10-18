@@ -67,7 +67,7 @@ final class AttachmentStore: Sendable {
             switch record.kind {
             case .image:
                 result.images.append(try Data(contentsOf:file))
-                result.text += "\nImage \(result.images.count) (after any shared-window image): \(record.name).\n"
+                result.text += ImageOrder.line(name: record.name, placedBefore: leadingImages, fileImagesSoFar: result.images.count)
             case .text:
                 let full=try String(contentsOf:file,encoding:.utf8)
                 let take=min(60_000,max(0,textBudget)); let excerpt=String(full.prefix(take)); textBudget-=excerpt.count
