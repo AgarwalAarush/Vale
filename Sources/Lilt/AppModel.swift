@@ -319,7 +319,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         persist()
     }
     func pasteImage(_ data:Data){
-        guard let files=fileStore,active != nil else{return}
+        if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: active != nil, importing: importing) { error = refusal; return }
+        guard let files=fileStore else{return}
         guard (active?.files.count ?? 0)<8 else{error="Attach up to 8 files in a chat.";return}
         do{let record=try files.importData(data,name:"Pasted image.png",fileExtension:"png");updateActive{$0.pendingAttachments.append(record)};persist()}catch{self.error=error.localizedDescription}
     }

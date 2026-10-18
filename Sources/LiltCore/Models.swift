@@ -18,6 +18,16 @@ public struct AttachmentRecord: Codable, Identifiable, Equatable, Sendable {
     public var storageName: String { id.uuidString + (kind == .image ? ".png" : kind == .pdf ? ".pdf" : ".txt") }
 }
 
+/// Why a drop or paste could not be kept. Nil means the attach may proceed.
+public enum AttachmentRefusal {
+    public static func message(libraryAvailable: Bool, hasChat: Bool, importing: Bool) -> String? {
+        if !libraryAvailable { return "The chat library is unavailable. Restore the library folder before attaching files." }
+        if !hasChat { return "Start a chat before attaching files." }
+        if importing { return "Wait for your files to finish attaching." }
+        return nil
+    }
+}
+
 public struct Message: Codable, Identifiable, Equatable {
     public var id: UUID
     public var role: String
