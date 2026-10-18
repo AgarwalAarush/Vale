@@ -23,6 +23,11 @@ public struct GuideProgress:Codable,Equatable,Sendable {
         return ([plan.title]+lines).joined(separator:"\n")
     }
 }
+
+/// The current step is shown in full. A three-line cap hides the instruction.
+public enum GuideStepText {
+    public static func visible(_ step: String) -> String { step }
+}
 public struct ConversationWindow {
     public let text:String
     public let omitted:Int
