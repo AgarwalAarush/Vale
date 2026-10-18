@@ -38,7 +38,7 @@ final class AttachmentStore: Sendable {
         var stored=data; var detail=""
         if ext == "pdf" {
             guard let pdf=PDFDocument(data:data), Self.readablePDF(pdf) != nil else { throw AppError("This PDF is locked or unreadable.") }
-            kind = .pdf; detail="\(pdf.pageCount) \(pdf.pageCount == 1 ? "page" : "pages")"
+            kind = .pdf; detail=PdfChip.detail(pages: pdf.pageCount)
         } else if let source=CGImageSourceCreateWithData(data as CFData,nil),CGImageSourceGetType(source) != nil,CGImageSourceGetCount(source)>0 {
             let options: [CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
             guard let image=CGImageSourceCreateThumbnailAtIndex(source,0,options as CFDictionary),let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }

@@ -1581,9 +1581,18 @@ public enum FieldSurface {
 }
 
 public enum PdfChip {
-    /// The chip says it is a PDF, not only a page count.
+    /// The chip says it is a PDF, not only a page count. The mark is a document, not rich text.
+    public static let symbol = "doc.fill"
     public static func detail(pages: Int) -> String {
         "PDF · \(pages) \(pages == 1 ? "page" : "pages")"
+    }
+    /// A stored page count still reads as a PDF. Other files keep the line they already have.
+    public static func shown(kind: AttachmentRecord.Kind, stored: String) -> String {
+        guard kind == .pdf else { return stored }
+        let trimmed = stored.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("PDF") { return trimmed }
+        if trimmed.isEmpty { return "PDF" }
+        return "PDF · \(trimmed)"
     }
 }
 

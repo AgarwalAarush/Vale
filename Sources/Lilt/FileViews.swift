@@ -12,8 +12,8 @@ struct FileChip: View {
             Button {model.showFile?(record)} label:{
                 HStack(spacing:8){
                     if let image=model.fileStore?.image(for:record){Image(nsImage:image).resizable().scaledToFit().frame(width:28,height:28).clipShape(RoundedRectangle(cornerRadius:5))}
-                    else{Image(systemName:record.kind == .pdf ? "doc.richtext" : "doc.text").font(.system(size:16)).foregroundStyle(Theme.accent).frame(width:28,height:28)}
-                    VStack(alignment:.leading,spacing:3){Text(record.name).font(.system(size:11,weight:.medium)).lineLimit(1);Text(record.detail).font(.system(size:9)).foregroundStyle(Theme.muted).lineLimit(1)}
+                    else{Image(systemName:record.kind == .pdf ? PdfChip.symbol : "doc.text").font(.system(size:16)).foregroundStyle(Theme.accent).frame(width:28,height:28)}
+                    VStack(alignment:.leading,spacing:3){Text(record.name).font(.system(size:11,weight:.medium)).lineLimit(1);Text(PdfChip.shown(kind: record.kind, stored: record.detail)).font(.system(size:9)).foregroundStyle(Theme.muted).lineLimit(1)}
                 }
             }.buttonStyle(.plain).help("Preview \(record.name)")
             if removable{Button{model.removeFile(record)}label:{Image(systemName:"xmark").font(.system(size:8)).frame(width:18,height:22)}.buttonStyle(.plain).foregroundStyle(Theme.muted).help("Remove \(record.name)").accessibilityLabel("Remove \(record.name)")}
