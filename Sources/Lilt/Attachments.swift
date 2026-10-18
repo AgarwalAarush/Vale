@@ -36,6 +36,7 @@ final class AttachmentStore: Sendable {
         guard data.count <= Self.maxBytes else { throw AppError("Choose a file under 25 MB.") }
         let kind: AttachmentRecord.Kind
         var stored=data; var detail=""
+        var laterPages: Data?
         if FileSignature.treatAsPDF(fileExtension: ext, data: data, isTextExtension: Self.textExtensions.contains(ext)) {
             guard let pdf=PDFDocument(data:data), Self.readablePDF(pdf) != nil else { throw AppError("This PDF is locked or unreadable.") }
             kind = .pdf; detail=PdfChip.detail(pages: pdf.pageCount)
@@ -45,6 +46,7 @@ final class AttachmentStore: Sendable {
             let full=preview == nil ? CGImageSourceCreateImageAtIndex(source,0,nil) : nil
             guard ImageRead.shouldKeep(preview:preview != nil,fullImage:full != nil), let image=preview ?? full, let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { throw AppError("That image couldn’t be read.") }
             kind = .image; stored=png; detail="Image"
+            if CGImageSourceGetCount(source) > 1 { laterPages = data }
         } else if Self.textExtensions.contains(ext) || ext.isEmpty {
             guard var text=String(data:data,encoding:.utf8), !text.contains("\0") else { throw AppError("This file isn’t readable text. Use an image, PDF, or UTF-8 text/code file.") }
             if ext == "rtf", let attributed=NSAttributedString(rtf:data,documentAttributes:nil) { text=attributed.string }
@@ -54,11 +56,19 @@ final class AttachmentStore: Sendable {
         let record=AttachmentRecord(name:String(name.prefix(180)),kind:kind,byteCount:stored.count,detail:detail)
         try stored.write(to:url(for:record),options:.atomic)
         try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:url(for:record).path)
+        if let laterPages {
+            let pages=pagesURL(for:record)
+            try laterPages.write(to:pages,options:.atomic)
+            try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:pages.path)
+        }
         return record
     }
     func remove(_ record: AttachmentRecord)throws {
+        let pages=pagesURL(for:record)
+        if FileManager.default.fileExists(atPath:pages.path) { try unlink(pages) }
         let file=url(for:record);guard FileManager.default.fileExists(atPath:file.path) else{return};try unlink(file)
     }
+    private func pagesURL(for record: AttachmentRecord) -> URL { url(for: record).appendingPathExtension("pages") }
     func image(for record: AttachmentRecord) -> NSImage? { record.kind == .image ? NSImage(contentsOf:url(for:record)) : nil }
     func context(for records: [AttachmentRecord], leadingImages: Int = 0) throws -> FileContext {
         var result=FileContext()
@@ -71,6 +81,7 @@ final class AttachmentStore: Sendable {
                 do {
                     result.images.append(try Data(contentsOf:file))
                     result.text += ImageOrder.line(name: record.name, placedBefore: leadingImages, fileImagesSoFar: result.images.count)
+                    appendLaterPages(of: record, into: &result, leadingImages: leadingImages)
                 } catch { result.text += AttachmentRead.omission(record.name) }
             case .text:
                 do {
@@ -106,5 +117,20 @@ final class AttachmentStore: Sendable {
         }
         guard result.images.count <= 12 else { throw AppError("This chat includes too many visual pages. Remove a file or start a new chat; up to 12 images/pages fit in one request.") }
         return result
+    }
+    /// Later pages of one picture stay with the question when they still fit. The stored preview remains the first page.
+    private func appendLaterPages(of record: AttachmentRecord, into result: inout FileContext, leadingImages: Int) {
+        let pages=pagesURL(for:record)
+        guard let data=try? Data(contentsOf:pages), let source=CGImageSourceCreateWithData(data as CFData,nil) else { return }
+        let room=max(0, 12-result.images.count)
+        let extra=ImagePages.extraPages(pageCount:CGImageSourceGetCount(source), extraRoom:room)
+        guard extra>0 else { return }
+        let options:[CFString:Any]=[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1600,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceShouldCacheImmediately:true]
+        for index in 1...extra {
+            let image=CGImageSourceCreateThumbnailAtIndex(source,index,options as CFDictionary) ?? CGImageSourceCreateImageAtIndex(source,index,nil)
+            guard let image, let png=NSBitmapImageRep(cgImage:image).representation(using:.png,properties:[:]) else { continue }
+            result.images.append(png)
+            result.text += ImageOrder.line(name: record.name, placedBefore: leadingImages, fileImagesSoFar: result.images.count)
+        }
     }
 }
