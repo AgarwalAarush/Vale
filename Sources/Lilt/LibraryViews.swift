@@ -180,12 +180,34 @@ struct SettingsView: View {
     func checkConnection() {
         guard let path = model.provider.executable else { connection = "Codex wasn’t found. Choose its path below."; return }
         connection = "Checking…"
+        let started = Date()
+        let gate = SignInGate()
         let process = Process(); process.executableURL = URL(fileURLWithPath: path); process.arguments = ["login", "status"]
         let pipe = Pipe(); process.standardOutput = pipe; process.standardError = pipe
         process.terminationHandler = { process in
             let data = pipe.fileHandleForReading.readDataToEndOfFile(); let text = String(data: data, encoding: .utf8) ?? ""
-            DispatchQueue.main.async { connection = process.terminationStatus == 0 ? (text.contains("ChatGPT") ? "Signed in with ChatGPT." : "Codex is signed in.") : "Not signed in. Run codex login in Terminal." }
+            let elapsed = Date().timeIntervalSince(started)
+            DispatchQueue.main.async {
+                guard gate.claim() else { return }
+                connection = SignInCheck.result(status: process.terminationStatus, output: text, timedOut: SignInCheck.timedOut(elapsed: elapsed))
+            }
         }
-        do { try process.run() } catch { connection = "Couldn’t launch Codex. Check the executable path." }
+        do { try process.run() } catch { connection = "Couldn’t launch Codex. Check the executable path."; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + SignInCheck.limit) {
+            guard gate.claim() else { return }
+            if process.isRunning { process.terminate() }
+            connection = SignInCheck.result(status: process.terminationStatus, output: "", timedOut: true)
+        }
+    }
+}
+
+private final class SignInGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+    func claim() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if finished { return false }
+        finished = true
+        return true
     }
 }
