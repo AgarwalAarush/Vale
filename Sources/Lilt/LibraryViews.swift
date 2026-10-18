@@ -63,7 +63,6 @@ struct LibraryView: View {
                             Spacer(minLength:20);Text(chat.updated,style:.date).font(.system(size:11)).foregroundStyle(Theme.muted);Image(systemName:"chevron.right").font(.system(size:10)).foregroundStyle(Theme.muted)
                         }.padding(.vertical,18)
                     }.buttonStyle(.plain)
-                    Divider().overlay(Theme.line)
                 }
                 if let error=model.error{
                     VStack(alignment:.leading,spacing:8){
