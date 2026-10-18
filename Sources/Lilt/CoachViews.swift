@@ -150,8 +150,11 @@ struct CoachView: View {
                                         HStack{Image(systemName:"arrow.clockwise");Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:10)).foregroundStyle(Theme.muted)
                                     }
                                     if message.role == "assistant" {
+                                        let reading = ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking)
                                         HStack(spacing: 8) {
-                                            IconButton(symbol: "speaker.wave.2", label: ReplyActions.read) { model.voice.speak(SpokenReply.text(from: message.text)) }
+                                            IconButton(symbol: ReplyPlayback.symbol(reading: reading), label: ReplyPlayback.label(reading: reading), tint: reading ? Theme.accent : Theme.muted) {
+                                                if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
+                                            }
                                             IconButton(symbol: copiedReply == message.id ? "checkmark" : "doc.on.doc", label: copiedReply == message.id ? "Copied" : ReplyActions.copy, tint: copiedReply == message.id ? Theme.accent : Theme.muted) {
                                                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string)
                                                 let id = message.id; copiedReply = id

@@ -1285,8 +1285,13 @@ public enum ReplyWait {
 public enum ReplyPlayback {
     /// The reply being read is the one whose control can stop playback.
     public static func reading(message: String, spoken: String?, speaking: Bool) -> Bool {
-        speaking && !message.isEmpty && spoken == message
+        guard speaking, let spoken, !spoken.isEmpty, !message.isEmpty else { return false }
+        if spoken == message { return true }
+        let cleaned = SpokenReply.text(from: message)
+        return !cleaned.isEmpty && spoken == cleaned
     }
+    public static func symbol(reading: Bool) -> String { reading ? "stop.fill" : "speaker.wave.2" }
+    public static func label(reading: Bool) -> String { reading ? "Stop reading" : ReplyActions.read }
 }
 
 public enum ReplySpeaker {

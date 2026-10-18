@@ -1949,6 +1949,13 @@ final class LiltCoreTests {
         XCTAssertFalse(ReplyPlayback.reading(message: "Other.", spoken: "The answer.", speaking: true))
         XCTAssertTrue(ReplyPlayback.reading(message: "The answer.", spoken: "The answer.", speaking: true))
         XCTAssertFalse(ReplyPlayback.reading(message: "", spoken: "", speaking: true))
+        let linked = "See [the docs](https://example.com/docs)"
+        XCTAssertTrue(ReplyPlayback.reading(message: linked, spoken: SpokenReply.text(from: linked), speaking: true))
+        XCTAssertFalse(ReplyPlayback.reading(message: linked, spoken: SpokenReply.text(from: "Other"), speaking: true))
+        XCTAssertEqual(ReplyPlayback.symbol(reading: false), "speaker.wave.2")
+        XCTAssertEqual(ReplyPlayback.symbol(reading: true), "stop.fill")
+        XCTAssertEqual(ReplyPlayback.label(reading: false), "Read")
+        XCTAssertEqual(ReplyPlayback.label(reading: true), "Stop reading")
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)
