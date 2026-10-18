@@ -93,12 +93,17 @@ final class AttachmentStore: Sendable {
                 } catch { result.text += AttachmentRead.omission(record.name) }
             case .pdf:
                 guard let pdf=PDFDocument(url:file) else { result.text += AttachmentRead.omission(record.name); continue }
-                let maximum=min(60_000,max(0,textBudget)); if maximum == 0 {result.text += "\n[PDF \(record.name) is not included because the text context limit was reached.]\n";continue}; var text=""; var pagesRead=0
+                let maximum=min(60_000,max(0,textBudget)); if maximum == 0 {result.text += "\n[PDF \(record.name) is not included because the text context limit was reached.]\n";continue}; var text=""; var pagesRead=0; var bodies:[String]=[]
                 for index in 0..<min(pdf.pageCount,300) {
                     guard text.count < maximum else { break }
-                    if let page=pdf.page(at:index) { text += "\n[Page \(index+1)]\n" + String((page.string ?? "").prefix(maximum-text.count)); pagesRead=index+1 }
+                    if let page=pdf.page(at:index) {
+                        let body=String((page.string ?? "").prefix(max(0,maximum-text.count)))
+                        bodies.append(body)
+                        text += "\n[Page \(index+1)]\n" + body
+                        pagesRead=index+1
+                    }
                 }
-                let extracted = text.replacingOccurrences(of:"[Page ",with:"").filter { $0.isLetter }.count > pagesRead * 2
+                let extracted = PdfText.hasReadableText(pageBodies: bodies)
                 if extracted {
                     textBudget-=text.count
                     result.text += "\n--- PDF: \(record.name) (\(pdf.pageCount) pages) ---\n\(text)\n"
