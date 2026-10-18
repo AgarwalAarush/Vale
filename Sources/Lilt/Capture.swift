@@ -87,8 +87,13 @@ struct ContextSnapshot {
     nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didUpdateWith filter:SCContentFilter,for stream:SCStream?){
         DispatchQueue.main.async{
             self.filter=filter;self.generation=UUID();self.latest=nil;self.lastCapture=nil
-            if #available(macOS 15.2,*),let window=filter.includedWindows.first{self.windowID=window.windowID;self.title="\(window.owningApplication?.applicationName ?? "Selected") window"}
-            else{self.windowID=nil;self.title="Selected window"}
+            if #available(macOS 15.2,*),let window=filter.includedWindows.first{
+                self.windowID=window.windowID
+                self.title=SharedWindowLabel.text(windowTitle:window.title,applicationName:window.owningApplication?.applicationName)
+            } else {
+                self.windowID=nil
+                self.title=SharedWindowLabel.text(windowTitle:nil,applicationName:nil)
+            }
             self.changed?();if self.requestedLive{self.requestedLive=false;self.startLive()}
         }
     }
