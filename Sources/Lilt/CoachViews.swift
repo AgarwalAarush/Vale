@@ -140,6 +140,11 @@ struct CoachView: View {
                                         if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted) }
                                     }
                                     if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
+                                    ForEach(message.attachments.filter(SentPicture.shows)) { record in
+                                        if let image = model.fileStore?.image(for: record) {
+                                            Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading).clipShape(RoundedRectangle(cornerRadius: 8))
+                                        }
+                                    }
                                     if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                                     if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                                     if !message.attachments.isEmpty {
