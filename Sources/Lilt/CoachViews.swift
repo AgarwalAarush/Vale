@@ -257,7 +257,7 @@ struct CoachView: View {
                                 Button("New chat") { model.prepareChat() }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent)
                             }.padding(.top, 8)
                         }
-                        if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini); Text("Thinking…").font(.system(size: 11)).foregroundStyle(Theme.muted) }.padding(.vertical, 2).id("thinking") }
+                        if model.busy, ReplyWait.inTheThread { HStack(spacing: 8) { Text(ReplyWait.speaker).font(.system(size: 10)).foregroundStyle(Theme.muted); ProgressView().controlSize(.mini).tint(Theme.muted); Text("Thinking…").font(.system(size: 11)).foregroundStyle(Theme.muted) }.padding(.vertical, 2).id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 18).padding(.bottom, 6).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
