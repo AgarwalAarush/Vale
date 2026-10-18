@@ -73,6 +73,11 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testComposerFocusRetriesUntilTheFieldExists() {
+        XCTAssertTrue(ComposerFocus.shouldRetry(found: false, attemptsLeft: ComposerFocus.attempts))
+        XCTAssertFalse(ComposerFocus.shouldRetry(found: true, attemptsLeft: ComposerFocus.attempts))
+        XCTAssertFalse(ComposerFocus.shouldRetry(found: false, attemptsLeft: 0))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -2578,6 +2583,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Composer focus retries until the field exists",tests.testComposerFocusRetriesUntilTheFieldExists),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),

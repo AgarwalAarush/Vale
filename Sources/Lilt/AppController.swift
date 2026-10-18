@@ -103,14 +103,23 @@ final class FloatingPanel: NSPanel {
         model.coachOpen=true
         library?.orderOut(nil)
         capsule.orderFrontRegardless(); coach.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self, let root = self.coach.contentView else { return }
-            func editor(_ view: NSView) -> NSView? {
-                if view.identifier?.rawValue == "lilt.composer" { return view }
-                for child in view.subviews { if let result = editor(child) { return result } }; return nil
-            }
-            if let input = editor(root) { self.coach.makeFirstResponder(input) }
+        focusComposer(attemptsLeft: ComposerFocus.attempts)
+    }
+    private func focusComposer(attemptsLeft: Int) {
+        guard let root = coach?.contentView else { return }
+        if let input = Self.findComposer(root) {
+            if coach.firstResponder !== input { coach.makeFirstResponder(input) }
+            return
         }
+        guard ComposerFocus.shouldRetry(found: false, attemptsLeft: attemptsLeft) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.focusComposer(attemptsLeft: attemptsLeft - 1)
+        }
+    }
+    private static func findComposer(_ view: NSView) -> NSView? {
+        if view.identifier?.rawValue == "lilt.composer" { return view }
+        for child in view.subviews { if let found = findComposer(child) { return found } }
+        return nil
     }
     func openLibrary() { coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     private func toggleCoachSize(){

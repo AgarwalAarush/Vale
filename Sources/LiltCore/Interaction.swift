@@ -1,6 +1,14 @@
 import Foundation
 import CoreGraphics
 
+/// The composer may not exist on the first focus attempt. Retry only until it is found.
+public enum ComposerFocus {
+    public static let attempts = 8
+    public static func shouldRetry(found: Bool, attemptsLeft: Int) -> Bool {
+        !found && attemptsLeft > 0
+    }
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]
