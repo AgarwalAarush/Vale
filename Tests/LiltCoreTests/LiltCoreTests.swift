@@ -73,6 +73,12 @@ final class LiltCoreTests {
         XCTAssertTrue(export.contains("## Lilt\n\nWhat stays true?"))
         XCTAssertTrue(export.contains("## Takeaway\n\nPreserve the invariant."))
     }
+    func testVoiceOptInWaitsForTheReply() {
+        XCTAssertFalse(ConversationOptIn.startsListeningNow(busy: true, speaking: false))
+        XCTAssertFalse(ConversationOptIn.startsListeningNow(busy: false, speaking: true))
+        XCTAssertFalse(ConversationOptIn.startsListeningNow(busy: true, speaking: true))
+        XCTAssertTrue(ConversationOptIn.startsListeningNow(busy: false, speaking: false))
+    }
     func testGeneralModeIsUntimedAndDirect() {
         let chat=LearningSession(title:"New chat")
         XCTAssertEqual(chat.mode,.assistant);XCTAssertEqual(chat.duration,0)
@@ -2578,6 +2584,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Truthful context prompt", tests.testPromptDoesNotClaimScreenWhenNoneIsAttached),
  ("Explicit walkthrough policy", tests.testWalkthroughRequiresExplicitRequest),
  ("Markdown export", tests.testExportUsesActualConversationAndTakeaway),
+ ("Voice opt-in waits for the reply",tests.testVoiceOptInWaitsForTheReply),
  ("General default without a timer",tests.testGeneralModeIsUntimedAndDirect),
  ("Legacy migration and backup",tests.testLegacyMigrationPreservesLearningAndBacksUp),
  ("Attachment metadata and history search",tests.testAttachmentMetadataAndSearchRoundTrip),

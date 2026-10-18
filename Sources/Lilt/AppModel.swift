@@ -247,8 +247,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func setConversation(_ enabled:Bool){
         conversationTask?.cancel();conversation=enabled
-        if enabled{guard !paused,active != nil else{conversation=false;return};cancel();spokenDraftPrefix=draft.isEmpty ? "" : draft+" ";voice.start()}
-        else{voice.stop();cancel()}
+        if !enabled { voice.stop(); return }
+        guard !paused,active != nil else{conversation=false;return}
+        guard ConversationOptIn.startsListeningNow(busy:busy,speaking:voice.speaking) else{return}
+        spokenDraftPrefix=draft.isEmpty ? "" : draft+" ";voice.start()
     }
     private func listenForNextTurn(){
         conversationTask?.cancel();guard conversation,!paused,active != nil else{return}

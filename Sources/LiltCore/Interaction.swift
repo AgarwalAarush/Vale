@@ -1,6 +1,11 @@
 import Foundation
 import CoreGraphics
 
+/// Voice opt-in must not discard an answer that is already on the way.
+public enum ConversationOptIn {
+    public static func startsListeningNow(busy: Bool, speaking: Bool) -> Bool { !busy && !speaking }
+}
+
 public struct GuidePlan: Codable,Equatable,Sendable {
     public var title:String
     public var steps:[String]
