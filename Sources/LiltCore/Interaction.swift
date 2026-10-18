@@ -266,7 +266,10 @@ public enum GuideInstall {
 
 public enum PointRequest {
     public static let prompt = "Point out the relevant part of the shared window, with one short explanation."
+    /// The thread shows the action the person used. The model still receives the full prompt.
+    public static let title = "Point it out"
     public static func wasPointing(_ question: String) -> Bool { question == prompt }
+    public static func shown(_ question: String) -> String { wasPointing(question) ? title : question }
 }
 
 public enum ReadableLine {

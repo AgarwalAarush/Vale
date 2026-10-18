@@ -283,7 +283,7 @@ struct MessageText: View {
                 }
             }
         } else {
-            Text(QuestionLine.shown(message.text))
+            Text(QuestionLine.shown(PointRequest.shown(message.text)))
         }
     }
     private func needsLiteral(_ text: String) -> Bool {

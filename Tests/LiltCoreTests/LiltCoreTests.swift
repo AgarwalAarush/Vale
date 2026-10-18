@@ -1121,6 +1121,8 @@ final class LiltCoreTests {
     func testRefreshOfPointItOutStillPoints() {
         XCTAssertTrue(PointRequest.wasPointing(PointRequest.prompt))
         XCTAssertFalse(PointRequest.wasPointing("What is this button?"))
+        XCTAssertEqual(PointRequest.shown(PointRequest.prompt), "Point it out")
+        XCTAssertEqual(PointRequest.shown("What is this button?"), "What is this button?")
         let again=TutorPrompt.build(session:LearningSession(title:"Window"),question:PointRequest.prompt,hasImage:true,pointing:true,reveal:false,hasWindow:true)
         XCTAssertTrue(again.contains("Pointing requested: Yes"))
         let ordinary=TutorPrompt.build(session:LearningSession(title:"Window"),question:"What is this button?",hasImage:true,pointing:PointRequest.wasPointing("What is this button?"),reveal:false,hasWindow:true)
