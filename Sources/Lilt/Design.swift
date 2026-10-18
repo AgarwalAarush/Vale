@@ -105,6 +105,21 @@ final class ComposerTextView: NSTextView {
         if PasteChoice.usePDF(hasFile:hasFile,hasImage:image != nil,hasPDF:pdf != nil),let pdf,let pastePDF {pastePDF(pdf);return}
         super.paste(sender)
     }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        FieldDrop.attaches(fileURLs(from: sender)).isEmpty ? super.draggingEntered(sender) : .copy
+    }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        FieldDrop.attaches(fileURLs(from: sender)).isEmpty ? super.draggingUpdated(sender) : .copy
+    }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let files = FieldDrop.attaches(fileURLs(from: sender))
+        guard !files.isEmpty else { return super.performDragOperation(sender) }
+        pasteFiles?(files)
+        return true
+    }
+    private func fileURLs(from sender: NSDraggingInfo) -> [URL] {
+        sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+    }
     override func keyDown(with event: NSEvent) {
         if (event.keyCode == 36 || event.keyCode == 76), LineBreak.sends(shift: event.modifierFlags.contains(.shift), option: event.modifierFlags.contains(.option), marked: hasMarkedText()) { submit?(); return }
         if event.keyCode == 53 { escape?(); return }
