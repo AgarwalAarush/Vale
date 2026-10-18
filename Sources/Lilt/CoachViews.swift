@@ -221,13 +221,13 @@ struct CoachView: View {
                                             Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading)
                                         }
                                     }
-                                    if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
-                                    if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
+                                    if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 10)).foregroundStyle(Theme.muted) }
+                                    if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) { Text(FailedAnswer.label).font(.system(size: 10)).foregroundStyle(Theme.muted) }
                                     if !message.attachments.isEmpty {
                                         let row = HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,among:message.attachments,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}
                                         if FileScroll.usesScroll(fileCount: message.attachments.count) { ScrollView(.horizontal) { row }.scrollIndicators(.hidden) } else { row }
                                     }
-                                    if message.highlightUnavailable{Text("Highlight unavailable · check your selected window").font(.system(size:11)).foregroundStyle(Theme.muted)}
+                                    if message.highlightUnavailable{Text("Highlight unavailable · check your selected window").font(.system(size:10)).foregroundStyle(Theme.muted)}
                                     if message.screenChanged{
                                         HStack(spacing: 8){Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain)}}.font(.system(size:11)).foregroundStyle(Theme.muted)
                                     }
@@ -407,6 +407,6 @@ struct CodexSignInCard: View {
 
 private extension View {
     @ViewBuilder func replyClip(_ role: String) -> some View {
-        if ReplyControls.clips(role) { self.clipShape(RoundedRectangle(cornerRadius: 10)) } else { self }
+        if ReplyControls.clips(role) { self.clipShape(RoundedRectangle(cornerRadius: 2)) } else { self }
     }
 }
