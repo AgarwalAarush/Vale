@@ -1681,7 +1681,7 @@ final class LiltCoreTests {
 
     func testConversationControlLooksPressable() {
         XCTAssertTrue(ConversationControl.showsAsButton)
-        XCTAssertEqual(ConversationControl.title(on: false), "Conversation")
+        XCTAssertEqual(ConversationControl.title(on: false), "Start conversation")
         XCTAssertEqual(ConversationControl.title(on: true), "End conversation")
         var chat=LearningSession(title:"New chat")
         chat.draft="secret draft"
