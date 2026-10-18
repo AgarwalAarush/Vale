@@ -86,9 +86,16 @@ final class ComposerTextView: NSTextView {
         let board=NSPasteboard.general
         let urls=board.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL]
         let hasFile=urls?.isEmpty==false
-        if hasFile,let urls,let pasteFiles {pasteFiles(urls);return}
+        let plain=board.string(forType:.string)
         let image=board.data(forType:.png) ?? board.data(forType:.tiff)
-        if let image,let pasteImage {pasteImage(image);return}
+        switch ComposerPaste.choice(text:plain,hasFile:hasFile,hasImage:image != nil) {
+        case .files:
+            if let urls,let pasteFiles {pasteFiles(urls);return}
+        case .image:
+            if let image,let pasteImage {pasteImage(image);return}
+        case .text:
+            super.paste(sender);return
+        }
         let pdf=board.data(forType:NSPasteboard.PasteboardType("com.adobe.pdf"))
         if PasteChoice.usePDF(hasFile:hasFile,hasImage:image != nil,hasPDF:pdf != nil),let pdf,let pastePDF {pastePDF(pdf);return}
         super.paste(sender)
