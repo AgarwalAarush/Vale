@@ -114,6 +114,13 @@ public struct TutorReply: Codable, Equatable {
 }
 public enum CoreError: Error { case emptyReply }
 
+public enum RetryOffer {
+    /// Retry is for a question that already failed. It stays hidden while a reply is still on the way.
+    public static func shows(waiting: Bool, lastRoleIsUser: Bool) -> Bool {
+        lastRoleIsUser && !waiting
+    }
+}
+
 public final class SessionStore {
     public let directory: URL
     private let file: URL
