@@ -249,7 +249,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
     }
     func retry(){if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
-    func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send("Give me one slightly more concrete hint, without revealing the full solution.",preserveDraft:true)}
+    func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send(HintRequest.prompt,preserveDraft:true)}
     func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send(PointRequest.prompt,pointing:true,preserveDraft:true)}
     func toggleVoice(){
         guard !paused,active != nil else{return}

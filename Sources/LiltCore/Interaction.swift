@@ -272,6 +272,13 @@ public enum PointRequest {
     public static func shown(_ question: String) -> String { wasPointing(question) ? title : question }
 }
 
+public enum HintRequest {
+    public static let prompt = "Give me one slightly more concrete hint, without revealing the full solution."
+    /// The thread shows Hint. The model still receives the full prompt.
+    public static let title = "Hint"
+    public static func shown(_ question: String) -> String { question == prompt ? title : question }
+}
+
 public enum ReadableLine {
     /// Lets a long unbroken line wrap. Every original character stays, in order.
     public static func display(_ text: String, limit: Int = 40) -> String {
