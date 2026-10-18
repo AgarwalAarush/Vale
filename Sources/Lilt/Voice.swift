@@ -1,10 +1,12 @@
 import AppKit
 @preconcurrency import AVFoundation
 import Speech
+import LiltCore
 
 @MainActor final class VoiceController:NSObject,ObservableObject,AVSpeechSynthesizerDelegate {
     @Published private(set) var listening=false
     @Published private(set) var speaking=false
+    @Published private(set) var spokenText:String?
     @Published private(set) var starting=false
     private let engine=AVAudioEngine()
     private let synth=AVSpeechSynthesizer()
@@ -13,6 +15,7 @@ import Speech
     private var recognition:SFSpeechRecognitionTask?
     private var request:SFSpeechAudioBufferRecognitionRequest?
     private var hasTap=false
+    private let intake=MicIntake()
     private var silence:DispatchWorkItem?
     private var finalText=""
     private var generation=UUID()
@@ -52,7 +55,8 @@ import Speech
         self.request=request;finalText="";let id=UUID();generation=id
         let node=engine.inputNode;let format=node.outputFormat(forBus:0)
         guard format.sampleRate>0,format.channelCount>0 else{failed?("No microphone is available. You can still type.");return}
-        node.installTap(onBus:0,bufferSize:1024,format:format){buffer,_ in request.append(buffer)};hasTap=true
+        intake.allow()
+        node.installTap(onBus:0,bufferSize:1024,format:format){[intake] buffer,_ in guard intake.isAccepting else{return};request.append(buffer)};hasTap=true
         recognition=recognizer.recognitionTask(with:request){result,error in DispatchQueue.main.async{
             guard self.generation==id,self.listening else{return}
             if let result{
@@ -74,7 +78,7 @@ import Speech
         request?.endAudio();recognition?.cancel();recognition=nil;request=nil;recognizer=nil;listening=false
     }
     func speak(_ text:String){
-        stopListening();stopSpeaking();playbackGeneration=UUID();speaking=true
+        stopListening();stopSpeaking();playbackGeneration=UUID();spokenText=text;speaking=true
         if fixtures{return}
         let spoken=text.replacingOccurrences(of:#"\[([^\]]+)\]\([^\)]+\)"#,with:"$1",options:.regularExpression).replacingOccurrences(of:"`",with:"").replacingOccurrences(of:"**",with:"")
         let utterance=AVSpeechUtterance(string:spoken);let selected=UserDefaults.standard.string(forKey:"speechVoice") ?? ""
@@ -82,13 +86,13 @@ import Speech
         let rate=UserDefaults.standard.double(forKey:"speechRate");utterance.rate=Float(rate==0 ? 0.49 : max(0.35,min(0.6,rate)))
         activeUtterance=utterance;synth.speak(utterance)
     }
-    func stopSpeaking(){playbackGeneration=UUID();activeUtterance=nil;if !fixtures{synth.stopSpeaking(at:.immediate)};speaking=false}
+    func stopSpeaking(){playbackGeneration=UUID();activeUtterance=nil;spokenText=nil;if !fixtures{synth.stopSpeaking(at:.immediate)};speaking=false}
     func stop(){stopListening();stopSpeaking()}
     nonisolated private func playbackEnded(_ utterance:AVSpeechUtterance,completed:Bool){
         let identity=ObjectIdentifier(utterance)
         DispatchQueue.main.async{[weak self]in
             guard let self,let active=self.activeUtterance,ObjectIdentifier(active)==identity else{return}
-            self.activeUtterance=nil;self.speaking=false
+            self.activeUtterance=nil;self.spokenText=nil;self.speaking=false
             if completed{self.playbackFinished?()}else{self.playbackInterrupted?()}
         }
     }
