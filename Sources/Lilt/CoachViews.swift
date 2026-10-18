@@ -234,11 +234,11 @@ struct CoachView: View {
                                     }
                                     if message.role == "assistant" {
                                         let reading = ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking)
-                                        HStack(spacing: 8) {
-                                            IconButton(symbol: ReplyPlayback.symbol(reading: reading), label: ReplyPlayback.label(reading: reading), tint: reading ? Theme.accent : Theme.muted) {
+                                        HStack(spacing: 4) {
+                                            IconButton(symbol: ReplyPlayback.symbol(reading: reading), label: ReplyPlayback.label(reading: reading), tint: reading ? Theme.accent : Theme.muted, compact: true) {
                                                 if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
                                             }
-                                            IconButton(symbol: copiedReply == message.id ? "checkmark" : "doc.on.doc", label: copiedReply == message.id ? "Copied" : ReplyActions.copy, tint: copiedReply == message.id ? Theme.accent : Theme.muted) {
+                                            IconButton(symbol: copiedReply == message.id ? "checkmark" : "doc.on.doc", label: copiedReply == message.id ? "Copied" : ReplyActions.copy, tint: copiedReply == message.id ? Theme.accent : Theme.muted, compact: true) {
                                                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(ReplyCopy.text(from: message.text), forType: .string)
                                                 let id = message.id; copiedReply = id
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if copiedReply == id { copiedReply = nil } }
@@ -246,9 +246,9 @@ struct CoachView: View {
                                         }.padding(.leading, -7)
                                     }
                                 }.frame(maxWidth: .infinity, alignment: SpeakerTurn.trails(message.role) ? .trailing : .leading)
-                                    .padding(message.role == "user" ? 12 : 0)
+                                    .padding(.vertical, message.role == "user" ? 2 : 0)
                                     .padding(.leading, SpeakerTurn.trails(message.role) ? SpeakerTurn.leadingClearance : (ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0))
-                                    .background(message.role == "user" ? Theme.fill : .clear)
+                                    .background(.clear)
                                     .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.45)).frame(width: ReplyTurn.ruleWidth) } }
                                     .replyClip(message.role)
                                     .id(message.id)
@@ -308,16 +308,16 @@ struct CoachView: View {
                     }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || !PausedTyping.allowsQuestion(paused: model.paused) || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
                 HStack(spacing: ComposerRows.spacing) {
-                    IconButton(symbol: "plus", label: AttachControl.title) { model.attachFiles() }.disabled(model.importing)
-                    IconButton(symbol:"globe",label:WebSearchLabel.title(enabled: model.active?.webEnabled == true),tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted){model.setWeb(!(model.active?.webEnabled ?? false))}.disabled(!WebToggle.changes(waiting: model.busy))
+                    IconButton(symbol: "plus", label: AttachControl.title, compact: true) { model.attachFiles() }.disabled(model.importing)
+                    IconButton(symbol:"globe",label:WebSearchLabel.title(enabled: model.active?.webEnabled == true),tint:model.active?.webEnabled == true ? Theme.accent : Theme.muted, compact: true){model.setWeb(!(model.active?.webEnabled ?? false))}.disabled(!WebToggle.changes(waiting: model.busy))
                     if !GuideControl.inTheMenu {
-                    IconButton(symbol:"list.number",label:GuideControl.title){
+                    IconButton(symbol:"list.number",label:GuideControl.title, compact: true){
                         if GuideStart.needsConfirmation(draft: model.draft, attachmentCount: model.pendingFiles.count) { confirmGuide = true } else { model.startGuide() }
                     }.disabled(model.busy || model.paused)
                     }
                     Spacer()
-                    if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
-                    IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
+                    if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent, compact: true) { model.stopResponse() } }
+                    IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted, compact: true) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
                 }
             }.padding(.horizontal, 18).padding(.vertical, 8)
             HStack {
@@ -406,11 +406,7 @@ struct CodexSignInCard: View {
             Text(notice.detail).font(.system(size: 12)).foregroundStyle(Theme.ink).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             Button("Settings") { model.openSettingsInCoach() }.buttonStyle(QuietButton())
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.accent.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accent.opacity(0.35), lineWidth: 0.8))
         .accessibilityElement(children: .contain)
     }
 }

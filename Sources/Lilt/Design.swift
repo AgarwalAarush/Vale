@@ -52,10 +52,11 @@ struct QuietButton: ButtonStyle {
     }
 }
 struct IconButton: View {
-    var symbol: String; var label: String; var tint: Color = Theme.muted; var action: () -> Void
+    var symbol: String; var label: String; var tint: Color = Theme.muted; var compact = false; var action: () -> Void
     @State private var hover = false
     var body: some View {
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).frame(width: 30, height: 30).background(hover ? Theme.fillRaised : .clear).clipShape(Circle()) }
+        let side: CGFloat = compact ? 22 : 30
+        Button(action: action) { Image(systemName: symbol).font(.system(size: compact ? 12 : 13, weight: .medium)).foregroundStyle(tint).frame(width: side, height: side).background(hover ? Theme.fillRaised : .clear).clipShape(Circle()) }
             .buttonStyle(.plain).help(label).accessibilityLabel(label).onHover { hover = $0 }
     }
 }

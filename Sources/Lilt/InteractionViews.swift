@@ -16,7 +16,7 @@ struct ContextStrip:View {
                     IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
                 }else{
                     Button(ShareControl.title){model.context.choose()}.buttonStyle(.plain).font(.system(size:12, weight: .medium)).foregroundStyle(Theme.muted).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
-                    Spacer();Text("Optional").font(.system(size:10)).foregroundStyle(Theme.muted)
+                    Spacer(minLength: 0)
                 }
             }
             if model.context.hasSelection{
