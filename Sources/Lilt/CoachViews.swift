@@ -273,7 +273,7 @@ struct MessageText: View {
     let message: Message
     var body: some View {
         if message.showsMarkdown {
-            let prepared = ReplyAddress.forDisplay(ReplyLines.forDisplay(message.text))
+            let prepared = ReadableLine.display(ReplyAddress.forDisplay(ReplyLines.forDisplay(message.text)))
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(ReplyCode.segments(prepared).enumerated()), id: \.offset) { _, segment in
                     if segment.code {
