@@ -43,11 +43,11 @@ struct IconButton: View {
 }
 struct LogoMark: View {
     var size: CGFloat = 25
+    private static let artwork = Bundle.main.url(forResource: "Vale", withExtension: "png")
+        .flatMap { NSImage(contentsOf: $0) } ?? NSApp.applicationIconImage!
     var body: some View {
-        Text("V").font(.system(size: size * 0.61, weight: .bold, design: .rounded)).foregroundStyle(Color(red: 0.13, green: 0.23, blue: 0.62))
-            .frame(width: size, height: size).background(LinearGradient(colors: [Color(red: 0.76, green: 0.81, blue: 1), Theme.accent], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: size * 0.25).strokeBorder(.white.opacity(0.2), lineWidth: 0.6))
+        Image(nsImage: Self.artwork).resizable().interpolation(.high)
+            .aspectRatio(contentMode: .fit).frame(width: size, height: size)
             .accessibilityHidden(true)
     }
 }

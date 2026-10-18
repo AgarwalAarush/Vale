@@ -5,7 +5,9 @@ LILT_APP="$PWD/dist/Vale.app"
 LILT_CACHE="$PWD/.build/module-cache"
 export CLANG_MODULE_CACHE_PATH="$LILT_CACHE"
 export SWIFTPM_MODULECACHE_OVERRIDE="$LILT_CACHE"
-mkdir -p "$LILT_APP/Contents/MacOS" "$LILT_APP/Contents/Resources" "$LILT_APP/Contents/Frameworks"
+mkdir -p "$LILT_APP/Contents/MacOS" "$LILT_APP/Contents/Resources" "$LILT_APP/Contents/Frameworks" "$LILT_CACHE"
+swift -module-cache-path "$LILT_CACHE" scripts/icon.swift "$PWD/Resources"
+iconutil -c icns Resources/Vale.iconset -o Resources/Vale.icns
 swift build -c release --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$LILT_CACHE"
 LILT_NATIVE_ARCH="$(uname -m)"
 case "${VALE_ARCH:-native}" in
@@ -25,8 +27,7 @@ else
   cp .build/release/Lilt "$LILT_APP/Contents/MacOS/Lilt"
 fi
 cp Resources/Info.plist "$LILT_APP/Contents/Info.plist"
-cp Resources/tutor.md Resources/reply.schema.json "$LILT_APP/Contents/Resources/"
-if [[ -f Resources/Vale.icns ]]; then cp Resources/Vale.icns "$LILT_APP/Contents/Resources/"; fi
+cp Resources/tutor.md Resources/reply.schema.json Resources/Vale.png Resources/Vale.icns "$LILT_APP/Contents/Resources/"
 ditto .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework "$LILT_APP/Contents/Frameworks/Sparkle.framework"
 cp -f .build/checkouts/Sparkle/LICENSE "$LILT_APP/Contents/Resources/Sparkle-LICENSE.txt"
 python3 scripts/configure-updates.py "$LILT_APP/Contents/Info.plist"
