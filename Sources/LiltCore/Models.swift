@@ -1462,8 +1462,16 @@ public enum ComposerUndo {
 }
 
 public enum QuestionScroll {
-    /// A question that was just sent opens at its first line.
-    public static func opensAtTheStart(role: String?) -> Bool { role == "user" }
+    /// A question opens at its first line. A reply does too when it would run past the composer.
+    public static let shortReplyCharacters = 480
+    public static func opensAtTheStart(role: String?, text: String = "") -> Bool {
+        if role == "user" { return true }
+        guard role == "assistant" else { return false }
+        return isLong(text)
+    }
+    public static func isLong(_ text: String) -> Bool {
+        text.count > shortReplyCharacters || text.split(separator: "\n", omittingEmptySubsequences: false).count > 8
+    }
 }
 
 public enum FieldDrop {

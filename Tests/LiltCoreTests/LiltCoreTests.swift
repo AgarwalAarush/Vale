@@ -2228,6 +2228,9 @@ final class LiltCoreTests {
     func testQuestionOpensAtTheStart() {
         XCTAssertTrue(QuestionScroll.opensAtTheStart(role: "user"))
         XCTAssertFalse(QuestionScroll.opensAtTheStart(role: "assistant"))
+        XCTAssertFalse(QuestionScroll.opensAtTheStart(role: "assistant", text: "A short reply."))
+        XCTAssertTrue(QuestionScroll.opensAtTheStart(role: "assistant", text: String(repeating: "A long answer. ", count: 40)))
+        XCTAssertTrue(QuestionScroll.opensAtTheStart(role: "assistant", text: (0..<9).map { "Line \($0)" }.joined(separator: "\n")))
         XCTAssertFalse(QuestionScroll.opensAtTheStart(role: nil))
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)

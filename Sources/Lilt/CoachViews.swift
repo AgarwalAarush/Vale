@@ -180,16 +180,8 @@ struct CoachView: View {
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 18).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
                 }.scrollIndicators(.hidden)
-                .onChange(of: model.active?.messages.count) {
-                    let last = model.active?.messages.last
-                    if QuestionScroll.opensAtTheStart(role: last?.role), let id = last?.id { proxy.scrollTo(id, anchor: .top) }
-                    else { proxy.scrollTo("bottom", anchor: .bottom) }
-                }
-                .onChange(of: model.busy) {
-                    let last = model.active?.messages.last
-                    if model.busy, QuestionScroll.opensAtTheStart(role: last?.role) { return }
-                    proxy.scrollTo("bottom", anchor: .bottom)
-                }
+                .onChange(of: model.active?.messages.count) { scrollThread(proxy) }
+                .onChange(of: model.busy) { scrollThread(proxy) }
             }.frame(maxHeight: .infinity)
             if let session = model.active, EmptyCoach.sitsWithComposer(messageCount: session.messages.count) { EmptyGreeting(model: model, session: session) }
             }
@@ -260,6 +252,15 @@ struct CoachView: View {
                 Button("Keep writing", role: .cancel) {}
                 Button("Start guide") { model.startGuide() }
             } message: { Text("This sends what you have typed and clears the composer.") }
+    }
+
+    private func scrollThread(_ proxy: ScrollViewProxy) {
+        let last = model.active?.messages.last
+        if QuestionScroll.opensAtTheStart(role: last?.role, text: last?.text ?? ""), let id = last?.id {
+            proxy.scrollTo(id, anchor: .top)
+        } else {
+            proxy.scrollTo("bottom", anchor: .bottom)
+        }
     }
 }
 
