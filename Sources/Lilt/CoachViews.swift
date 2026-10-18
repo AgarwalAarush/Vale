@@ -4,6 +4,10 @@ import LiltCore
 struct CapsuleView: View {
     @ObservedObject var model: AppModel
     var openCoach: () -> Void
+    var close: () -> Void = {}
+    var chromeless = false
+    @State private var walkthrough = false
+    @State private var confirmGuide = false
     var body: some View {
         HStack(spacing: 12) {
             if CapsuleFace.nameLeads {
@@ -24,14 +28,36 @@ struct CapsuleView: View {
                 }.buttonStyle(.plain).help("Type a question")
             }
             Spacer(minLength: 0)
-            if CapsuleMic.shows(coachOpen: model.coachOpen) {
+            if CapsuleMic.shows(coachOpen: model.companionExpanded) {
                 IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : (CapsuleMic.idleIsQuiet(listening: model.voice.listening, speaking: model.voice.speaking, busy: model.busy) ? Theme.muted : Theme.ink)) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
             }
             if !CapsulePause.inTheMenu {
                 Button { model.togglePause() } label: { Label(CapsulePause.title(paused: model.paused), systemImage: model.paused ? "play.fill" : "pause.fill").font(.system(size: 12, weight: .medium)) }.buttonStyle(QuietButton(filled: true)).disabled(model.active == nil)
             }
             Menu {
-                Button("Open coach", action: openCoach)
+                if model.companionExpanded {
+                    Button(model.expanded ? "Compact size" : "Larger size") { model.expandCoach?() }
+                    Button("Hide") { close() }
+                } else {
+                    Button("Open", action: openCoach)
+                }
+                if ModePlace.inTheMenu {
+                    Button(ModePlace.assistantTitle) { model.setMode(.assistant) }
+                    Button(ModePlace.learnTitle) { model.setMode(.learn) }
+                    Divider()
+                }
+                Toggle("Read typed replies aloud", isOn: $model.readAloud)
+                Button("New chat") { model.newSession() }
+                Button("Point it out") { model.pointItOut() }.disabled(!PointControl.enabled(waiting: model.busy))
+                if GuideControl.inTheMenu {
+                    Button(GuideControl.title) {
+                        if GuideStart.needsConfirmation(draft: model.draft, attachmentCount: model.pendingFiles.count) { confirmGuide = true } else { model.startGuide() }
+                    }.disabled(model.busy || model.paused)
+                }
+                if model.active?.mode == .learn { Button("Show a full walkthrough…") { walkthrough = true }.disabled(model.active?.messages.isEmpty != false || model.busy) }
+                if FocusTimer.shows(mode: model.active?.mode ?? .assistant, running: (model.active?.duration ?? 0) > 0) {
+                    Menu("Focus timer") { Button("30 minutes") { model.setFocus(minutes: 30) }; Button("60 minutes") { model.setFocus(minutes: 60) }; Button("No timer") { model.setFocus(minutes: 0) } }
+                }
                 Button("Chat history") { model.showLibrary?() }
                 if CapsulePause.inTheMenu { Button(CapsulePause.title(paused: model.paused)) { model.togglePause() }.disabled(model.active == nil) }
                 if model.active != nil { Button("Close chat") { model.complete() } }
@@ -39,7 +65,15 @@ struct CapsuleView: View {
                 Button("Settings…") { model.showCoach?(); model.openSettingsInCoach() }
                 Button("Quit Vale") { NSApplication.shared.terminate(nil) }
             } label: { Image(systemName: "ellipsis").font(.system(size: 15)).frame(width: 20, height: 28) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("More options")
-        }.padding(.horizontal, 20).frame(height: 62).modifier(GlassSurface(radius: 20))
+        }.padding(.horizontal, 20).frame(height: 62).modifier(CapsuleChrome(enabled: !chromeless))
+            .alert("Show the walkthrough?", isPresented: $walkthrough) {
+                Button("Keep thinking", role: .cancel) {}
+                Button("Show walkthrough") { model.send("Please give me the full walkthrough now, explaining why each step works.", reveal: true) }
+            } message: { Text("This will reveal the method. Your current hints stay in the conversation.") }
+            .alert("Start a step-by-step guide?", isPresented: $confirmGuide) {
+                Button("Keep writing", role: .cancel) {}
+                Button("Start guide") { model.startGuide() }
+            } message: { Text("This sends what you have typed and clears the composer.") }
     }
 
     private var faceTitle: String {
@@ -72,9 +106,42 @@ struct CapsuleView: View {
     }
 }
 
+private struct CapsuleChrome: ViewModifier {
+    var enabled: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if enabled { content.modifier(GlassSurface(radius: 20)) } else { content }
+    }
+}
+
+struct CompanionView: View {
+    @ObservedObject var model: AppModel
+    var close: () -> Void
+    var relayout: () -> Void
+    var body: some View {
+        VStack(spacing: 0) {
+            CapsuleView(model: model, openCoach: { model.coachOpen = true; relayout() }, close: close, chromeless: true)
+            if model.companionExpanded {
+                CoachView(model: model, close: close, hidesHeader: true)
+            }
+        }
+        .modifier(GlassSurface(radius: model.companionExpanded ? 22 : 20))
+        .dropDestination(for:URL.self){urls,_ in
+            model.keepDroppedLinks(urls)
+            let files=urls.filter(\.isFileURL)
+            if !files.isEmpty { Task{await model.importFiles(files)} }
+            return DroppedLink.text(from:urls) != nil || !files.isEmpty
+        }
+        .onChange(of: model.companionExpanded) { _ in relayout() }
+        .onChange(of: model.expanded) { _ in relayout() }
+        .onChange(of: model.pendingFiles.count) { _ in relayout() }
+        .onChange(of: model.active?.messages.count) { _ in relayout() }
+    }
+}
+
 struct CoachView: View {
     @ObservedObject var model: AppModel
     var close: () -> Void
+    var hidesHeader = false
     @State private var walkthrough = false
     @State private var confirmGuide = false
     @State private var copiedReply: UUID?
@@ -83,7 +150,7 @@ struct CoachView: View {
         let sendReady = model.hasInput && !model.paused && model.active != nil && !model.importing
         let showSendHint = sendReady && !model.busy && !model.voice.listening && !model.voice.speaking && !model.voice.starting && !model.conversation
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
+            if !hidesHeader { HStack(spacing: 10) {
                 LogoMark(); Text(CoachHeading.title(for: model.active?.title)).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                 Spacer()
                 if !ModePlace.inTheMenu {
@@ -114,7 +181,7 @@ struct CoachView: View {
                 } label: { Image(systemName: "ellipsis").font(.system(size: 14)).frame(width: 24, height: 30) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 IconButton(symbol:model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",label:model.expanded ? "Compact assistant" : "Expand assistant"){model.expandCoach?()}
                 IconButton(symbol: CoachDismiss.symbol, label: CoachDismiss.label, action: close)
-            }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11)
+            }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11) }
             if !ShareRow.afterTheComposer { ContextStrip(model:model) }
             if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
             if model.active?.showsEarlierContextNotice == true {
@@ -248,13 +315,7 @@ struct CoachView: View {
                 Button{model.setConversation(!model.conversation)}label:{Label(ConversationControl.title(on: model.conversation),systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
             }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 8)
             if ShareRow.afterTheComposer, !model.settingsInCoach { ContextStrip(model: model).padding(.bottom, 12) }
-        }.modifier(GlassSurface(radius: 20))
-            .dropDestination(for:URL.self){urls,_ in
-                model.keepDroppedLinks(urls)
-                let files=urls.filter(\.isFileURL)
-                if !files.isEmpty { Task{await model.importFiles(files)} }
-                return DroppedLink.text(from:urls) != nil || !files.isEmpty
-            }
+        }.modifier(CapsuleChrome(enabled: !hidesHeader))
             .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
             .alert("Show the walkthrough?", isPresented: $walkthrough) {
                 Button("Keep thinking", role: .cancel) {}

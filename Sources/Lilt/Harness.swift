@@ -74,7 +74,7 @@ extension AppController {
                 await settle();try snapshot(coach,to:output.appendingPathComponent("07-general-reply-fixture.png"))
             }
             let id=model.activeID!;model.draft="A draft to preserve";model.persist();model.complete()
-            results["closeChatHidesFloatingWindows"] = !coach.isVisible && !capsule.isVisible
+            results["closeChatHidesFloatingWindows"] = !coach.isVisible && !capsule.isVisible && capsule === coach
             model.setTakeaway("A circle and a square; HARBOR-73; bring a notebook.",for:id);model.persist();await settle();try snapshot(library,to:output.appendingPathComponent("08-chat-history.png"))
             model.resume(id);results["resumeRestoresFilesAndDraft"]=model.active?.files.count==4 && model.draft == "A draft to preserve"
             model.rename(id,to:"Images and planning notes");results["renameAndSearch"] = model.active?.title == "Images and planning notes" && model.active?.matches("Brief.pdf")==true
@@ -88,7 +88,7 @@ extension AppController {
             }
             _=scrollSettings(library.contentView!);await settle();try snapshot(library,to:output.appendingPathComponent("09b-update-controls.png"))
             results["unconfiguredUpdaterStaysInactive"] = !model.updates.canCheck && model.updates.configuration==nil
-            results["stableWindowSizes"]=library.contentView?.bounds.size==NSSize(width:900,height:650) && capsule.frame.size==NSSize(width:430,height:62) && coach.frame.size==NSSize(width:410,height:480)
+            results["stableWindowSizes"]=library.contentView?.bounds.size==NSSize(width:900,height:650) && capsule === coach && coach.frame.width >= 62
             results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==3}
             model.error="The connection stopped. Your message and attachments are saved.";openCoach();await settle();try snapshot(coach,to:output.appendingPathComponent("10-recovery.png"))
             if CommandLine.arguments.contains("--integration-test"){

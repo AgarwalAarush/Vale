@@ -72,6 +72,10 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var selected: LearningSession? { sessions.first { $0.id == selectedID } }
     var contextName: String? { context.title }
     var pendingFiles: [AttachmentRecord] { active?.pendingAttachments ?? [] }
+    /// One window. Compact until a conversation, a file, an error, or an explicit open needs the thread.
+    var companionExpanded: Bool {
+        coachOpen || settingsInCoach || error != nil || !(active?.messages.isEmpty ?? true) || !pendingFiles.isEmpty || !(active?.files.isEmpty ?? true)
+    }
     var hasInput: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty }
     var status: String {
         let line = FooterStatus.line(paused: paused, importing: importing, microphoneStarting: voice.starting, listening: voice.listening, waiting: busy, speaking: voice.speaking, conversation: conversation)
