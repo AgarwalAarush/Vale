@@ -139,7 +139,19 @@ private final class SearchEventProbe: @unchecked Sendable {
             }
             try process.run()
             DispatchQueue.global(qos: .userInitiated).async {
-                try? input.fileHandleForWriting.write(contentsOf: Data(prompt.utf8)); try? input.fileHandleForWriting.close()
+                let bytes = Data(prompt.utf8)
+                var written = 0
+                if !bytes.isEmpty {
+                    do {
+                        try input.fileHandleForWriting.write(contentsOf: bytes)
+                        written = bytes.count
+                    } catch {
+                        written = 0
+                    }
+                }
+                if PromptDelivery.canClose(afterWriting: written, of: bytes.count) {
+                    try? input.fileHandleForWriting.close()
+                }
             }
             let timeout = DispatchWorkItem { [weak self] in
                 guard let self, self.process === process else { return }
