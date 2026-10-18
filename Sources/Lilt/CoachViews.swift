@@ -192,7 +192,7 @@ struct CoachView: View {
                 IconButton(symbol: CoachDismiss.symbol, label: CoachDismiss.label, action: close)
             }.padding(.horizontal, 18).padding(.top, 15).padding(.bottom, 11) }
             if !ShareRow.afterTheComposer { ContextStrip(model:model) }
-            if let warning=model.shortcutWarning{Text(warning).font(.system(size:10)).foregroundStyle(.orange).padding(.horizontal,20).padding(.top,8)}
+            if let warning=model.shortcutWarning{Text(warning).font(.system(size:11)).foregroundStyle(Theme.ink).padding(.horizontal,18).padding(.top,8)}
             if model.active?.showsEarlierContextNotice == true {
                 HStack(alignment:.firstTextBaseline,spacing:8){Text("Using recent messages only. Earlier context stays in History.");Spacer(minLength:0);Button("History"){model.showLibrary?()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}.font(.system(size:11)).foregroundStyle(Theme.muted).padding(.horizontal,18).padding(.top,8)
             }
@@ -206,7 +206,7 @@ struct CoachView: View {
             } else {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
                         if let session = model.active {
                             if session.messages.isEmpty, !EmptyCoach.sitsWithComposer(messageCount: session.messages.count) { EmptyGreeting(model: model, session: session) }
                             ForEach(session.messages) { message in
@@ -249,7 +249,7 @@ struct CoachView: View {
                                     .padding(.vertical, message.role == "user" ? 2 : 0)
                                     .padding(.leading, SpeakerTurn.trails(message.role) ? SpeakerTurn.leadingClearance : (ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0))
                                     .background(.clear)
-                                    .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.45)).frame(width: ReplyTurn.ruleWidth) } }
+                                    .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.line).frame(width: ReplyTurn.ruleWidth) } }
                                     .replyClip(message.role)
                                     .id(message.id)
                             }
@@ -270,7 +270,7 @@ struct CoachView: View {
             }
             if let error = model.error {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 11)).foregroundStyle(Color(red: 0.96, green: 0.77, blue: 0.49)); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
+                    HStack(alignment: .top, spacing: 8) { Text(error).font(.system(size: 12)).foregroundStyle(Theme.ink); Spacer(minLength: 0); Button { model.error = nil } label: { Image(systemName: "xmark").font(.system(size: 9)).foregroundStyle(Theme.muted) }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
                     HStack(spacing: 14) {
                         if model.errorOffersSettings { Button("Open Settings") { model.openSettingsInCoach() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent) }
                         if model.context.hasSelection { Button("Change window") { model.context.choose() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent) }
