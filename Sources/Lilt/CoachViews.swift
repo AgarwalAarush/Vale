@@ -211,14 +211,14 @@ struct CoachView: View {
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack(spacing: 6) {
-                                        if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.muted) }
+                                        if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 7)).foregroundStyle(Theme.muted.opacity(0.55)) }
                                         Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10)).foregroundStyle(Theme.muted)
                                         if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 10)).foregroundStyle(Theme.muted) }
                                     }
                                     if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(4).tint(Theme.accent).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
                                     ForEach(message.attachments.filter(SentPicture.shows)) { record in
                                         if let image = model.fileStore?.image(for: record) {
-                                            Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading).clipShape(RoundedRectangle(cornerRadius: 8))
+                                            Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading)
                                         }
                                     }
                                     if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
