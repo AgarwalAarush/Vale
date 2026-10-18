@@ -1106,6 +1106,11 @@ public enum ModePlace {
     public static let learnTitle = "Learn with hints"
 }
 
+public enum FocusTimer {
+    /// A study timer belongs to Learn. A general chat does not offer one, unless a timer is already running and can be turned off.
+    public static func shows(mode: ChatMode, running: Bool) -> Bool { mode == .learn || running }
+}
+
 public enum CapsuleSeat {
     /// The capsule sits on the coach so the two windows read as one companion.
     public static let onTheCoach = true

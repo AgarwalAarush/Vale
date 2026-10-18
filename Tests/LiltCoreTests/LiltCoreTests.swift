@@ -1732,6 +1732,16 @@ final class LiltCoreTests {
         XCTAssertEqual(chat.mode, .assistant)
     }
 
+    func testFocusTimerStaysInLearn() {
+        XCTAssertFalse(FocusTimer.shows(mode: .assistant, running: false))
+        XCTAssertTrue(FocusTimer.shows(mode: .learn, running: false))
+        XCTAssertTrue(FocusTimer.shows(mode: .assistant, running: true))
+        let chat = LearningSession(title: "New chat")
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(FocusTimer.shows(mode: chat.mode, running: chat.duration > 0))
+        XCTAssertFalse(chat.webEnabled)
+    }
+
     func testMicrophoneSitsWithTheTools() {
         XCTAssertTrue(MicPlacement.withTheTools)
         var chat=LearningSession(title:"New chat")
@@ -2770,6 +2780,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Idle wave stays quiet until voice",tests.testIdleWaveStaysQuietUntilVoice),
  ("Send sits on the typed line",tests.testSendSitsOnTheTypedLine),
  ("The send control looks ready",tests.testSendControlLooksReady),
+ ("A focus timer stays in Learn",tests.testFocusTimerStaysInLearn),
  ("Microphone sits with the tools",tests.testMicrophoneSitsWithTheTools),
  ("Empty thread says where the reply shows",tests.testEmptyThreadSaysWhereTheReplyShows),
  ("Coach dismiss is not a quit mark",tests.testCoachDismissIsNotAQuitMark),

@@ -107,7 +107,7 @@ struct CoachView: View {
                         }.disabled(model.busy || model.paused)
                     }
                     if model.active?.mode == .learn { Button("Show a full walkthrough…") { walkthrough = true }.disabled(model.active?.messages.isEmpty != false || model.busy) }
-                    Menu("Focus timer") {Button("30 minutes"){model.setFocus(minutes:30)};Button("60 minutes"){model.setFocus(minutes:60)};Button("No timer"){model.setFocus(minutes:0)}}
+                    if FocusTimer.shows(mode: model.active?.mode ?? .assistant, running: (model.active?.duration ?? 0) > 0) { Menu("Focus timer") {Button("30 minutes"){model.setFocus(minutes:30)};Button("60 minutes"){model.setFocus(minutes:60)};Button("No timer"){model.setFocus(minutes:0)}} }
                     Button("Close chat") { model.complete() }.disabled(model.active == nil)
                     Divider(); Button("Settings…") { model.openSettingsInCoach() }
                 } label: { Image(systemName: "ellipsis").font(.system(size: 14)).frame(width: 24, height: 30) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
