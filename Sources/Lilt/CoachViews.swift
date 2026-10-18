@@ -233,16 +233,16 @@ struct CoachView: View {
                                     }
                                     if message.role == "assistant" {
                                         let reading = ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking)
-                                        HStack(spacing: 4) {
-                                            IconButton(symbol: ReplyPlayback.symbol(reading: reading), label: ReplyPlayback.label(reading: reading), tint: reading ? Theme.accent : Theme.muted, compact: true) {
+                                        HStack(spacing: 14) {
+                                            Button(ReplyPlayback.label(reading: reading)) {
                                                 if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
-                                            }
-                                            IconButton(symbol: copiedReply == message.id ? "checkmark" : "doc.on.doc", label: copiedReply == message.id ? "Copied" : ReplyActions.copy, tint: copiedReply == message.id ? Theme.accent : Theme.muted, compact: true) {
+                                            }.buttonStyle(.plain).foregroundStyle(reading ? Theme.accent : Theme.muted)
+                                            Button(copiedReply == message.id ? "Copied" : ReplyActions.copy) {
                                                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(ReplyCopy.text(from: message.text), forType: .string)
                                                 let id = message.id; copiedReply = id
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if copiedReply == id { copiedReply = nil } }
-                                            }
-                                        }.padding(.leading, -7)
+                                            }.buttonStyle(.plain).foregroundStyle(copiedReply == message.id ? Theme.accent : Theme.muted)
+                                        }.font(.system(size: 11))
                                     }
                                 }.frame(maxWidth: .infinity, alignment: SpeakerTurn.trails(message.role) ? .trailing : .leading)
                                     .padding(.vertical, message.role == "user" ? 2 : 0)
@@ -277,7 +277,7 @@ struct CoachView: View {
                 }.padding(.horizontal, 18).padding(.bottom, 8)
             }
             if ReplyRetry.isAvailable(busy: model.busy, hasFailedQuestion: model.hasFailedQuestion, lastRole: model.active?.messages.last?.role) {
-                HStack { Button("Retry message") { model.retry() }.buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent); Spacer(minLength: 0) }.padding(.horizontal, 18).padding(.bottom, 8)
+                HStack { Button("Retry message") { model.retry() }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.accent); Spacer(minLength: 0) }.padding(.horizontal, 18).padding(.bottom, 8)
             }
             if model.paused, model.active != nil {
                 HStack { Text("Paused · mic and sharing off").font(.system(size: 11)).foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.accent) }.padding(.horizontal, 18).padding(.bottom, 6)
