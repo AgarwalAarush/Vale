@@ -1486,7 +1486,11 @@ public enum ComposerMarks {
 
 public enum NewChat {
     /// Starting another chat leaves the screen only when nothing is still being written.
+    public static let keptMessage = "Send or clear what you’ve written before starting a new chat."
     public static func leaves(hasUnsentWork: Bool) -> Bool { !hasUnsentWork }
+    public static func hasUnsentWork(draft: String, fileCount: Int, importing: Bool) -> Bool {
+        importing || fileCount > 0 || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 public enum PictureThumb {

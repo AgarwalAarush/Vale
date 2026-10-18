@@ -105,6 +105,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
         guard store != nil else { error="The chat library is unavailable. Restore the library folder before starting."; return }
+        let unsent = NewChat.hasUnsentWork(draft: draft, fileCount: active?.pendingAttachments.count ?? 0, importing: importing)
+        guard NewChat.leaves(hasUnsentWork: unsent) else { error = NewChat.keptMessage; return }
         settingsInCoach = false
         suspend()
         if !importing, let old = active, EmptyChat.canDiscard(title: old.title, messageCount: old.messages.count, draft: old.draft, fileCount: old.files.count, duration: old.duration, mode: old.mode, webEnabled: old.webEnabled) { sessions.removeAll { $0.id == old.id } }

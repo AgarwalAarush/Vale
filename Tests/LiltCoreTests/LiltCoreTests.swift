@@ -2285,6 +2285,12 @@ final class LiltCoreTests {
     func testNewChatKeepsAnUnsentQuestion() {
         XCTAssertFalse(NewChat.leaves(hasUnsentWork: true))
         XCTAssertTrue(NewChat.leaves(hasUnsentWork: false))
+        XCTAssertTrue(NewChat.hasUnsentWork(draft: "What is this?", fileCount: 0, importing: false))
+        XCTAssertTrue(NewChat.hasUnsentWork(draft: "", fileCount: 1, importing: false))
+        XCTAssertTrue(NewChat.hasUnsentWork(draft: "", fileCount: 0, importing: true))
+        XCTAssertFalse(NewChat.hasUnsentWork(draft: "  ", fileCount: 0, importing: false))
+        XCTAssertFalse(NewChat.leaves(hasUnsentWork: NewChat.hasUnsentWork(draft: "What is this?", fileCount: 0, importing: false)))
+        XCTAssertEqual(NewChat.keptMessage, "Send or clear what you’ve written before starting a new chat.")
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)
