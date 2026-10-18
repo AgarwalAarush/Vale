@@ -1534,6 +1534,10 @@ public enum FileCopy {
         guard same.count > 1, let index = same.firstIndex(where: { $0.id == record.id }) else { return record.detail }
         return "\(record.detail) · \(index + 1)"
     }
+    /// The chip line numbers copies and still says PDF when the file is a PDF.
+    public static func line(for record: AttachmentRecord, among records: [AttachmentRecord]) -> String {
+        PdfChip.shown(kind: record.kind, stored: detail(for: record, among: records))
+    }
 }
 
 public enum ReplyControls {
