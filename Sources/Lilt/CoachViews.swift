@@ -13,7 +13,7 @@ struct CapsuleView: View {
             if CapsuleFace.nameLeads {
                 Button(action: openCoach) {
                     HStack(spacing: 12) {
-                        ForEach(CapsuleFace.order(hasTimer: (model.active?.duration ?? 0) > 0, hasWindow: model.context.hasSelection), id: \.self) { part in
+                        ForEach(barParts, id: \.self) { part in
                             capsulePart(part)
                         }
                     }
@@ -76,6 +76,14 @@ struct CapsuleView: View {
             } message: { Text("This sends what you have typed and clears the composer.") }
     }
 
+    /// Idle bars stay on the compact bar. Once the thread is open they appear only while voice is in use.
+    private var barParts: [String] {
+        let parts = CapsuleFace.order(hasTimer: (model.active?.duration ?? 0) > 0, hasWindow: model.context.hasSelection)
+        let voiceOn = model.voice.listening || model.voice.speaking
+        guard model.companionExpanded, !voiceOn else { return parts }
+        return parts.filter { $0 != "bars" }
+    }
+
     private var faceTitle: String {
         if model.voice.speaking { return CapsuleSpeech.label(title: model.active?.title, busy: model.busy, speaking: true) }
         if model.busy { return CapsuleWait.label(title: model.active?.title, busy: true) }
@@ -121,6 +129,7 @@ struct CompanionView: View {
         VStack(spacing: 0) {
             CapsuleView(model: model, openCoach: { model.coachOpen = true; relayout() }, close: close, chromeless: true)
             if model.companionExpanded {
+                Rectangle().fill(Theme.line).frame(height: 0.7).padding(.horizontal, 16)
                 CoachView(model: model, close: close, hidesHeader: true)
             }
         }
@@ -203,11 +212,11 @@ struct CoachView: View {
                             ForEach(session.messages) { message in
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack(spacing: 6) {
-                                        if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.accent) }
-                                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 11, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
-                                        if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted) }
+                                        if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.accent.opacity(0.8)) }
+                                        Text(message.role == "user" ? "YOU" : ReplySpeaker.name).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted)
+                                        if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted.opacity(0.85)) }
                                     }
-                                    if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
+                                    if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
                                     ForEach(message.attachments.filter(SentPicture.shows)) { record in
                                         if let image = model.fileStore?.image(for: record) {
                                             Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading).clipShape(RoundedRectangle(cornerRadius: 8))
@@ -274,10 +283,11 @@ struct CoachView: View {
             if model.paused, model.active != nil {
                 HStack { Text("Paused · mic and sharing off").font(.system(size: 11)).foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.accent) }.padding(.horizontal, 20).padding(.bottom, 10)
             }
-            if model.active?.mode == .learn, !model.settingsInCoach { HStack(spacing: 9) {
-                Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
-                Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
-            }.disabled(model.busy || model.paused || model.active == nil).padding(.horizontal, 18).padding(.bottom, 10) }
+            if model.active?.mode == .learn, !model.settingsInCoach { HStack(spacing: 16) {
+                Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb") }.buttonStyle(.plain)
+                Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays") }.buttonStyle(.plain)
+                Spacer(minLength: 0)
+            }.font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused || model.active == nil).padding(.horizontal, 22).padding(.bottom, 8) }
             if !model.pendingFiles.isEmpty {
                 let row = HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,among:model.pendingFiles,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}.padding(.horizontal,18)
                 if FileScroll.usesScroll(fileCount: model.pendingFiles.count) { ScrollView(.horizontal){ row }.scrollIndicators(.hidden).stayInTheCoach().padding(.bottom,10) } else { row.stayInTheCoach().padding(.bottom,10) }
@@ -310,10 +320,10 @@ struct CoachView: View {
             }.padding(9).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.16), lineWidth: 0.8)).padding(.horizontal, 18)
             HStack {
-                Text(model.status).font(.system(size: 11, weight: .medium)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
+                Text(model.status).font(.system(size: 11)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                 Spacer()
                 Button{model.setConversation(!model.conversation)}label:{Label(ConversationControl.title(on: model.conversation),systemImage:model.conversation ? "waveform.circle.fill" : "waveform.circle").font(.system(size:10)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
-            }.padding(.horizontal, 21).padding(.top, 7).padding(.bottom, 8)
+            }.padding(.horizontal, 21).padding(.top, 6).padding(.bottom, 6)
             if ShareRow.afterTheComposer, !model.settingsInCoach { ContextStrip(model: model).padding(.bottom, 12) }
         }.modifier(CapsuleChrome(enabled: !hidesHeader))
             .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
@@ -373,11 +383,10 @@ struct EmptyGreeting: View {
     @ObservedObject var model: AppModel
     let session: LearningSession
     var body: some View {
-        VStack(alignment: .leading, spacing: EmptyCoach.blockSpacing) {
-            Text(session.mode == .learn ? "ONE HINT AT A TIME" : "HERE WHEN YOU NEED A HAND").font(.system(size: EmptyCoach.kickerSize, weight: .medium)).tracking(0.4).foregroundStyle(Theme.muted)
-            Text(session.mode == .learn ? "What are we\nworking through?" : "How can I help?").font(.system(size: 24, weight: .medium)).tracking(-0.55).lineSpacing(1)
-            Text(session.mode == .learn ? "Think it through with a little guidance." : OpeningLine.assistant).font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted).lineSpacing(3)
-            if EmptyThread.showsPlace { Text(EmptyThread.line).font(.system(size: 12)).foregroundStyle(Theme.muted) }
+        VStack(alignment: .leading, spacing: 8) {
+            Text(session.mode == .learn ? "What are we working through?" : "How can I help?").font(.system(size: 17, weight: .medium))
+            Text(session.mode == .learn ? "Think it through with a little guidance." : OpeningLine.assistant).font(.system(size: EmptyCoach.bodySize)).foregroundStyle(Theme.muted).lineSpacing(2)
+            if EmptyThread.showsPlace { Text(EmptyThread.line).font(.system(size: EmptyCoach.kickerSize)).foregroundStyle(Theme.muted) }
             if CodexNotice.shows(executableKnown: model.provider.executable != nil, lookupFinished: model.provider.lookupFinished) { CodexSignInCard(model: model) }
         }
         .padding(.horizontal, 18)

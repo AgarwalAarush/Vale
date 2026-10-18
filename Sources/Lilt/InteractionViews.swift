@@ -27,7 +27,7 @@ struct ContextStrip:View {
                     else if CaptureAge.shows(live: model.context.live, hasCapture: model.context.lastCapture != nil), let date=model.context.lastCapture{Text("\(max(0,Int(Date().timeIntervalSince(date))))s ago").monospacedDigit()}
                 }.font(.system(size:9)).foregroundStyle(Theme.muted)
             }
-        }.padding(.horizontal,12).padding(.vertical,8).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius:9)).padding(.horizontal,18)
+        }.padding(.horizontal,18).padding(.vertical,4)
     }
 }
 struct GuideCard:View {
