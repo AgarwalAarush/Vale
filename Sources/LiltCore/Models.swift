@@ -391,6 +391,10 @@ public enum StaleWindowAnswer {
     public static let notice = "Window changed during this answer"
     public static func applies(to message: Message) -> Bool { message.role == "assistant" && message.screenChanged }
     public static func exportNote(_ message: Message) -> String { applies(to: message) ? "\n\n\(notice)." : "" }
+    /// Refresh replaces that stale answer. The question that asked for it stays.
+    public static func dropsOnRefresh(lastRole: String?, windowChanged: Bool) -> Bool {
+        lastRole == "assistant" && windowChanged
+    }
 }
 
 public enum SpokenReply {

@@ -298,7 +298,13 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true)
     }
     func endGuide(){updateActive{$0.guide=nil};persist()}
-    func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,retry:true)}
+    func refreshAnswer(){
+        guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return}
+        if StaleWindowAnswer.dropsOnRefresh(lastRole: active?.messages.last?.role, windowChanged: active?.messages.last?.screenChanged == true) {
+            updateActive { if !$0.messages.isEmpty { $0.messages.removeLast() } }
+        }
+        send(question,retry:true)
+    }
     func stopSharing(){context.stop()}
     func previewContext(){
         let chatID=activeID;let generation=context.generation

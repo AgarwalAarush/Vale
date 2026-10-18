@@ -449,6 +449,9 @@ final class LiltCoreTests {
         let fresh=Message(role:"assistant",text:"Use the new button")
         XCTAssertTrue(StaleWindowAnswer.applies(to:stale))
         XCTAssertFalse(StaleWindowAnswer.applies(to:fresh))
+        XCTAssertTrue(StaleWindowAnswer.dropsOnRefresh(lastRole: "assistant", windowChanged: true))
+        XCTAssertFalse(StaleWindowAnswer.dropsOnRefresh(lastRole: "assistant", windowChanged: false))
+        XCTAssertFalse(StaleWindowAnswer.dropsOnRefresh(lastRole: "user", windowChanged: true))
         XCTAssertFalse(StaleWindowAnswer.applies(to:Message(role:"user",text:"Where?",screenChanged:true)))
         var chat=LearningSession(title:"Export")
         chat.messages=[Message(role:"user",text:"Where is it?"),stale]
