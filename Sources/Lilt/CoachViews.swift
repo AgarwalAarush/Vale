@@ -224,7 +224,8 @@ struct CoachView: View {
                             if SendGesture.stops(elapsed: Date().timeIntervalSince(model.sentAt)) { model.stopResponse() }
                         } else { model.send() }
                     } label: {
-                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink).frame(width: 30, height: 30).background(Theme.accent.opacity(!model.hasInput && !model.busy ? 0.12 : 0.35)).clipShape(Circle())
+                        let filled = SendMark.filled(hasInput: model.hasInput, busy: model.busy, hasChat: model.active != nil, importing: model.importing)
+                        Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(filled ? Color.black.opacity(0.82) : Theme.muted).frame(width: 30, height: 30).background(Theme.accent.opacity(filled ? 1 : 0.12)).clipShape(Circle())
                     }.buttonStyle(.plain).disabled(!model.busy && (!model.hasInput || !PausedTyping.allowsQuestion(paused: model.paused) || model.active == nil || model.importing)).help(model.busy ? "Stop response" : "Send message").accessibilityLabel(model.busy ? "Stop response" : "Send message")
                 }
             }.padding(9).background(.white.opacity(0.035)).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

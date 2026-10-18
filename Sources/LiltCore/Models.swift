@@ -1052,6 +1052,13 @@ public enum SendPlacement {
     public static let onTheTypedLine = true
 }
 
+public enum SendMark {
+    /// A question that can go out uses a solid send control. An empty field stays quiet so it does not look tappable.
+    public static func filled(hasInput: Bool, busy: Bool, hasChat: Bool, importing: Bool) -> Bool {
+        busy || (hasInput && hasChat && !importing)
+    }
+}
+
 public enum MicPlacement {
     /// The microphone sits with the other tools, not beside send.
     public static let withTheTools = true

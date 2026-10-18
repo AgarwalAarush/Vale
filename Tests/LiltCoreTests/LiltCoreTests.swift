@@ -1721,6 +1721,17 @@ final class LiltCoreTests {
         XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
     }
 
+    func testSendControlLooksReady() {
+        XCTAssertFalse(SendMark.filled(hasInput: false, busy: false, hasChat: true, importing: false))
+        XCTAssertTrue(SendMark.filled(hasInput: true, busy: false, hasChat: true, importing: false))
+        XCTAssertTrue(SendMark.filled(hasInput: false, busy: true, hasChat: true, importing: false))
+        XCTAssertFalse(SendMark.filled(hasInput: true, busy: false, hasChat: false, importing: false))
+        XCTAssertFalse(SendMark.filled(hasInput: true, busy: false, hasChat: true, importing: true))
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
+
     func testMicrophoneSitsWithTheTools() {
         XCTAssertTrue(MicPlacement.withTheTools)
         var chat=LearningSession(title:"New chat")
@@ -2753,6 +2764,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Conversation control looks pressable",tests.testConversationControlLooksPressable),
  ("Idle wave stays quiet until voice",tests.testIdleWaveStaysQuietUntilVoice),
  ("Send sits on the typed line",tests.testSendSitsOnTheTypedLine),
+ ("The send control looks ready",tests.testSendControlLooksReady),
  ("Microphone sits with the tools",tests.testMicrophoneSitsWithTheTools),
  ("Empty thread says where the reply shows",tests.testEmptyThreadSaysWhereTheReplyShows),
  ("Coach dismiss is not a quit mark",tests.testCoachDismissIsNotAQuitMark),
