@@ -991,6 +991,8 @@ public enum CapsuleMic {
     public static func idleIsQuiet(listening: Bool, speaking: Bool, busy: Bool) -> Bool {
         !listening && !speaking && !busy
     }
+    /// The coach already has the microphone. The capsule shows one only while that panel is hidden.
+    public static func shows(coachOpen: Bool) -> Bool { !coachOpen }
 }
 
 public enum ComposerPrompt {

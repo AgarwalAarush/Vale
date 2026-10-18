@@ -2563,6 +2563,13 @@ final class LiltCoreTests {
         XCTAssertFalse(PointControl.enabled(waiting: true))
     }
 
+    func testCapsuleMicStaysOffTheOpenCoach() {
+        XCTAssertFalse(CapsuleMic.shows(coachOpen: true))
+        XCTAssertTrue(CapsuleMic.shows(coachOpen: false))
+        XCTAssertTrue(CapsuleMic.idleIsQuiet(listening: false, speaking: false, busy: false))
+        XCTAssertFalse(CapsuleMic.idleIsQuiet(listening: true, speaking: false, busy: false))
+    }
+
 }
 
 @main struct CoreChecks {
@@ -2803,6 +2810,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Wait stays while a file is added",tests.testWaitStaysWhileAFileIsAdded),
  ("Retry waits until the reply fails",tests.testRetryWaitsUntilTheReplyFails),
  ("Point it out explains a missing window",tests.testPointControlExplainsAMissingWindow),
+ ("The capsule microphone waits while the coach is open",tests.testCapsuleMicStaysOffTheOpenCoach),
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

@@ -49,6 +49,7 @@ final class FloatingPanel: NSPanel {
             if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.newSession(); return nil }
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
             if CoachClose.hidesTheCoach(key: event.charactersIgnoringModifiers ?? "", command: mods.contains(.command), shift: mods.contains(.shift), option: mods.contains(.option), control: mods.contains(.control), coachIsKey: self.coach.isKeyWindow, blocked: self.coach.attachedSheet != nil || NSApp.modalWindow != nil) {
+                self.model.coachOpen = false
                 self.coach.orderOut(nil); return nil
             }
             return event
@@ -112,7 +113,7 @@ final class FloatingPanel: NSPanel {
             if let input = editor(root) { self.coach.makeFirstResponder(input) }
         }
     }
-    func openLibrary() { coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
+    func openLibrary() { model.coachOpen = false; coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     private func toggleCoachSize(){
         model.expanded.toggle();let visible=NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
         let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
