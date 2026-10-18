@@ -147,3 +147,8 @@ struct ContextSnapshot {
         stop();self.windowID=windowID;fixtureFrame=frame;captureTimeout=max(0.05,min(6,timeout));fixtureOnScreen=onScreen;fixturePointVisible=pointVisible;fixtureSource=source;title="Synthetic fixture window";changed?()
     }
 }
+
+private func windowPNG(_ image: CGImage) -> Data? {
+    let rep = NSBitmapImageRep(cgImage: image)
+    return WindowImage.png(primary: rep.representation(using: .png, properties: [:]), flattened: rep.tiffRepresentation)
+}
