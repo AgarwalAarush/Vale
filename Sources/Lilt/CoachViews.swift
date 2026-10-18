@@ -229,7 +229,7 @@ struct CoachView: View {
                                     }
                                     if message.highlightUnavailable{Text("Highlight unavailable · check your selected window").font(.system(size:11)).foregroundStyle(Theme.muted)}
                                     if message.screenChanged{
-                                        HStack(spacing: 8){Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}}.font(.system(size:11)).foregroundStyle(Theme.muted)
+                                        HStack(spacing: 8){Text("Window changed during this answer");if message.id==model.active?.messages.last?.id{Button("Refresh"){model.refreshAnswer()}.buttonStyle(.plain)}}.font(.system(size:11)).foregroundStyle(Theme.muted)
                                     }
                                     if message.role == "assistant" {
                                         let reading = ReplyPlayback.reading(message: message.text, spoken: model.voice.spokenText, speaking: model.voice.speaking)
@@ -315,16 +315,13 @@ struct CoachView: View {
                     }.disabled(model.busy || model.paused)
                     }
                     Spacer()
+                    Button{model.setConversation(!model.conversation)}label:{Text(ConversationControl.title(on: model.conversation)).font(.system(size:11)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
                     if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent, compact: true) { model.stopResponse() } }
                     IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : (model.voice.speaking || model.busy ? "Interrupt and talk" : "Talk"), tint: model.voice.listening ? Theme.accent : Theme.muted, compact: true) { model.toggleVoice() }.disabled(model.paused || model.active == nil)
                 }
             }.padding(.horizontal, 18).padding(.vertical, 8)
-            HStack {
-                let idle = !model.paused && !model.importing && !model.voice.starting && !model.voice.listening && !model.busy && !model.voice.speaking && !model.conversation && model.active?.webEnabled != true
-                if !idle { Text(model.status).font(.system(size: 11)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted) }
-                Spacer()
-                Button{model.setConversation(!model.conversation)}label:{Text(ConversationControl.title(on: model.conversation)).font(.system(size:11)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)}.buttonStyle(.plain).disabled(model.paused).help("Opt in to hands-free turn-taking; tap mic or press Escape to interrupt")
-            }.padding(.horizontal, 21).padding(.top, 4).padding(.bottom, 6)
+            let idle = !model.paused && !model.importing && !model.voice.starting && !model.voice.listening && !model.busy && !model.voice.speaking && !model.conversation && model.active?.webEnabled != true
+            if !idle { Text(model.status).font(.system(size: 11)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.bottom, 6) }
             if ShareRow.afterTheComposer, !model.settingsInCoach { ContextStrip(model: model).padding(.bottom, 12) }
         }.modifier(CapsuleChrome(enabled: !hidesHeader))
             .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
