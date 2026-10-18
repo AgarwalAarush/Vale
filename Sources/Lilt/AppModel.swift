@@ -196,7 +196,12 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                 if self.context.hasSelection {snapshot=try await self.context.capture()}
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
                 let leading=snapshot == nil ? 0 : 1
-                let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records,leadingImages:leading) ?? FileContext()}.value
+                let fileContext: FileContext
+                if MainThread.mustHop(isMainThread: Thread.isMainThread) {
+                    fileContext = try await MainActor.run { try files?.context(for: records, leadingImages: leading) ?? FileContext() }
+                } else {
+                    fileContext = try files?.context(for: records, leadingImages: leading) ?? FileContext()
+                }
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
                 var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
                 if QuestionPreview.shouldCloseOpenedPreview(questionWasSent: true) { self.closePreview?() }
