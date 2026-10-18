@@ -290,7 +290,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard !paused,!busy else{return}
         let goal=draft.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !goal.isEmpty || context.hasSelection else{error="Type what you’d like to work through, or share a window first.";return}
-        send(goal.isEmpty ? "Guide me through the selected window, one step at a time. Start by identifying the task and the first useful action." : "Guide me step by step: \(goal)",pointing:context.hasSelection,reveal:true,guideRequested:true)
+        send(goal.isEmpty ? GuideTurn.windowPrompt : GuideTurn.request(goal),pointing:context.hasSelection,reveal:true,guideRequested:true)
     }
     func moveGuide(_ delta:Int){
         guard let guide=active?.guide,!busy,!paused else{return}

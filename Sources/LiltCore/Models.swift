@@ -1092,6 +1092,19 @@ public enum GuideControl {
     public static let title = "Start step-by-step help"
 }
 
+public enum GuideTurn {
+    /// The model receives this when no goal was typed. The thread shows the action instead.
+    public static let windowPrompt = "Guide me through the selected window, one step at a time. Start by identifying the task and the first useful action."
+    public static let prefix = "Guide me step by step: "
+    public static func request(_ goal: String) -> String { prefix + goal }
+    public static func shown(_ question: String) -> String {
+        if question == windowPrompt { return GuideControl.title }
+        guard question.hasPrefix(prefix) else { return question }
+        let goal = String(question.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return goal.isEmpty ? question : goal
+    }
+}
+
 public enum HistoryMark {
     /// The control that opens chats uses a conversation mark, not a stack of windows.
     public static let symbol = "bubble.left.and.bubble.right"

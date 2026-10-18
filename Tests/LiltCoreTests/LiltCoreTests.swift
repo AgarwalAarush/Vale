@@ -1811,6 +1811,10 @@ final class LiltCoreTests {
     func testGuideControlLeavesTheComposer() {
         XCTAssertTrue(GuideControl.inTheMenu)
         XCTAssertEqual(GuideControl.title, "Start step-by-step help")
+        XCTAssertEqual(GuideTurn.shown(GuideTurn.windowPrompt), GuideControl.title)
+        XCTAssertEqual(GuideTurn.shown(GuideTurn.request("Install the update")), "Install the update")
+        XCTAssertEqual(GuideTurn.shown("What is this?"), "What is this?")
+        XCTAssertEqual(GuideTurn.request("Install the update"), "Guide me step by step: Install the update")
         var chat=LearningSession(title:"New chat")
         chat.draft="secret draft"
         XCTAssertFalse(chat.webEnabled)
