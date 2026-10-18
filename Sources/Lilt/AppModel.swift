@@ -170,14 +170,29 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         cancel();voice.stopListening();error=nil;busy=true;sentAt=Date()
         let id=UUID();requestID=id;let chatID=chat.id
         if !retry {
+            let previousTitle = chat.title
             chat.messages.append(Message(role:"user",text:stored,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
             if chat.title == "New chat", !stored.isEmpty { let heading = ChatHeading.from(stored); if !heading.isEmpty { chat.title = heading } }
             replace(chat)
             let cleared = !CommandPrompt.keepsComposerDraft(sendsOwnPrompt: preserveDraft)
             if cleared { draft = "" }
+            if !persist() {
+                let restored = SendSave.restore(previousTitle: previousTitle, messages: chat.messages, pending: [], question: stored, draft: raw)
+                chat.title = restored.title
+                chat.messages = restored.messages
+                chat.pendingAttachments = restored.pending
+                replace(chat)
+                if cleared {
+                    loading = true
+                    draft = restored.draft
+                    loading = false
+                }
+                busy = false
+                return
+            }
             if ComposerFocus.returns(afterSending: cleared) { focusComposer?() }
         }
-        failedQuestion=question;persist()
+        failedQuestion=question;if retry { persist() }
         var history=chat
         if history.messages.last?.role=="user", history.messages.last?.text==stored { history.messages.removeLast() }
         let newest=chat.messages.last{$0.role=="user"}?.attachments.map(\.id) ?? []
@@ -421,5 +436,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     private func replace(_ chat:LearningSession){if let i=sessions.firstIndex(where:{$0.id==chat.id}){sessions[i]=chat}}
     private func scheduleSave(){saveWork?.cancel();let work=DispatchWorkItem{[weak self]in self?.persist()};saveWork=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.5,execute:work)}
-    func persist(){do{sessions.sort{$0.updated>$1.updated};try store?.save(sessions)}catch{self.error="Couldn’t save your chat. Check available disk space."}}
+    @discardableResult
+    func persist() -> Bool {
+        do { sessions.sort{$0.updated>$1.updated}; try store?.save(sessions); return true }
+        catch { self.error="Couldn’t save your chat. Check available disk space."; return false }
+    }
 }
