@@ -149,7 +149,8 @@ struct CoachView: View {
                                     if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                                     if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
                                     if !message.attachments.isEmpty {
-                                        ScrollView(.horizontal) {HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,among:message.attachments,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}}.scrollIndicators(.hidden)
+                                        let row = HStack(spacing:7){ForEach(message.attachments){record in FileChip(record:record,among:message.attachments,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}
+                                        if FileScroll.usesScroll(fileCount: message.attachments.count) { ScrollView(.horizontal) { row }.scrollIndicators(.hidden) } else { row }
                                     }
                                     if message.highlightUnavailable{Label("Highlight unavailable · check your selected window",systemImage:"eye.slash").font(.system(size:10)).foregroundStyle(Theme.muted)}
                                     if message.screenChanged{
@@ -210,7 +211,10 @@ struct CoachView: View {
                 Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
                 Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays").frame(maxWidth: .infinity) }.buttonStyle(QuietButton())
             }.disabled(model.busy || model.paused || model.active == nil).padding(.horizontal, 18).padding(.bottom, 10) }
-            if !model.pendingFiles.isEmpty {ScrollView(.horizontal){HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,among:model.pendingFiles,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}.padding(.horizontal,18)}.scrollIndicators(.hidden).stayInTheCoach().padding(.bottom,10)}
+            if !model.pendingFiles.isEmpty {
+                let row = HStack(spacing:7){ForEach(model.pendingFiles){record in FileChip(record:record,among:model.pendingFiles,model:model,removable:SentFile.canRemove(id:record.id,session:model.active))}}.padding(.horizontal,18)
+                if FileScroll.usesScroll(fileCount: model.pendingFiles.count) { ScrollView(.horizontal){ row }.scrollIndicators(.hidden).stayInTheCoach().padding(.bottom,10) } else { row.stayInTheCoach().padding(.bottom,10) }
+            }
             VStack(spacing: 3) {
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text(WaitingField.shown(waiting: model.busy)).font(.system(size: 15, weight: ComposerPrompt.usesMediumWeight ? .medium : .regular)).foregroundStyle(Theme.muted.opacity(ComposerPrompt.opacity)).padding(.top, ComposerPrompt.topInset).padding(.leading, ComposerPrompt.leadingInset).allowsHitTesting(false) }
