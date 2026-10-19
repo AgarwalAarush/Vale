@@ -1,5 +1,5 @@
 # Vale
-Vale is a general-purpose native macOS companion. Learning is an optional mode. Preserve legacy Lilt storage and bundle identifiers. The assistant persona is not renamed by product branding. Preserve the original dark floating capsule and coach visual system. Typing is a first-class feature, voice optional. Avoid full-height chat sidebars and generic dashboards.
+Vale is a general-purpose native macOS companion. Learning is an optional mode. Preserve legacy Lilt storage and bundle identifiers. The assistant persona is not renamed by product branding. The owner requested a single native workspace and a significant visual redesign on 2026-10-19; PRODUCT.md and DESIGN.md replace the old capsule/coach layout contract. Chat, history, settings, notes and content previews stay inside that one workspace. Typing is a first-class feature, voice optional. Preserve all current capabilities and avoid generic dashboards.
 
 Build: `scripts/build.sh`. Core tests: `swift run --disable-sandbox LiltCoreChecks`. Native UI checks: `scripts/verify.sh` (added with app harness). Render and inspect screenshots of the actual AppKit/SwiftUI views, not a browser reconstruction.
 
