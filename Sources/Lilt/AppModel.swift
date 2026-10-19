@@ -103,7 +103,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         commitComposer?(); workspaceRoute = .settings; showWorkspace?()
     }
     func showHistory() {
-        commitComposer?(); workspaceRoute = .chat; sidebarVisible = true; compactHistoryVisible = true; historyFocus += 1; showWorkspace?()
+        commitComposer?(); inspector = nil; contextPreview = nil
+        workspaceRoute = .chat; sidebarVisible = true; compactHistoryVisible = true; historyFocus += 1; showWorkspace?()
     }
     func backToChat() { workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
     func navigateToChat(_ id: UUID) {

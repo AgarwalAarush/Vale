@@ -122,6 +122,7 @@ final class ComposerTextView: NSTextView {
 struct DraftEditor: NSViewRepresentable {
     @Binding var text: String
     var focusToken: Int = 0
+    var permitsFocus: (NSWindow) -> Bool = { _ in true }
     var submit: () -> Void
     var cancel: () -> Void
     var pasteFiles: (([URL]) -> Void)? = nil
@@ -181,7 +182,11 @@ struct DraftEditor: NSViewRepresentable {
             context.coordinator.lastFocus = focusToken
             if ComposerFocus.returns(afterSending: true) {
                 DispatchQueue.main.async { [weak editor, weak coordinator = context.coordinator] in
-                    guard let editor, let coordinator, coordinator.parent.focusToken == focusToken, let window = editor.window else { return }
+                    guard let editor, let coordinator, coordinator.parent.focusToken == focusToken, let window = editor.window,
+                          window.isVisible, !window.isMiniaturized, window.attachedSheet == nil, NSApp.modalWindow == nil,
+                          NSApp.keyWindow?.isSheet != true,
+                          !NSApp.windows.contains(where: { $0.isVisible && ($0.isSheet || $0.attachedSheet != nil) }),
+                          coordinator.parent.permitsFocus(window) else { return }
                     window.makeFirstResponder(editor)
                 }
             }

@@ -16,16 +16,17 @@ struct WorkspaceView: View {
     private var colorScheme: ColorScheme? { appearance == "light" ? .light : appearance == "dark" ? .dark : nil }
     var body: some View {
         GeometryReader { geometry in
-            let showRail = model.sidebarVisible && geometry.size.width >= 860
+            let compact = geometry.size.width < 860
+            let showRail = model.sidebarVisible && !compact
             let inlineInspector = geometry.size.width >= 1120 && model.workspaceRoute == .chat
-            let chatVisible = model.workspaceRoute == .chat && (model.inspector == nil || inlineInspector) && (showRail || !model.compactHistoryVisible)
+            let chatVisible = model.workspaceRoute == .chat && (model.inspector == nil || inlineInspector) && (!compact || !model.compactHistoryVisible)
             HStack(spacing: 0) {
                 if showRail {
                     navigation.frame(width: 224)
                     Rectangle().fill(Theme.line).frame(width: 1)
                 }
                 VStack(spacing: 0) {
-                    toolbar(compact: geometry.size.width < 860, chatCovered: !chatVisible)
+                    toolbar(compact: compact, chatCovered: !chatVisible)
                     Rectangle().fill(Theme.line).frame(height: 1)
                     HStack(spacing: 0) {
                         ZStack {
@@ -36,7 +37,7 @@ struct WorkspaceView: View {
                                 .accessibilityHidden(!chatVisible)
                             if model.workspaceRoute == .settings { SettingsView(model: model) }
                             else if model.inspector != nil && !inlineInspector { inspector }
-                            else if !showRail && model.compactHistoryVisible { compactNavigation }
+                            else if compact && model.compactHistoryVisible { compactNavigation }
                         }.frame(maxWidth: .infinity, maxHeight: .infinity)
                         if inlineInspector, model.inspector != nil {
                             Rectangle().fill(Theme.line).frame(width: 1)
@@ -93,7 +94,7 @@ struct WorkspaceView: View {
 
     private func toolbar(compact: Bool, chatCovered: Bool) -> some View {
         HStack(spacing: 12) {
-            IconButton(symbol: "sidebar.left", label: (compact ? model.compactHistoryVisible : model.sidebarVisible) ? "Hide chat history" : "Show chat history") { model.commitComposer?(); if compact { if model.compactHistoryVisible { model.backToChat() } else { model.showHistory() } } else { model.sidebarVisible.toggle() } }
+            IconButton(symbol: "sidebar.left", label: (compact ? model.compactHistoryVisible : model.sidebarVisible) ? "Hide chat history" : "Show chat history") { model.commitComposer?(); if compact { if model.compactHistoryVisible { model.backToChat() } else { model.showHistory() } } else { model.compactHistoryVisible = false; model.sidebarVisible.toggle() } }
             if model.workspaceRoute == .settings {
                 Button { model.backToChat() } label: { Label("Back to chat", systemImage: "chevron.left") }.buttonStyle(.plain).font(.system(size: 13))
             } else {
@@ -221,7 +222,8 @@ private struct WorkspaceHistory: View {
                     }
                 }.padding(.horizontal, 12)
             }
-        }.onChange(of: model.historyFocus) { searchFocused = true }
+        }.onAppear { if model.compactHistoryVisible { searchFocused = true } }
+        .onChange(of: model.historyFocus) { searchFocused = true }
     }
 }
 

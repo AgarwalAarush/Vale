@@ -76,7 +76,10 @@ struct CoachView: View {
             if !model.pendingFiles.isEmpty { ScrollView(.horizontal) { HStack(spacing: 8) { ForEach(model.pendingFiles) { FileChip(record: $0, among: model.pendingFiles, model: model, removable: true) } } }.scrollIndicators(.hidden).fixedSize(horizontal: false, vertical: true) }
             ZStack(alignment: .topLeading) {
                 if FieldPrompt.showsIdle(model.draft) { Text(model.busy ? "Add a thought for your next message…" : "Message Vale…").font(.system(size: 15)).foregroundStyle(Theme.muted).padding(.top, 5).padding(.leading, 2).allowsHitTesting(false) }
-                DraftEditor(text: Binding(get: { model.draft }, set: { model.editDraft($0) }), focusToken: model.composerFocus, submit: { if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
+                DraftEditor(text: Binding(get: { model.draft }, set: { model.editDraft($0) }), focusToken: model.composerFocus, permitsFocus: { window in
+                    model.workspaceRoute == .chat && model.inspector == nil &&
+                    (!model.compactHistoryVisible || (window.contentView?.bounds.width ?? 0) >= 860)
+                }, submit: { if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
                     let height = CGFloat(ComposerHeight.clamped(Double(measured))); if abs(composerHeight - height) > 0.5 { composerHeight = height }
                 }).frame(height: composerHeight)
             }.help("Return sends. Shift–Return adds a line.")

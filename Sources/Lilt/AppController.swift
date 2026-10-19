@@ -100,11 +100,15 @@ import LiltCore
         guard !nativeDialogOpen else { return }
         bringWorkspaceOnScreen(); model.workspaceOpen = true
         workspace.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-        if model.workspaceRoute == .chat, model.inspector == nil, !model.compactHistoryVisible || workspace.frame.width >= 860 { focusComposer(attemptsLeft: ComposerFocus.attempts) }
+        if composerMayReceiveFocus { focusComposer(attemptsLeft: ComposerFocus.attempts) }
         else { workspace.makeFirstResponder(nil) }
     }
+    private var composerMayReceiveFocus: Bool {
+        !nativeDialogOpen && workspace.isVisible && !workspace.isMiniaturized && model.workspaceRoute == .chat && model.inspector == nil &&
+        (!model.compactHistoryVisible || (workspace.contentView?.bounds.width ?? 0) >= 860)
+    }
     private func focusComposer(attemptsLeft: Int) {
-        guard !nativeDialogOpen, workspace.isVisible, model.workspaceRoute == .chat, model.inspector == nil, let root = workspace.contentView else { return }
+        guard composerMayReceiveFocus, let root = workspace.contentView else { return }
         func editor(_ view: NSView) -> NSView? {
             if view.identifier?.rawValue == "lilt.composer" { return view }
             return view.subviews.lazy.compactMap { editor($0) }.first
