@@ -119,6 +119,13 @@ extension AppController {
         results["workspaceCompactFilesOpenHistoryInPlace"] = oneWorkspace() && model.compactHistoryVisible && model.inspector == nil && model.draft == composedDraft
         results["workspaceCompactHistoryOwnsSearchFocus"] = workspace.firstResponder is NSTextView && workspace.firstResponder !== editor
         try await capture("workspace-11b-compact-history")
+        model.showInspector(.notes); await settle()
+        model.closeInspector(); await settle()
+        results["workspaceCompactHistoryNotesBackReachesComposer"] = oneWorkspace() && !model.compactHistoryVisible && model.inspector == nil && workspace.firstResponder === editor && model.activeID == originalID && model.draft == composedDraft && model.pendingFiles.map(\.id) == pendingIDs
+        model.showHistory(); await settle()
+        model.showInspector(.files); await settle()
+        model.closeInspector(); await settle()
+        results["workspaceCompactHistoryFilesBackReachesComposer"] = oneWorkspace() && !model.compactHistoryVisible && model.inspector == nil && workspace.firstResponder === editor && model.activeID == originalID && model.draft == composedDraft && model.pendingFiles.map(\.id) == pendingIDs
         model.backToChat(); await settle()
         model.closeInspector(); model.openSettings(); await settle()
         results["workspaceQueuedFocusDoesNotEnterHiddenComposer"] = model.workspaceRoute == .settings && workspace.firstResponder !== editor && model.draft == composedDraft
