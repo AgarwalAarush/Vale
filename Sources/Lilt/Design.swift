@@ -158,7 +158,7 @@ struct DraftEditor: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
-        let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false
+        let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false; editor.allowsUndo = true
         editor.font = .systemFont(ofSize: 15); editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
         editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
