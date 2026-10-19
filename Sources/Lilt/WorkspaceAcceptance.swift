@@ -147,6 +147,7 @@ extension AppController {
         results["workspaceNavigationPersistsDraftNotesAndFiles"] = loaded?.draft == composedDraft && loaded?.pendingAttachments.map(\.id) == pendingIDs && loaded?.takeaway.contains("HARBOR-73") == true
         try runMultipageAttachmentAcceptance(output: output, results: &results)
         try await runCursorReplyAcceptance(output: output, results: &results)
+        await runNativeUndoAcceptance(editor: editor, results: &results)
     }
 }
 
@@ -234,5 +235,30 @@ extension AppController {
         pending?(.success(TutorReply(text: "Generated fresh answer.")))
         await until { !restored.busy }
         results["cursorStaleRefreshReplacesOnlyStaleAnswerAndKeepsDraft"] = staleReplacedBeforeReply && restored.active?.messages.count == 2 && restored.active?.messages.last?.text == "Generated fresh answer." && restored.draft == "Keep this unsent personal draft."
+    }
+}
+
+extension AppController {
+    /// Uses actual NSTextView editing/undo; generated provider adapter prevents any live request.
+    func runNativeUndoAcceptance(editor: ComposerTextView, results: inout [String: Bool]) async {
+        let previousAdapter = model.provider.fixtureReply
+        defer { model.provider.fixtureReply = previousAdapter }
+        model.provider.fixtureReply = { _, _, _, _ in }
+        model.newSession(title: "Generated native undo origin"); await settle()
+        editor.insertText("Generated draft before navigation", replacementRange: NSRange(location: 0, length: 0))
+        await settle()
+        let navigationHadUndo = editor.undoManager?.canUndo == true
+        let oldID = model.activeID
+        model.newSession(title: "Generated native undo destination"); await settle()
+        results["workspaceNewChatDropsPriorDraftNativeUndo"] = navigationHadUndo && model.activeID != oldID && model.draft.isEmpty && editor.string.isEmpty && editor.undoManager?.canUndo != true
+        editor.insertText("Generated question for native Undo", replacementRange: NSRange(location: 0, length: 0))
+        await settle()
+        let sendHadUndo = editor.undoManager?.canUndo == true
+        model.send(); await settle()
+        let sentUndoWasCleared = editor.undoManager?.canUndo != true
+        if editor.undoManager?.canUndo == true { editor.undoManager?.undo() }
+        await settle()
+        results["workspaceSentQuestionCannotReturnThroughNativeUndo"] = sendHadUndo && sentUndoWasCleared && model.draft.isEmpty && editor.string.isEmpty && model.active?.messages.last?.role == "user"
+        model.stopInteraction()
     }
 }
