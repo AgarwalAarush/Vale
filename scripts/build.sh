@@ -8,7 +8,7 @@ export SWIFTPM_MODULECACHE_OVERRIDE="$LILT_CACHE"
 mkdir -p "$LILT_APP/Contents/MacOS" "$LILT_APP/Contents/Resources" "$LILT_APP/Contents/Frameworks" "$LILT_CACHE"
 swift -module-cache-path "$LILT_CACHE" scripts/icon.swift "$PWD/Resources"
 iconutil -c icns Resources/Vale.iconset -o Resources/Vale.icns
-LILT_NATIVE_BUILD_ARGS=(-c release --scratch-path .build --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$LILT_CACHE")
+LILT_NATIVE_BUILD_ARGS=(--product Lilt -c release --scratch-path .build --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$LILT_CACHE")
 swift build "${LILT_NATIVE_BUILD_ARGS[@]}"
 LILT_NATIVE_BIN_PATH="$(swift build "${LILT_NATIVE_BUILD_ARGS[@]}" --show-bin-path)"
 if [[ ! -f "$LILT_NATIVE_BIN_PATH/Lilt" ]]; then
@@ -32,7 +32,7 @@ case "${VALE_ARCH:-native}" in
   *) print -u2 "Choose VALE_ARCH=native, arm64, x86_64, or universal."; exit 1 ;;
 esac
 if [[ "$LILT_OTHER_ARCH" != "$LILT_NATIVE_ARCH" ]]; then
-  LILT_OTHER_BUILD_ARGS=(-c release --triple "$LILT_OTHER_ARCH-apple-macosx14.0" --scratch-path ".build-$LILT_OTHER_ARCH" --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$PWD/.build/module-cache-$LILT_OTHER_ARCH")
+  LILT_OTHER_BUILD_ARGS=(--product Lilt -c release --triple "$LILT_OTHER_ARCH-apple-macosx14.0" --scratch-path ".build-$LILT_OTHER_ARCH" --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -Xswiftc -module-cache-path -Xswiftc "$PWD/.build/module-cache-$LILT_OTHER_ARCH")
   swift build "${LILT_OTHER_BUILD_ARGS[@]}"
   LILT_OTHER_BIN_PATH="$(swift build "${LILT_OTHER_BUILD_ARGS[@]}" --show-bin-path)"
   if [[ ! -f "$LILT_OTHER_BIN_PATH/Lilt" ]]; then

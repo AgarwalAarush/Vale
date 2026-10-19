@@ -15,9 +15,12 @@
 <key>NSMicrophoneUsageDescription</key><string>Vale uses your microphone when you choose Talk or Conversation.</string>
 <key>NSSpeechRecognitionUsageDescription</key><string>Vale transcribes your spoken message when you choose Talk or Conversation. Typing is always available.</string>
 <key>NSScreenCaptureUsageDescription</key><string>Vale captures only the window you choose when you ask, so your assistant can see the context.</string>
-<key>SUEnableAutomaticChecks</key><false/>
-<key>SUAutomaticallyUpdate</key><false/>
-<key>SUAllowsAutomaticUpdates</key><false/>
+<key>SUFeedURL</key><string>https://github.com/AgarwalAarush/Vale/releases/latest/download/appcast.xml</string>
+<key>SUPublicEDKey</key><string>LIo57815YwKGJzwijcc6uut6Q4H5nShI95d99T6O4Z8=</string>
+<key>SUEnableAutomaticChecks</key><true/>
+<key>SUAutomaticallyUpdate</key><true/>
+<key>SUSignedFeedFailureExpirationInterval</key><integer>0</integer>
+<key>SUSendProfileInfo</key><false/>
 <key>SURequireSignedFeed</key><true/>
 <key>SUVerifyUpdateBeforeExtraction</key><true/>
 </dict></plist>
