@@ -15,10 +15,18 @@ import LiltCore
     private var statusMenu: NSMenu?
     private var showingStatusMenu = false
     private var testing = false
+    /// AppKit can dispatch menu key equivalents even when a local monitor yields
+    /// to a sheet. Share this boundary with validation, actions and focus retries.
+    private var nativeDialogOpen: Bool {
+        workspace?.attachedSheet != nil || NSApp.modalWindow != nil || NSApp.keyWindow?.isSheet == true ||
+        NSApp.windows.contains { $0.isVisible && ($0.isSheet || $0.attachedSheet != nil) }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        testing = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")
+        let releaseCheck = ReleaseFeedAcceptanceContext.read()
+        if CommandLine.arguments.contains("--verify-release-feed"), releaseCheck == nil { exit(2) }
+        testing = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") || releaseCheck != nil
         let directory = testing ? URL(fileURLWithPath: CommandLine.arguments.last!).appendingPathComponent("test-library") : nil
         model = AppModel(dataDirectory: directory)
         setupWorkspace(); setupMenu()
@@ -43,12 +51,15 @@ import LiltCore
         }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            let dialog = self.workspace.attachedSheet != nil || NSApp.modalWindow != nil || NSApp.keyWindow?.attachedSheet != nil
+            let dialog = self.nativeDialogOpen
             if event.keyCode == 53 {
                 if EscapeKey.stopsSession(dialogOpen: dialog) { self.model.stopInteraction(); self.clearAnnotation(); return nil }
             }
-            guard !dialog else { return event }
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
+            if dialog {
+                if modifiers == .command, let key = event.charactersIgnoringModifiers, ["n", ","].contains(key) { return nil }
+                return event
+            }
             if modifiers == .command {
                 switch event.charactersIgnoringModifiers {
                 case ",": self.model.openSettings(); return nil
@@ -61,7 +72,8 @@ import LiltCore
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.willSleepNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.screensDidSleepNotification, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(systemSuspend), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
-        if testing { Task { await runHarness() } }
+        if let releaseCheck { Task { await runReleaseFeedAcceptance(releaseCheck) } }
+        else if testing { Task { await runHarness() } }
         else { model.prepareChat(); openWorkspace() }
     }
 
@@ -85,13 +97,14 @@ import LiltCore
         }
     }
     func openWorkspace() {
+        guard !nativeDialogOpen else { return }
         bringWorkspaceOnScreen(); model.workspaceOpen = true
         workspace.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         if model.workspaceRoute == .chat, model.inspector == nil, !model.compactHistoryVisible || workspace.frame.width >= 860 { focusComposer(attemptsLeft: ComposerFocus.attempts) }
         else { workspace.makeFirstResponder(nil) }
     }
     private func focusComposer(attemptsLeft: Int) {
-        guard let root = workspace.contentView else { return }
+        guard !nativeDialogOpen, workspace.isVisible, model.workspaceRoute == .chat, model.inspector == nil, let root = workspace.contentView else { return }
         func editor(_ view: NSView) -> NSView? {
             if view.identifier?.rawValue == "lilt.composer" { return view }
             return view.subviews.lazy.compactMap { editor($0) }.first
@@ -187,10 +200,12 @@ import LiltCore
         return true
     }
     @objc func systemSuspend() { model.suspend() }
-    @objc private func menuClose() { NSApp.keyWindow?.performClose(nil) }
-    @objc private func menuNew() { model.newSession() }
-    @objc private func menuUpdates() { model.updates.check() }
+    @objc private func menuClose() { guard !nativeDialogOpen else { return }; NSApp.keyWindow?.performClose(nil) }
+    @objc private func menuNew() { guard !nativeDialogOpen else { return }; model.newSession() }
+    @objc private func menuUpdates() { guard !nativeDialogOpen, model.updates.canCheck else { return }; model.updates.check() }
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        let guardedActions = [#selector(menuNew), #selector(menuSettings), #selector(menuLibrary), #selector(menuPause), #selector(menuUpdates), #selector(menuWorkspace), #selector(menuClose)]
+        if nativeDialogOpen, let action = item.action, guardedActions.contains(action) { return false }
         if item.action == #selector(menuUpdates) { return model.updates.canCheck }
         if item.action == #selector(menuPause) { item.title = model.paused && model.active != nil ? "Resume" : "Pause chat"; return model.active != nil }
         return true
@@ -203,9 +218,9 @@ import LiltCore
         if !showingStatusMenu { openWorkspace() }
     }
     @objc private func menuWorkspace() { openWorkspace() }
-    @objc private func menuLibrary() { model.showHistory() }
-    @objc private func menuPause() { if model.active != nil { model.togglePause() } }
-    @objc private func menuSettings() { model.openSettings() }
+    @objc private func menuLibrary() { guard !nativeDialogOpen else { return }; model.showHistory() }
+    @objc private func menuPause() { guard !nativeDialogOpen, model.active != nil else { return }; model.togglePause() }
+    @objc private func menuSettings() { guard !nativeDialogOpen else { return }; model.openSettings() }
     @objc private func menuQuit() { NSApp.terminate(nil) }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { openWorkspace(); return true }
     func applicationWillTerminate(_ notification: Notification) {
