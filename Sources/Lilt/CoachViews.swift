@@ -60,13 +60,13 @@ struct CoachView: View {
                     HStack {
                         Text(model.status).font(.system(size: 12)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                         Spacer()
-                        Button { model.setConversation(!model.conversation) } label: { Label(model.conversation ? "Conversation on" : "Conversation", systemImage: model.conversation ? "waveform.circle.fill" : "waveform.circle") }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted).disabled(model.paused).help("Opt in to spoken turn-taking. Escape stops voice and sharing.")
+                        Button { model.setConversation(!model.conversation) } label: { Label(ConversationControl.title(on: model.conversation), systemImage: model.conversation ? "waveform.circle.fill" : "waveform.circle") }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted).disabled(model.paused).help("Opt in to spoken turn-taking. Escape stops voice and sharing.")
                     }.padding(.horizontal, 2)
                 }
             }.fixedSize(horizontal: false, vertical: true).layoutPriority(1).padding(.horizontal, 32).padding(.bottom, 22).frame(maxWidth: 740).frame(maxWidth: .infinity)
         }.background(Theme.background)
         .dropDestination(for: URL.self) { urls, _ in
-            if let links = DroppedLink.text(from: urls) { if model.active == nil { model.prepareChat() }; model.editDraft(model.draft.isEmpty ? links : model.draft + "\n" + links) }
+            model.keepDroppedLinks(urls)
             let files = FieldDrop.attaches(urls); if !files.isEmpty { model.importDroppedFiles(files) }
             return !files.isEmpty || DroppedLink.text(from: urls) != nil
         }
@@ -76,7 +76,7 @@ struct CoachView: View {
             if !model.pendingFiles.isEmpty { ScrollView(.horizontal) { HStack(spacing: 8) { ForEach(model.pendingFiles) { FileChip(record: $0, among: model.pendingFiles, model: model, removable: true) } } }.scrollIndicators(.hidden).fixedSize(horizontal: false, vertical: true) }
             ZStack(alignment: .topLeading) {
                 if FieldPrompt.showsIdle(model.draft) { Text(model.busy ? "Add a thought for your next message…" : "Message Vale…").font(.system(size: 15)).foregroundStyle(Theme.muted).padding(.top, 5).padding(.leading, 2).allowsHitTesting(false) }
-                DraftEditor(text: Binding(get: { model.draft }, set: { model.editDraft($0) }), focusToken: model.composerFocus, permitsFocus: { window in
+                DraftEditor(text: Binding(get: { model.draft }, set: { model.editDraft($0) }), draftID: model.activeID, focusToken: model.composerFocus, permitsFocus: { window in
                     model.workspaceRoute == .chat && model.inspector == nil &&
                     (!model.compactHistoryVisible || (window.contentView?.bounds.width ?? 0) >= 860)
                 }, submit: { if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
@@ -101,8 +101,10 @@ struct CoachView: View {
     }
     private func notice(_ text: String) -> some View { Text(text).font(.system(size: 12)).foregroundStyle(Theme.warning).frame(maxWidth: .infinity, alignment: .leading).padding(12) }
     private func revealLatest(_ proxy: ScrollViewProxy) {
-        if model.busy, !QuestionScroll.opensAtTheStart(role: model.active?.messages.last?.role) { proxy.scrollTo("thinking", anchor: .bottom) }
-        else if let id = model.active?.messages.last?.id { proxy.scrollTo(id, anchor: .top) }
+        let latest = model.active?.messages.last
+        let opensAtStart = QuestionScroll.opensAtTheStart(role: latest?.role, text: latest?.text ?? "")
+        if model.busy, !opensAtStart { proxy.scrollTo("thinking", anchor: .bottom) }
+        else if let id = latest?.id { proxy.scrollTo(id, anchor: opensAtStart ? .top : .bottom) }
         else { proxy.scrollTo("bottom", anchor: .bottom) }
     }
 }
@@ -185,11 +187,11 @@ private struct ReplyTools: View {
     var body: some View {
         HStack(spacing: 16) {
             Button {
-                if reading { model.voice.stopSpeaking() } else { model.voice.speak(message.text) }
-            } label: { Label(reading ? "Stop playback" : ReplyActions.read, systemImage: reading ? "stop.fill" : "speaker.wave.2") }
-                .buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(reading ? Theme.accent : Theme.muted).help(reading ? "Stop playback" : "Read this reply").accessibilityLabel(reading ? "Stop playback" : "Read this reply")
+                if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
+            } label: { Label(ReplyPlayback.label(reading: reading), systemImage: ReplyPlayback.symbol(reading: reading)) }
+                .buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(reading ? Theme.accent : Theme.muted).help(reading ? "Stop reading" : "Read this reply").accessibilityLabel(reading ? "Stop reading" : "Read this reply")
             Button {
-                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string)
+                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(ReplyCopy.text(from: message.text), forType: .string)
                 let token = UUID(); copyToken = token; copied = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if copyToken == token { copied = false } }
             } label: { Label(copied ? "Copied" : ReplyActions.copy, systemImage: copied ? "checkmark" : "doc.on.doc") }
@@ -217,7 +219,7 @@ struct MessageText: View {
                 }
             }
         } else {
-            Text(QuestionLine.shown(message.text))
+            Text(QuestionLine.shown(HintRequest.shown(GuideTurn.shown(PointRequest.shown(message.text)))))
         }
     }
     private func needsLiteral(_ text: String) -> Bool {

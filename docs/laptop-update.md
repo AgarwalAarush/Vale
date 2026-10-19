@@ -4,6 +4,8 @@ The 1.3.0 candidate supplies `Vale-1.3.0-laptop-setup.dmg` and an app-only signe
 
 Build 1.2.3 has no update source/key, so it cannot acquire the new configuration by checking for updates. One manual installation of the configured bootstrap is required. The 1.3 source enables automatic checks/downloads with editable saved preferences, strict signed-feed/archive verification and a pinned HTTPS release address. A prepared source/address is separate from an approved published feed. Consult the release manifest and live check receipt for delivery state.
 
+The final source reconciliation includes Cursor consolidation358ed76 and follow-up eaadb821. Compatible functional fixes are retained or adapted into the workspace. The older capsule plus separate History and block-New-chat variants are superseded by the explicit single-window and draft-preservation contract. Consult the source commit and native result maps in the final manifest.
+
 This session controls the Intel macserver and cannot install, remove apps or verify Gatekeeper on the user's laptop. The host's installed Lilt remains untouched. Target installation, chat/settings retention, obsolete-app cleanup and native relaunch must stay open until actually observed there. Developer ID/notarization and hardware consent/runtime are separate limits.
 
 <details>

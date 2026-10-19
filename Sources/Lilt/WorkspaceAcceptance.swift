@@ -1,6 +1,8 @@
 import AppKit
 import SwiftUI
 import LiltCore
+import ImageIO
+import UniformTypeIdentifiers
 
 extension AppController {
     /// Additional native acceptance for the new workspace. Uses only generated fixture data.
@@ -143,5 +145,94 @@ extension AppController {
         results["workspaceReopenKeepsTypingAndOneWindow"] = oneWorkspace() && model.activeID == originalID && model.draft == composedDraft && (!readyBeforeClose || !model.paused) && !model.voice.listening && !model.context.hasSelection
         let loaded = try SessionStore(directory: output.appendingPathComponent("test-library")).load().first(where: { $0.id == originalID })
         results["workspaceNavigationPersistsDraftNotesAndFiles"] = loaded?.draft == composedDraft && loaded?.pendingAttachments.map(\.id) == pendingIDs && loaded?.takeaway.contains("HARBOR-73") == true
+        try runMultipageAttachmentAcceptance(output: output, results: &results)
+        try await runCursorReplyAcceptance(output: output, results: &results)
+    }
+}
+
+private final class AttachmentPageFault: @unchecked Sendable {
+    private let lock = NSLock()
+    private var denied = true
+    func recover() { lock.lock(); denied = false; lock.unlock() }
+    func remove(_ url: URL) throws {
+        lock.lock(); let shouldDeny = denied && url.pathExtension == "pages"; lock.unlock()
+        if shouldDeny { throw AppError("Generated attachment-page deletion denial") }
+        try FileManager.default.removeItem(at: url)
+    }
+}
+
+extension AppController {
+    /// Generated native attachment bytes, private ownership and real deletion/retry; no personal library.
+    func runMultipageAttachmentAcceptance(output: URL, results: inout [String: Bool]) throws {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data as CFMutableData, UTType.tiff.identifier as CFString, 2, nil) else { throw AppError("Couldn’t create generated TIFF fixture") }
+        for name in ["A.png", "B.png"] {
+            guard let source = CGImageSourceCreateWithURL(output.appendingPathComponent("fixtures/" + name) as CFURL, nil) else { throw AppError("Missing generated image fixture") }
+            CGImageDestinationAddImageFromSource(destination, source, 0, nil)
+        }
+        guard CGImageDestinationFinalize(destination) else { throw AppError("Couldn’t finish generated TIFF fixture") }
+        let directory = output.appendingPathComponent("multipage-fixture-" + UUID().uuidString)
+        let fixture = AppModel(dataDirectory: directory)
+        defer { fixture.suspend() }
+        fixture.newSession(title: "Generated multi-page attachment")
+        fixture.pasteImage(data as Data)
+        guard let id = fixture.activeID, let record = fixture.active?.pendingAttachments.first, let files = fixture.fileStore else { throw AppError("Generated multi-page attachment import failed") }
+        let primary = files.url(for: record), pages = primary.appendingPathExtension("pages")
+        let context = try files.context(for: [record], leadingImages: 1)
+        func privateFile(_ url: URL) -> Bool {
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+            return (attributes?[.posixPermissions] as? NSNumber)?.intValue == 0o600
+        }
+        results["attachmentMultipageBytesPrivateAndNumberedAfterWindow"] = privateFile(primary) && privateFile(pages) && context.images.count == 2 && context.text.contains("Image 2") && context.text.contains("Image 3")
+        fixture.delete(id)
+        results["attachmentMultipageForgetPurgesAllOwnedBytes"] = fixture.sessions.isEmpty && !FileManager.default.fileExists(atPath: primary.path) && !FileManager.default.fileExists(atPath: pages.path)
+
+        let fault = AttachmentPageFault()
+        let retry = AppModel(dataDirectory: directory.appendingPathComponent("retry"), fileRemoval: { try fault.remove($0) })
+        defer { retry.suspend() }
+        retry.newSession(title: "Generated sidecar deletion retry")
+        retry.pasteImage(data as Data)
+        guard let retryID = retry.activeID, let retryRecord = retry.active?.pendingAttachments.first, let retryFiles = retry.fileStore else { throw AppError("Generated retry attachment import failed") }
+        let retryPrimary = retryFiles.url(for: retryRecord), retryPages = retryPrimary.appendingPathExtension("pages")
+        retry.delete(retryID)
+        results["attachmentMultipageDeletionFailureKeepsRetryableOwnership"] = retry.sessions.contains { $0.id == retryID } && retry.error != nil && FileManager.default.fileExists(atPath: retryPrimary.path) && FileManager.default.fileExists(atPath: retryPages.path)
+        fault.recover(); retry.delete(retryID)
+        results["attachmentMultipageRetryPurgesAllOwnedBytes"] = retry.sessions.isEmpty && retry.error == nil && !FileManager.default.fileExists(atPath: retryPrimary.path) && !FileManager.default.fileExists(atPath: retryPages.path)
+    }
+}
+
+extension AppController {
+    /// Real model/store transitions with a labeled generated provider adapter.
+    func runCursorReplyAcceptance(output: URL, results: inout [String: Bool]) async throws {
+        let directory = output.appendingPathComponent("cursor-reply-fixture-" + UUID().uuidString)
+        let initial = AppModel(dataDirectory: directory)
+        initial.voice.enableFixtures()
+        defer { initial.suspend() }
+        initial.newSession(title: "Generated saved attachment-only retry")
+        initial.pasteImage(try Data(contentsOf: output.appendingPathComponent("fixtures/A.png")))
+        initial.provider.fixtureReply = { _, _, _, complete in complete(.failure(AppError("Generated provider refusal"))) }
+        initial.send(); await until { !initial.busy }
+        initial.persist(); initial.suspend()
+        let restored = AppModel(dataDirectory: directory)
+        restored.voice.enableFixtures()
+        defer { restored.suspend() }
+        restored.prepareChat()
+        let questionID = restored.active?.messages.last?.id
+        var retriedImages = 0
+        restored.provider.fixtureReply = { _, images, _, complete in retriedImages = images.count; complete(.success(TutorReply(text: "Generated attachment retry answer."))) }
+        restored.retry(); await until { !restored.busy }
+        results["cursorSavedAttachmentOnlyRetryUsesOriginalFiles"] = restored.active?.messages.last?.text == "Generated attachment retry answer." && restored.active?.messages.filter { $0.role == "user" }.count == 1 && restored.active?.messages.first?.id == questionID && restored.active?.messages.first?.answerFailed == false && restored.active?.messages.first?.attachments.count == 1 && retriedImages == 1
+
+        restored.newSession(title: "Generated stale-answer refresh")
+        restored.updateActive { $0.messages = [Message(role: "user", text: "Which button?"), Message(role: "assistant", text: "Generated stale answer.", screenChanged: true)] }
+        restored.draft = "Keep this unsent personal draft."
+        restored.persist()
+        var pending: ((Result<TutorReply, Error>) -> Void)?
+        restored.provider.fixtureReply = { _, _, _, complete in pending = complete }
+        restored.refreshAnswer(); await until { pending != nil }
+        let staleReplacedBeforeReply = restored.busy && restored.active?.messages.count == 1 && restored.active?.messages.first?.text == "Which button?"
+        pending?(.success(TutorReply(text: "Generated fresh answer.")))
+        await until { !restored.busy }
+        results["cursorStaleRefreshReplacesOnlyStaleAnswerAndKeepsDraft"] = staleReplacedBeforeReply && restored.active?.messages.count == 2 && restored.active?.messages.last?.text == "Generated fresh answer." && restored.draft == "Keep this unsent personal draft."
     }
 }

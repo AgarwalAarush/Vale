@@ -2,6 +2,8 @@
 
 Vale 1.3.0 build 7 replaces the floating capsule/coach/history panels with one native workspace. Conversation and editor remain mounted while Settings or compact details are open. History resumes chats directly; Notes, files and previews stay in the window. Light, dark and system appearances share semantic native colors. PRODUCT.md and DESIGN.md are canonical.
 
+Source reconciliation includes Cursor’s consolidation and the latest audited follow-up eaadb821, retaining compatible behavior through the new workspace rather than restoring legacy windows. New chat saves unsent work with its originating chat.
+
 The configured candidate embeds a dedicated trusted public key and pinned GitHub HTTPS feed. Automatic checks and downloads default on, Settings exposes both choices, and startup preserves saved choices. An older unconfigured build needs one manual bootstrap replacement. Production publication, anonymously retrieved bytes and an actual configured-client check require separate delivery evidence. Consult the versioned release manifest and [verification](verification.md) for accepted results and delivery status; this source description is not a publication or laptop-install receipt.
 
 The genuine isolated Sparkle test automatically downloaded, installed and relaunched a newer compiled binary while retaining generated draft/note/file/preference fixtures. Altered feed and archive cases produced cryptographic SDK rejection with the old executable unchanged. These are loopback/ad-hoc fixture results. The candidate is ad-hoc signed, not notarized. Target-laptop/Apple Silicon runtime, real screen/mic consent, physical gestures and VoiceOver remain unverified. The tested CLI's Web search limitation remains explicit.

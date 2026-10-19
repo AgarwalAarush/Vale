@@ -107,7 +107,7 @@ public struct LearningSession: Codable, Identifiable, Equatable {
     }
     /// History row. A chat with no messages still shows an unsent draft instead of an empty state.
     public var listPreview: String {
-        if let last = messages.last { return last.text }
+        if let last = messages.last { return ChatListLine.text(from: last.text) ?? last.text }
         if let draft = unsentDraft, let line = draft.split(whereSeparator: \.isNewline).first {
             return String(line).trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -377,6 +377,14 @@ public enum WebSearchLabel {
     }
 }
 
+public enum WebSearchStatus {
+    /// After the person turns web search on, the idle footer says so. A wait, pause, or voice line stays as it is.
+    public static func line(base: String, enabled: Bool, idle: Bool) -> String {
+        guard enabled, idle else { return base }
+        return "\(base) · \(WebSearchLabel.title(enabled: true))"
+    }
+}
+
 public enum ComposerPaste {
     public enum Choice: Equatable, Sendable { case text, files, image }
     public static func choice(text: String?, hasFile: Bool, hasImage: Bool) -> Choice {
@@ -391,6 +399,10 @@ public enum StaleWindowAnswer {
     public static let notice = "Window changed during this answer"
     public static func applies(to message: Message) -> Bool { message.role == "assistant" && message.screenChanged }
     public static func exportNote(_ message: Message) -> String { applies(to: message) ? "\n\n\(notice)." : "" }
+    /// Refresh replaces that stale answer. The question that asked for it stays.
+    public static func dropsOnRefresh(lastRole: String?, windowChanged: Bool) -> Bool {
+        lastRole == "assistant" && windowChanged
+    }
 }
 
 public enum SpokenReply {
@@ -1038,7 +1050,8 @@ public enum ComposerRows {
 public enum ConversationControl {
     /// The optional voice control looks like a button. It still starts only when the person uses it.
     public static let showsAsButton = true
-    public static func title(on: Bool) -> String { on ? "End conversation" : "Conversation" }
+    /// Off is an action, not a status line. Turning it on starts hands-free listening.
+    public static func title(on: Bool) -> String { on ? "End conversation" : "Start conversation" }
 }
 
 public enum IdleWave {
@@ -1049,6 +1062,13 @@ public enum IdleWave {
 public enum SendPlacement {
     /// The send control sits on the typed line, not among the tool icons.
     public static let onTheTypedLine = true
+}
+
+public enum SendMark {
+    /// A question that can go out uses a solid send control. An empty field stays quiet so it does not look tappable.
+    public static func filled(hasInput: Bool, busy: Bool, hasChat: Bool, importing: Bool) -> Bool {
+        busy || (hasInput && hasChat && !importing)
+    }
 }
 
 public enum MicPlacement {
@@ -1080,6 +1100,19 @@ public enum GuideControl {
     public static let title = "Start step-by-step help"
 }
 
+public enum GuideTurn {
+    /// The model receives this when no goal was typed. The thread shows the action instead.
+    public static let windowPrompt = "Guide me through the selected window, one step at a time. Start by identifying the task and the first useful action."
+    public static let prefix = "Guide me step by step: "
+    public static func request(_ goal: String) -> String { prefix + goal }
+    public static func shown(_ question: String) -> String {
+        if question == windowPrompt { return GuideControl.title }
+        guard question.hasPrefix(prefix) else { return question }
+        let goal = String(question.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return goal.isEmpty ? question : goal
+    }
+}
+
 public enum HistoryMark {
     /// The control that opens chats uses a conversation mark, not a stack of windows.
     public static let symbol = "bubble.left.and.bubble.right"
@@ -1096,6 +1129,11 @@ public enum ModePlace {
     public static let inTheMenu = true
     public static let assistantTitle = "Assistant"
     public static let learnTitle = "Learn with hints"
+}
+
+public enum FocusTimer {
+    /// A study timer belongs to Learn. A general chat does not offer one, unless a timer is already running and can be turned off.
+    public static func shows(mode: ChatMode, running: Bool) -> Bool { mode == .learn || running }
 }
 
 public enum CapsuleSeat {
@@ -1285,8 +1323,13 @@ public enum ReplyWait {
 public enum ReplyPlayback {
     /// The reply being read is the one whose control can stop playback.
     public static func reading(message: String, spoken: String?, speaking: Bool) -> Bool {
-        speaking && !message.isEmpty && spoken == message
+        guard speaking, let spoken, !spoken.isEmpty, !message.isEmpty else { return false }
+        if spoken == message { return true }
+        let cleaned = SpokenReply.text(from: message)
+        return !cleaned.isEmpty && spoken == cleaned
     }
+    public static func symbol(reading: Bool) -> String { reading ? "stop.fill" : "speaker.wave.2" }
+    public static func label(reading: Bool) -> String { reading ? "Stop reading" : ReplyActions.read }
 }
 
 public enum ReplySpeaker {
@@ -1427,21 +1470,49 @@ public enum ReplyActions {
     public static func titles() -> [String] { [read, copy] }
 }
 
+public enum ReplyCopy {
+    /// Copy keeps the words on screen, including an address the reply shows. A code block stays as written.
+    public static func text(from source: String) -> String {
+        let shown = ReplyAddress.forDisplay(source)
+        return ReplyCode.segments(shown).map { segment in
+            segment.code ? segment.text : visible(segment.text)
+        }.joined()
+    }
+    private static func visible(_ prose: String) -> String {
+        let links = prose.replacingOccurrences(of: #"\[([^\]]+)\]\([^\)]+\)"#, with: "$1", options: .regularExpression)
+        return links.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
+    }
+}
+
 public enum FailedAnswer {
     /// A question whose reply failed, once the wait has ended.
     public static let label = "No answer"
     public static func shows(failed: Bool, waiting: Bool) -> Bool { failed && !waiting }
+    /// An answer that arrived is not a failed question.
+    public static func stillFailed(hadFailed: Bool, answerArrived: Bool) -> Bool { hadFailed && !answerArrived }
 }
 
 public enum ComposerUndo {
     /// Replacing the composer from the saved draft must not restore a question that already went out.
     public static let dropsSentText = true
     public static func restoresSentText() -> Bool { !dropsSentText }
+    /// Clearing a written question drops its undo stack so Undo cannot put that question back.
+    public static func clearsUndo(previous: String, replacement: String) -> Bool {
+        dropsSentText && !previous.isEmpty && replacement.isEmpty
+    }
 }
 
 public enum QuestionScroll {
-    /// A question that was just sent opens at its first line.
-    public static func opensAtTheStart(role: String?) -> Bool { role == "user" }
+    /// A question opens at its first line. A reply does too when it would run past the composer.
+    public static let shortReplyCharacters = 480
+    public static func opensAtTheStart(role: String?, text: String = "") -> Bool {
+        if role == "user" { return true }
+        guard role == "assistant" else { return false }
+        return isLong(text)
+    }
+    public static func isLong(_ text: String) -> Bool {
+        text.count > shortReplyCharacters || text.split(separator: "\n", omittingEmptySubsequences: false).count > 8
+    }
 }
 
 public enum FieldDrop {
@@ -1468,7 +1539,11 @@ public enum ComposerMarks {
 
 public enum NewChat {
     /// Starting another chat leaves the screen only when nothing is still being written.
+    public static let keptMessage = "Send or clear what you’ve written before starting a new chat."
     public static func leaves(hasUnsentWork: Bool) -> Bool { !hasUnsentWork }
+    public static func hasUnsentWork(draft: String, fileCount: Int, importing: Bool) -> Bool {
+        importing || fileCount > 0 || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 public enum PictureThumb {
@@ -1520,6 +1595,10 @@ public enum FileCopy {
         let same = records.filter { $0.name == record.name }
         guard same.count > 1, let index = same.firstIndex(where: { $0.id == record.id }) else { return record.detail }
         return "\(record.detail) · \(index + 1)"
+    }
+    /// The chip line numbers copies and still says PDF when the file is a PDF.
+    public static func line(for record: AttachmentRecord, among records: [AttachmentRecord]) -> String {
+        PdfChip.shown(kind: record.kind, stored: detail(for: record, among: records))
     }
 }
 
@@ -1576,9 +1655,18 @@ public enum FieldSurface {
 }
 
 public enum PdfChip {
-    /// The chip says it is a PDF, not only a page count.
+    /// The chip says it is a PDF, not only a page count. The mark is a document, not rich text.
+    public static let symbol = "doc.fill"
     public static func detail(pages: Int) -> String {
         "PDF · \(pages) \(pages == 1 ? "page" : "pages")"
+    }
+    /// A stored page count still reads as a PDF. Other files keep the line they already have.
+    public static func shown(kind: AttachmentRecord.Kind, stored: String) -> String {
+        guard kind == .pdf else { return stored }
+        let trimmed = stored.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("PDF") { return trimmed }
+        if trimmed.isEmpty { return "PDF" }
+        return "PDF · \(trimmed)"
     }
 }
 

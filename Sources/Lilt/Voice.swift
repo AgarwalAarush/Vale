@@ -83,6 +83,7 @@ import LiltCore
         request?.endAudio();recognition?.cancel();recognition=nil;request=nil;recognizer=nil;listening=false
     }
     func speak(_ text:String){
+        guard SpeechStart.speaks(text) else{return}
         let spoken=SpokenReply.text(from:text)
         guard !spoken.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return}
         stopListening();stopSpeaking();playbackGeneration=UUID();spokenText=text;speaking=true

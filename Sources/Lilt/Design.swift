@@ -118,9 +118,29 @@ final class ComposerTextView: NSTextView {
         }
         super.keyDown(with: event)
     }
+    override func resignFirstResponder() -> Bool {
+        commitMarkedTextIfNeeded()
+        return super.resignFirstResponder()
+    }
+    /// Keep an in-progress IME word when leaving or sending from this editor.
+    func commitMarkedTextIfNeeded() {
+        guard ComposerSubmit.commitsMarkedTextBeforeSend(hasMarkedText: hasMarkedText()) else { return }
+        let range = markedRange()
+        let original = string as NSString
+        guard range.location != NSNotFound, range.location >= 0, range.location <= original.length,
+              range.length > 0, range.length <= original.length - range.location else { unmarkText(); return }
+        let committed = original.substring(with: range)
+        unmarkText()
+        let current = string as NSString
+        let length = (committed as NSString).length
+        let kept = range.location <= current.length && length <= current.length - range.location &&
+            current.substring(with: NSRange(location: range.location, length: length)) == committed
+        if !kept { insertText(committed, replacementRange: NSRange(location: min(range.location, current.length), length: 0)) }
+    }
 }
 struct DraftEditor: NSViewRepresentable {
     @Binding var text: String
+    var draftID: UUID? = nil
     var focusToken: Int = 0
     var permitsFocus: (NSWindow) -> Bool = { _ in true }
     var submit: () -> Void
@@ -166,15 +186,20 @@ struct DraftEditor: NSViewRepresentable {
             // Ordinary edits already publish through textDidChange. Only a live IME
             // composition can need committing here; model changes may be newer than this view.
             guard ComposerSubmit.commitsMarkedTextBeforeSend(hasMarkedText: editor.hasMarkedText()) else { return }
-            editor.unmarkText()
+            editor.commitMarkedTextIfNeeded()
             if editor.string != coordinator.parent.text { coordinator.parent.text = editor.string }
         }
+        let ownerChanged = context.coordinator.draftID != draftID
+        context.coordinator.draftID = draftID
+        if ownerChanged { editor.undoManager?.removeAllActions() }
         if editor.string != text, !editor.hasMarkedText() {
             let previous = editor.string.utf16.count
             let caret = editor.selectedRange().location
-            if ComposerUndo.dropsSentText { editor.undoManager?.disableUndoRegistration() }
+            let dropUndo = ComposerUndo.clearsUndo(previous: editor.string, replacement: text)
+            editor.undoManager?.disableUndoRegistration()
             editor.string = text
-            if ComposerUndo.dropsSentText { editor.undoManager?.enableUndoRegistration(); editor.undoManager?.removeAllActions() }
+            editor.undoManager?.enableUndoRegistration()
+            if dropUndo { editor.undoManager?.removeAllActions() }
             editor.setSelectedRange(NSRange(location: DraftCaret.location(previousUTF16: previous, nextUTF16: text.utf16.count, caret: caret), length: 0))
             editor.scrollRangeToVisible(editor.selectedRange())
         }
@@ -199,7 +224,8 @@ struct DraftEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: DraftEditor
         var lastFocus: Int
-        init(_ parent: DraftEditor) { self.parent = parent; lastFocus = parent.focusToken }
+        var draftID: UUID?
+        init(_ parent: DraftEditor) { self.parent = parent; lastFocus = parent.focusToken; draftID = parent.draftID }
         func textDidChange(_ notification: Notification) {
             guard let editor = notification.object as? NSTextView else { return }
             parent.text = editor.string

@@ -266,7 +266,17 @@ public enum GuideInstall {
 
 public enum PointRequest {
     public static let prompt = "Point out the relevant part of the shared window, with one short explanation."
+    /// The thread shows the action the person used. The model still receives the full prompt.
+    public static let title = "Point it out"
     public static func wasPointing(_ question: String) -> Bool { question == prompt }
+    public static func shown(_ question: String) -> String { wasPointing(question) ? title : question }
+}
+
+public enum HintRequest {
+    public static let prompt = "Give me one slightly more concrete hint, without revealing the full solution."
+    /// The thread shows Hint. The model still receives the full prompt.
+    public static let title = "Hint"
+    public static func shown(_ question: String) -> String { question == prompt ? title : question }
 }
 
 public enum ReadableLine {
@@ -321,6 +331,12 @@ public enum DroppedLink {
         }
         guard !links.isEmpty else { return nil }
         return links.joined(separator: "\n")
+    }
+    /// The address is added to what is already written. It does not replace it.
+    public static func inserted(into draft: String, links: String) -> String {
+        if draft.isEmpty { return links }
+        if draft.hasSuffix("\n") { return draft + links }
+        return draft + "\n" + links
     }
 }
 

@@ -36,6 +36,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var onboarding = false // Kept for old preference compatibility; no setup gate.
     @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet {
         UserDefaults.standard.set(readAloud, forKey: "readAloud")
+        guard readAloud != oldValue else { return }
         if let text = ReadAloud.replyToSpeak(messages: active?.messages ?? [], enabled: readAloud, alreadySpeaking: voice.speaking) { voice.speak(text) }
         else if !readAloud && !conversation { voice.stopSpeaking() }
     } }
@@ -53,6 +54,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var loading = false
     private var observerTokens: [AnyCancellable] = []
     private var failedQuestion: String?
+    var hasFailedQuestion: Bool { failedQuestion != nil }
     private var guideEpoch = UUID()
     private var spokenDraftPrefix = ""
     private var spokenReplyGeneration = UUID()
@@ -170,7 +172,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let composerBeforeSend = draft
         let raw = override ?? draft
         let kept = OutgoingMessage.text(raw)
-        let hasFiles = !chat.pendingAttachments.isEmpty
+        let retryFiles = retry ? chat.messages.last(where:{$0.role=="user"})?.attachments ?? [] : []
+        let hasFiles = !chat.pendingAttachments.isEmpty || !retryFiles.isEmpty
         let stored = kept ?? (hasFiles ? "" : nil)
         guard let stored else { return }
         let question = kept ?? AttachmentQuestion.modelPrompt
@@ -236,6 +239,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             let shown=ShownAnswer(text:reply.text);let answerID=UUID()
                             self.busy=false;self.failedQuestion=nil
                             self.updateChat(chatID){chat in
+                                if let index=chat.messages.lastIndex(where:{$0.role=="user"}) {
+                                    chat.messages[index].answerFailed=FailedAnswer.stillFailed(hadFailed:chat.messages[index].answerFailed,answerArrived:true)
+                                }
                                 chat.messages.append(Message(role:"assistant",text:shown.text,id:answerID));chat.updated=Date()
                             }
                             self.persist()
@@ -280,8 +286,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
     }
     func retry(){if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
-    func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send("Give me one slightly more concrete hint, without revealing the full solution.",preserveDraft:true)}
-    func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send("Point out the relevant part of the shared window, with one short explanation.",pointing:true,preserveDraft:true)}
+    func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send(HintRequest.prompt,preserveDraft:true)}
+    func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send(PointRequest.prompt,pointing:true,preserveDraft:true)}
     func toggleVoice(){
         guard !paused,active != nil else{return}
         if voice.listening{voice.finishUtterance()}
@@ -324,7 +330,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard !paused,!busy else{return}
         let goal=draft.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !goal.isEmpty || context.hasSelection else{error="Type what you’d like to work through, or share a window first.";return}
-        send(goal.isEmpty ? "Guide me through the selected window, one step at a time. Start by identifying the task and the first useful action." : "Guide me step by step: \(goal)",pointing:context.hasSelection,reveal:true,guideRequested:true)
+        send(goal.isEmpty ? GuideTurn.windowPrompt : GuideTurn.request(goal),pointing:context.hasSelection,reveal:true,guideRequested:true)
     }
     func moveGuide(_ delta:Int){
         guard let guide=active?.guide,!busy,!paused else{return}
@@ -334,7 +340,20 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         send("Help me with step \(index+1): \(guide.plan.steps[index]). ",pointing:context.hasSelection,reveal:true,preserveDraft:true)
     }
     func endGuide(){guideEpoch=UUID();updateActive{$0.guide=nil};persist()}
-    func refreshAnswer(){guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return};send(question,pointing:PointRequest.wasPointing(question),retry:true)}
+    func refreshAnswer(){
+        guard let question=active?.messages.last(where:{$0.role=="user"})?.text else{return}
+        let chatID=activeID
+        var staleAnswer:Message?
+        if !paused,!importing,StaleWindowAnswer.dropsOnRefresh(lastRole:active?.messages.last?.role,windowChanged:active?.messages.last?.screenChanged == true) {
+            staleAnswer=active?.messages.last
+            updateActive { $0.messages.removeLast() }
+        }
+        send(question,pointing:PointRequest.wasPointing(question),retry:true)
+        if !busy,let staleAnswer,let chatID,activeID==chatID {
+            updateChat(chatID){$0.messages.append(staleAnswer)}
+            persist()
+        }
+    }
     func stopSharing(){context.stop()}
     func previewContext(){
         guard HeldPreview.canShow(held: context.preview != nil), let image=context.preview else { return }
@@ -348,12 +367,16 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         Task{await importFiles(urls)}
     }
     func importDroppedFiles(_ urls: [URL]) {
-        if let text = DroppedLink.text(from: urls) { editDraft(draft.isEmpty ? text : draft + "\n" + text) }
+        keepDroppedLinks(urls)
         let held = urls.filter { ScopedRead.needsAccess(isFileURL: $0.isFileURL) && $0.startAccessingSecurityScopedResource() }
         Task {
             defer { for url in held { url.stopAccessingSecurityScopedResource() } }
             if urls.contains(where: \.isFileURL) { await importFiles(urls) }
         }
+    }
+    func keepDroppedLinks(_ urls:[URL]){
+        guard let links=DroppedLink.text(from:urls) else{return}
+        editDraft(DroppedLink.inserted(into:draft,links:links))
     }
     func importFiles(_ urls:[URL]) async {
         if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: activeID != nil, importing: importing) { error = refusal; return }

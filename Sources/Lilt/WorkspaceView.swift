@@ -127,10 +127,12 @@ struct WorkspaceView: View {
                         Button("Start step-by-step guide…") { if GuideStart.needsConfirmation(draft: model.draft, attachmentCount: model.pendingFiles.count) { confirmGuide = true } else { model.startGuide() } }.disabled(model.busy || model.paused)
                         Button("Show full walkthrough…") { walkthrough = true }.disabled(chat.messages.isEmpty || model.busy)
                     }
-                    Menu("Focus timer") {
-                        Button("30 minutes") { model.setFocus(minutes: 30) }
-                        Button("60 minutes") { model.setFocus(minutes: 60) }
-                        Button("No timer") { model.setFocus(minutes: 0) }
+                    if FocusTimer.shows(mode: chat.mode, running: chat.duration > 0) {
+                        Menu("Focus timer") {
+                            Button("30 minutes") { model.setFocus(minutes: 30) }
+                            Button("60 minutes") { model.setFocus(minutes: 60) }
+                            Button("No timer") { model.setFocus(minutes: 0) }
+                        }
                     }
                     Button(model.paused ? "Resume chat" : "Pause chat") { model.togglePause() }
                     Button("Close chat") { model.complete() }
@@ -200,7 +202,12 @@ private struct WorkspaceHistory: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
-                TextField("Search chats", text: $model.historyQuery, prompt: Text("Search chats").foregroundStyle(Theme.muted)).textFieldStyle(.plain).focused($searchFocused).accessibilityLabel("Search messages, notes, and files")
+                TextField("", text: $model.historyQuery, prompt: Text("")).textFieldStyle(.plain).focused($searchFocused).accessibilityLabel("Search messages, notes, and files")
+                    .overlay(alignment: .leading) {
+                        if model.historyQuery.isEmpty {
+                            Text("Search chats").foregroundStyle(Theme.muted).allowsHitTesting(false).accessibilityHidden(true)
+                        }
+                    }
                 if !model.historyQuery.isEmpty { Button { model.historyQuery = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.plain).accessibilityLabel("Clear search").foregroundStyle(Theme.muted) }
             }.font(.system(size: 12)).padding(9).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 12)
             ScrollView {

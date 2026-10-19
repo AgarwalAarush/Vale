@@ -4,9 +4,8 @@
   "build": "7",
   "sourceCommit": "Recorded in the immutable release manifest",
   "core": {
-    "passed": 235,
-    "total": 235,
-    "receipt": "artifacts/core-results-1.3.0.json"
+    "receipt": "artifacts/core-results-1.3.0.json",
+    "countsAndFinalAcceptance": "Read the frozen release manifest and Factory verification receipt"
   },
   "updateConfiguration": {
     "passed": 13,
@@ -91,5 +90,11 @@
     "physicalPickerDropAndVoiceOverVerified": false,
     "repeatAndIntegrationCountsOverlapNative": true,
     "publicationIsNotEstablishedBySourceMetadata": true
+  },
+  "sourceReconciliation": {
+    "consolidatedCursorMain": "358ed7662de4ad6f31c5eb7faeb21d6b80e78019",
+    "latestCursorFollowup": "eaadb821cc547cd2304b0a76ff063673f7275276",
+    "legacyLayoutSupersededBy": "PRODUCT.md and DESIGN.md single workspace contract",
+    "unsentDraftBehavior": "New chat preserves the prior draft/files in history; native acceptance required"
   }
 }

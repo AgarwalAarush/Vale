@@ -83,7 +83,14 @@ struct ContextSnapshot {
         SCContentSharingPicker.shared.isActive=false;changed?()
     }
     nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didCancelFor stream:SCStream?){DispatchQueue.main.async{self.requestedLive=false}}
-    nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){DispatchQueue.main.async{self.requestedLive=false;self.failed?(SharingPicker.failureMessage(keeping:self.sharedSelection))}}
+    nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){
+        DispatchQueue.main.async{
+            let kept=SharingPicker.selection(after:.failedToOpen,keeping:self.sharedSelection)
+            self.requestedLive=false
+            SCContentSharingPicker.shared.isActive=false
+            self.failed?(SharingPicker.failureMessage(keeping:kept))
+        }
+    }
     nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didUpdateWith filter:SCContentFilter,for stream:SCStream?){
         DispatchQueue.main.async{
             let wantsLive=self.requestedLive
