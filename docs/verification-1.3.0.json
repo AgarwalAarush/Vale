@@ -1,0 +1,95 @@
+{
+  "product": "Vale",
+  "version": "1.3.0",
+  "build": "7",
+  "sourceCommit": "Recorded in the immutable release manifest",
+  "core": {
+    "passed": 235,
+    "total": 235,
+    "receipt": "artifacts/core-results-1.3.0.json"
+  },
+  "updateConfiguration": {
+    "passed": 13,
+    "total": 13,
+    "receipt": "artifacts/update-build-config-results.json"
+  },
+  "native": {
+    "receipt": "artifacts/native-ui-1.3.0-final/results.json",
+    "repeatReceipt": "artifacts/native-ui-1.3.0-repeat/results.json",
+    "surface": "Actual AppKit workspace/NSTextView/SwiftUI, generated data",
+    "physicalInputOrHardwareProof": false,
+    "countsAndFinalAcceptance": "Read the frozen release manifest and Factory verification receipt"
+  },
+  "provider": {
+    "receipt": "artifacts/integration-1.3.0-final/results.json",
+    "realRequests": [
+      "Public multi-image/PDF/text analysis",
+      "Explicit Web event requirement",
+      "Guide from labeled synthetic screen"
+    ],
+    "webUnavailableKnownInPriorTestedRuntime": true,
+    "currentResultIsRequired": true,
+    "executionToolsEnabled": false,
+    "paidFallback": false
+  },
+  "sparkleSDK": {
+    "valid": {
+      "passed": true,
+      "mode": "relaunch",
+      "checks": {
+        "feedFetched": true,
+        "automaticDefaultsObserved": true,
+        "archiveFetched": true,
+        "readyOnQuit": true,
+        "newExecutableInstalled": true,
+        "newCompiledBinaryLaunched": true,
+        "generatedDataPreserved": true
+      },
+      "installedExecutableSHA256": "c2d2e5bdd2335b36bbfccd4191340afe2ae8d7842a6909c5e5b7011de685540d"
+    },
+    "feed-tamper": {
+      "passed": true,
+      "mode": "relaunch",
+      "checks": {
+        "feedFetched": true,
+        "SDKCryptographicRejection": true,
+        "oldExecutablePreserved": true,
+        "noInstallReady": true,
+        "expectedArchiveFetch": true
+      },
+      "installedExecutableSHA256": "fc1ee5c6cdf4ebf4ff64989dafbc122123bd4a894128b421cc0a195a515c3872"
+    },
+    "archive-tamper": {
+      "passed": true,
+      "mode": "relaunch",
+      "checks": {
+        "feedFetched": true,
+        "SDKCryptographicRejection": true,
+        "oldExecutablePreserved": true,
+        "noInstallReady": true,
+        "expectedArchiveFetch": true
+      },
+      "installedExecutableSHA256": "e6c117c19f1009503a4c56cc0fc00ee450de7a90b8583e32373c1c673eb07e0a"
+    }
+  },
+  "configuredValeProbe": {
+    "backendStarts": true,
+    "initialAutomaticDefaultsObserved": true,
+    "choicesPersistedOffInCrossProcessRead": true,
+    "savedChoicesOffObservedAfterRelaunch": true,
+    "isolatedStandardDefaultsDomain": true,
+    "liveProductionCheckRequiresPublicationReceipt": true
+  },
+  "boundaries": {
+    "SDKTransport": "Loopback HTTP in isolated fixtures only; production HTTPS policy unchanged",
+    "codeSigning": "Ad-hoc host with valid nested SDK signatures",
+    "notarizationVerified": false,
+    "runtime": "Intel/macOS 15.7.9",
+    "arm64RuntimeVerified": false,
+    "laptopInstalled": false,
+    "hardwareConsentVerified": false,
+    "physicalPickerDropAndVoiceOverVerified": false,
+    "repeatAndIntegrationCountsOverlapNative": true,
+    "publicationIsNotEstablishedBySourceMetadata": true
+  }
+}

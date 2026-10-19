@@ -78,8 +78,9 @@ locations. The installer requires no Swift, Python, lipo or developer tools.
 
 Respond personally to normal macOS security confirmations. This installer does
 not remove quarantine, change security settings, force-quit an app or use sudo.
-Signature: {signature}; notarization is not verified. This package is unpublished
-local preparation and has not been installed or tested on your laptop. Intel and
+Signature: {signature}; notarization is not verified. The bundled verification
+receipt records local preparation; check the release delivery receipt for current
+publication/feed status. This has not been tested on your laptop. Intel and
 Apple Silicon slices are present; target-laptop/Apple Silicon runtime remains
 unverified here.
 

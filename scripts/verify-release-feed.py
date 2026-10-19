@@ -29,7 +29,9 @@ def prepare(app):
     target = root / 'Vale.app'
     command('/usr/bin/ditto', app, target)
     info['CFBundleIdentifier'] = identifier
-    info['SUDefaultsDomain'] = identifier
+    # A suite equal to the main bundle ID is invalid on macOS. The unique
+    # main bundle ID already isolates standard defaults used by Sparkle.
+    info.pop('SUDefaultsDomain', None)
     (target / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     command('/usr/bin/codesign', '--force', '--sign', '-', '--identifier', identifier, target)
     command('/usr/bin/codesign', '--verify', '--deep', '--strict', target)
@@ -59,11 +61,33 @@ def run(path):
             raise RuntimeError('No isolated app receipt before the deadline; no app was force-quit')
         result = json.loads(receipt.read_text())
         print(json.dumps(result, indent=2))
+        termination = subprocess.run(
+            ['/usr/bin/osascript', '-l', 'JavaScript', '-', request['bundleID']],
+            input="""ObjC.import('AppKit'); ObjC.import('Foundation');
+function run(argv) {
+    if (!argv[0].startsWith('local.vale.releasecheck.')) throw new Error('Unexpected identity');
+    var deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+        var apps = $.NSRunningApplication.runningApplicationsWithBundleIdentifier(argv[0]);
+        if (Number(apps.count) === 0) return 'stopped';
+        $.NSThread.sleepForTimeInterval(0.1);
+    }
+    throw new Error('The isolated app has not terminated normally.');
+}
+""", text=True, capture_output=True, timeout=20)
+        if termination.returncode or termination.stdout.strip() != 'stopped':
+            raise RuntimeError('The isolated app has not terminated normally; no app was force-quit')
         if not result['passed']:
             raise RuntimeError('Real release-feed check did not pass; inspect the recorded receipt')
-        # The app writes its receipt immediately before normal exit. Avoid reopening
-        # the same domain before LaunchServices sees termination.
-        time.sleep(2)
+        if phase == 'preferences-off':
+            persisted = {}
+            for key in ('SUEnableAutomaticChecks', 'SUAutomaticallyUpdate'):
+                value = subprocess.run(['/usr/bin/defaults', 'read', request['bundleID'], key],
+                                       text=True, capture_output=True, timeout=10)
+                persisted[key] = value.returncode == 0 and value.stdout.strip() == '0'
+            (evidence / 'cross-process-preferences.json').write_text(json.dumps(persisted, indent=2) + '\n')
+            if not all(persisted.values()):
+                raise RuntimeError('Saved updater choices did not persist across normal exit')
 
 
 def main():

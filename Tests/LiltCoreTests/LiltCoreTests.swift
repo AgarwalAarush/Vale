@@ -116,6 +116,8 @@ final class LiltCoreTests {
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true,signedFeedFailureExpirationInterval:1_728_000))
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true,signedFeedFailureExpirationInterval:.nan))
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/with space",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid:65536/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid:0/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
     }
     func testUpdaterRejectsForeignAndInsecureArchiveURLs() throws {
         let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="

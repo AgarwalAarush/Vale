@@ -28,11 +28,11 @@ NATIVE_PNGS = (
     '17-conversation.png', '19-step-guide.png', '20-occluded-highlight.png',
     '21-context-limit.png', '22-deletion-error.png', '23-forget-recovered.png',
     'workspace-01-empty-light.png', 'workspace-02-conversation-light.png',
-    'workspace-03-settings-light.png', 'workspace-04-notes-light.png',
+    'workspace-03-settings-light.png', 'workspace-03b-settings-active-voice.png', 'workspace-04-notes-light.png',
     'workspace-05-files-light.png', 'workspace-06-pdf-light.png',
     'workspace-07-search-light.png', 'workspace-08-conversation-dark.png',
     'workspace-09-settings-dark.png', 'workspace-10-compact-chat.png',
-    'workspace-11-compact-notes.png', 'workspace-12-wide-notes.png',
+    'workspace-11-compact-notes.png', 'workspace-11b-compact-history.png', 'workspace-12-wide-notes.png',
 )
 INTEGRATION_PNGS = ('07-real-general-reply.png', '11-live-web-search.png', '24-real-guide-synthetic-screen.png')
 SECRET_PATTERNS = (

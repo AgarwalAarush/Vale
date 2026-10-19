@@ -60,11 +60,12 @@ import LiltCore
         }
     }
 
-    func check() {
+    func check(background: Bool = false) {
         guard canCheck, let controller else { return }
         lastCompletedCheckSucceeded = nil
         status = "Checking for updates…"
-        controller.checkForUpdates(nil)
+        if background { controller.updater.checkForUpdatesInBackground() }
+        else { controller.checkForUpdates(nil) }
     }
 
     func setAutomaticChecks(_ enabled: Bool) {
@@ -84,7 +85,11 @@ import LiltCore
         automaticallyChecks = updater.automaticallyChecksForUpdates
         automaticallyDownloads = updater.automaticallyDownloadsUpdates
         lastCheckDate = updater.lastUpdateCheckDate
-        guard !updater.sessionInProgress, !readyToInstall else { return }
+        guard !readyToInstall else { return }
+        guard !updater.sessionInProgress else {
+            status = "An update check is in progress…"
+            return
+        }
         if !automaticallyChecks {
             status = "Automatic checks are off. You can check manually."
         } else if automaticallyDownloads {

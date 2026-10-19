@@ -92,7 +92,6 @@ def prepare(args):
             'FixtureMode': args.mode,
             'SUFeedURL': feed_url,
             'SUPublicEDKey': public_key,
-            'SUDefaultsDomain': bundle_id,
             'SUEnableAutomaticChecks': True,
             'SUAutomaticallyUpdate': True,
             'SUAllowsAutomaticUpdates': True,

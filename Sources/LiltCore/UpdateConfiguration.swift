@@ -4,7 +4,7 @@ public struct UpdateConfiguration: Equatable {
     public let feed: URL
     public let publicKey: String
     public init(feed: String, publicKey: String, requiresSignedFeed: Bool, verifiesBeforeExtraction: Bool, signedFeedFailureExpirationInterval: TimeInterval = 0) throws {
-        guard !feed.contains(where: \.isWhitespace),let url=URL(string:feed),url.scheme?.lowercased()=="https",let host=url.host,!host.isEmpty,url.user==nil,url.password==nil,url.fragment==nil,(url.port ?? 443)>0 else{throw UpdateConfigurationError.insecureFeed}
+        guard !feed.contains(where: \.isWhitespace),let url=URL(string:feed),url.scheme?.lowercased()=="https",let host=url.host,!host.isEmpty,url.user==nil,url.password==nil,url.fragment==nil,(1...65535).contains(url.port ?? 443) else{throw UpdateConfigurationError.insecureFeed}
         guard let key=Data(base64Encoded:publicKey),key.count==32 else{throw UpdateConfigurationError.invalidKey}
         guard requiresSignedFeed,verifiesBeforeExtraction,signedFeedFailureExpirationInterval == 0 else{throw UpdateConfigurationError.incompleteVerification}
         self.feed=url;self.publicKey=publicKey

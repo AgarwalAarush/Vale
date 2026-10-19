@@ -57,6 +57,11 @@ extension AppController {
         model.openSettings(); await settle()
         results["workspaceSettingsPreserveDraftFilesAndEditor"] = oneWorkspace() && model.workspaceRoute == .settings && model.activeID == originalID && model.draft == savedDraft && model.pendingFiles.map(\.id) == pendingIDs && workspace.contentView.flatMap({ composer(in: $0) }) === editor && editor.selectedRange() == selection
         try await capture("workspace-03-settings-light")
+        model.setConversation(true); await settle()
+        results["workspaceSettingsRetainsExplicitActivityUntilStopped"] = model.workspaceRoute == .settings && model.conversation && model.voice.listening && model.draft == savedDraft
+        try await capture("workspace-03b-settings-active-voice")
+        model.stopInteraction(); await settle()
+        results["workspaceStopFromCoveredChatClearsActivityAndKeepsDraft"] = model.workspaceRoute == .settings && !model.conversation && !model.voice.listening && !model.context.hasSelection && model.draft == savedDraft
         model.backToChat(); await settle()
         results["workspaceBackRestoresComposerSelection"] = model.activeID == originalID && model.draft == savedDraft && editor.selectedRange() == selection && workspace.firstResponder === editor
 
@@ -88,6 +93,19 @@ extension AppController {
         await settle()
         results["workspaceHistoryResumesDraftAndFilesDirectly"] = oneWorkspace() && model.activeID == originalID && model.draft == composedDraft && model.pendingFiles.map(\.id) == pendingIDs
 
+        let dialog = NSAlert()
+        dialog.messageText = "Generated modal keyboard fixture"
+        dialog.addButton(withTitle: "Done")
+        dialog.beginSheetModal(for: workspace) { _ in }
+        await settle()
+        if let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: workspace.windowNumber, context: nil, characters: "n", charactersIgnoringModifiers: "n", isARepeat: false, keyCode: 45) { NSApp.sendEvent(key) }
+        results["workspaceModalDialogDoesNotStartAnotherChat"] = model.activeID == originalID && model.draft == composedDraft
+        workspace.endSheet(dialog.window); dialog.window.orderOut(nil); dialog.window.close()
+        await settle()
+        // Restore the explicit origin so a failed modal probe cannot contaminate later cases.
+        if let originalID { model.navigateToChat(originalID) }
+        await settle()
+
         workspace.appearance = NSAppearance(named: .darkAqua)
         try await capture("workspace-08-conversation-dark")
         model.openSettings(); try await capture("workspace-09-settings-dark")
@@ -97,6 +115,14 @@ extension AppController {
         try await capture("workspace-10-compact-chat")
         model.showInspector(.notes); try await capture("workspace-11-compact-notes")
         results["workspaceCompactInspectorKeepsWindowIdentity"] = oneWorkspace() && model.draft == composedDraft && model.inspector == .notes
+        model.showInspector(.files); model.showHistory(); await settle()
+        results["workspaceCompactFilesOpenHistoryInPlace"] = oneWorkspace() && model.compactHistoryVisible && model.inspector == nil && model.draft == composedDraft
+        results["workspaceCompactHistoryOwnsSearchFocus"] = workspace.firstResponder is NSTextView && workspace.firstResponder !== editor
+        try await capture("workspace-11b-compact-history")
+        model.backToChat(); await settle()
+        model.closeInspector(); model.openSettings(); await settle()
+        results["workspaceQueuedFocusDoesNotEnterHiddenComposer"] = model.workspaceRoute == .settings && workspace.firstResponder !== editor && model.draft == composedDraft
+        model.backToChat(); await settle()
         model.closeInspector()
         workspace.setContentSize(NSSize(width: 1280, height: 800))
         model.showInspector(.notes); try await capture("workspace-12-wide-notes")

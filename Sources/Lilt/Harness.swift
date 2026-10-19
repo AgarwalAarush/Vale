@@ -121,7 +121,7 @@ extension AppController {
             try await runInteractionFixtures(output:output,results:&results)
             do {
                 let defaults = UserDefaults.standard
-                let savedAppearance = defaults.object(forKey: "valeAppearance")
+                let savedAppearance = defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "local.lilt.companion")?["valeAppearance"]
                 defaults.set("system", forKey: "valeAppearance")
                 defer {
                     if let savedAppearance { defaults.set(savedAppearance, forKey: "valeAppearance") }

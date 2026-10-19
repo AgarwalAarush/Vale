@@ -85,8 +85,8 @@ struct UpdateSettingsView: View {
             }
             Text(updates.status).font(.system(size: 13)).foregroundStyle(Theme.muted).lineSpacing(4).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
             Toggle("Automatically check for updates", isOn: Binding(get: { updates.automaticallyChecks }, set: { updates.setAutomaticChecks($0) })).toggleStyle(.switch).disabled(!updates.isConfigured)
-            Toggle("Download updates automatically", isOn: Binding(get: { updates.automaticallyDownloads }, set: { updates.setAutomaticDownloads($0) })).toggleStyle(.switch).disabled(!updates.isConfigured)
-            Text("Installation and restart stay under your control.").font(.system(size: 12)).foregroundStyle(Theme.muted)
+            Toggle("Download updates automatically", isOn: Binding(get: { updates.automaticallyDownloads }, set: { updates.setAutomaticDownloads($0) })).toggleStyle(.switch).disabled(!updates.isConfigured || !updates.automaticallyChecks)
+            Text(updates.isConfigured && !updates.automaticallyChecks ? "Enable automatic checks to change automatic downloads." : "Downloaded updates normally install when Vale quits.").font(.system(size: 12)).foregroundStyle(Theme.muted)
             if let date = updates.lastCheckDate { Text("Last checked \(date.formatted(date: .abbreviated, time: .shortened))").font(.system(size: 12)).foregroundStyle(Theme.muted) }
             Button("Check for Updates…") { updates.check() }.buttonStyle(QuietButton()).disabled(!updates.canCheck)
         }.font(.system(size: 13)).accessibilityElement(children: .contain)
