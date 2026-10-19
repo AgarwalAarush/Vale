@@ -113,6 +113,9 @@ final class LiltCoreTests {
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://user:pass@example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:"bad",requiresSignedFeed:true,verifiesBeforeExtraction:true))
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:false,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true,signedFeedFailureExpirationInterval:1_728_000))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true,signedFeedFailureExpirationInterval:.nan))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/with space",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
     }
     func testUpdaterRejectsForeignAndInsecureArchiveURLs() throws {
         let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="
@@ -121,6 +124,7 @@ final class LiltCoreTests {
         XCTAssertFalse(config.permitsRelease(URL(string:"https://elsewhere.example.invalid/Vale.zip")!))
         XCTAssertFalse(config.permitsRelease(URL(string:"http://private.example.invalid/Vale.zip")!))
         XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid:444/Vale.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid/Vale.zip#other")!))
         let same=[URL(string:"https://private.example.invalid/Vale.zip")!,URL(string:"https://private.example.invalid/Vale.delta")!]
         XCTAssertTrue(config.permitsReleases(same))
         XCTAssertFalse(config.permitsReleases(same+[URL(string:"https://cdn.example.invalid/Vale.zip")!]))
@@ -135,6 +139,28 @@ final class LiltCoreTests {
         let config=try UpdateConfiguration(feed:fixture.feed,publicKey:fixture.publicKey,requiresSignedFeed:true,verifiesBeforeExtraction:true)
         for archive in fixture.archives {XCTAssertEqual(config.permitsRelease(archive.url),archive.allowed)}
         XCTAssertThrowsError(try UpdateConfiguration(feed:fixture.feed,publicKey:fixture.publicKey,requiresSignedFeed:true,verifiesBeforeExtraction:false))
+    }
+    func testUpdaterMetadataAndNativeHarnessIsolation() throws {
+        let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="
+        var info:[String:Any]=[
+            "SUFeedURL":"https://github.com/fixture/project/releases/latest/download/appcast.xml",
+            "SUPublicEDKey":key,"SURequireSignedFeed":true,"SUVerifyUpdateBeforeExtraction":true,
+            "SUSignedFeedFailureExpirationInterval":0
+        ]
+        let parsed=try UpdateConfiguration.read(from:info)
+        XCTAssertNotNil(parsed)
+        guard let config=parsed else {return}
+        XCTAssertTrue(config.permitsRelease(URL(string:"https://github.com/fixture/project/releases/download/v2/Vale.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://raw.githubusercontent.com/fixture/project/main/Vale.zip")!))
+        try XCTAssertNil(UpdateConfiguration.read(from:[:]))
+        info.removeValue(forKey:"SUSignedFeedFailureExpirationInterval")
+        XCTAssertThrowsError(try UpdateConfiguration.read(from:info))
+        info["SUSignedFeedFailureExpirationInterval"]=1_728_000
+        XCTAssertThrowsError(try UpdateConfiguration.read(from:info))
+        XCTAssertThrowsError(try UpdateConfiguration.read(from:["SUFeedURL":"https://example.invalid/feed"]))
+        XCTAssertTrue(UpdateRuntimePolicy.permitsProductionUpdates(arguments:["Vale"]))
+        XCTAssertFalse(UpdateRuntimePolicy.permitsProductionUpdates(arguments:["Vale","--self-test","fixture-output"]))
+        XCTAssertFalse(UpdateRuntimePolicy.permitsProductionUpdates(arguments:["Vale","--integration-test","fixture-output"]))
     }
 
     func testForgetPurgesTargetFromBackupAndKeepsOthers()throws{
@@ -2596,6 +2622,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
+ ("Updater metadata and native harness isolation",tests.testUpdaterMetadataAndNativeHarnessIsolation),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
  ("Forget failure preserves retryable chat",tests.testForgetFailurePreservesRetryableChat),
  ("Visible conversation limit",tests.testConversationLimitIsExplicit),
