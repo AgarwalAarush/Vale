@@ -1,5 +1,7 @@
 # Built-in updates
 
+Current handoff, rechecked 2026-10-19: the Vale 1.2.3 build 6 DMG does **not** update itself. Its payload is unchanged from the verified private handoff. The source, built app, staged app and ZIP all have no update feed/public verification key, with automatic checks, downloads and installation disabled. The configured runtime implementation is also manual-check-only; supplying a feed alone would not add automatic updates. Evidence: `artifacts/update-status-2026-10-19.json`. Laptop installation and its current version remain unverified from this host.
+
 The updater is implemented in `Sources/Lilt/Updates.swift`, backed by the embedded official Sparkle 2.10.0 framework. Settings and the app menu expose **Check for Updates**. The distributed local build intentionally has no production feed or public key; its check action is disabled and the engine does not start.
 
 ## Enforced configuration
