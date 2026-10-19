@@ -113,7 +113,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         else { commitComposer?(); workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
     }
     func showInspector(_ detail: WorkspaceInspector) {
-        commitComposer?(); if detail != .context { contextPreview = nil }; inspector = detail; workspaceRoute = .chat; showWorkspace?()
+        commitComposer?(); compactHistoryVisible = false
+        if detail != .context { contextPreview = nil }; inspector = detail; workspaceRoute = .chat; showWorkspace?()
     }
     func closeInspector() { inspector = nil; contextPreview = nil; composerFocus += 1 }
     func showError(_ message: String, settings: Bool = false) { settingsForNextError = settings; error = message }
