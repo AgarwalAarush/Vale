@@ -21,27 +21,27 @@ extension AppController {
         selectFixture();let beforeNames=try FileManager.default.contentsOfDirectory(atPath:model.fileStore!.directory.path)
         model.context.startLive();await until{model.context.latest != nil}
         results["fixture_liveRequiresSelectionAndDoesNotTransmit"]=model.context.live && model.context.latest?.data==first && transmitted==0
-        await settle();try snapshot(coach,to:output.appendingPathComponent("12-live-context.png"));try snapshot(capsule,to:output.appendingPathComponent("12b-live-capsule.png"))
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("12-live-context.png"))
         bytes=second;await until({model.context.latest?.data==second},seconds:3)
         results["fixture_liveRefreshesOnlyLatestFrame"]=model.context.latest?.data==second && captureCount>=2
         results["fixture_liveDoesNotPersistCaptureBytes"]=(try FileManager.default.contentsOfDirectory(atPath:model.fileStore!.directory.path))==beforeNames
         model.context.stopLive();let stoppedCount=captureCount;try? await Task.sleep(nanoseconds:2_100_000_000)
         results["fixture_stopLiveClearsPreviewAndStopsRefresh"]=model.context.latest==nil && !model.context.live && model.context.hasSelection && captureCount==stoppedCount
-        model.previewContext();await settle();results["fixture_previewRequiresHeldPixels"] = !NSApp.windows.contains{$0.title=="Shared context preview" && $0.isVisible}
-        model.context.startLive();await until{model.context.latest != nil};model.previewContext();await settle();let preview=NSApp.windows.first{$0.title=="Shared context preview" && $0.isVisible};model.stopSharing();await settle();results["fixture_stopSharingClosesPreviewPixels"]=preview != nil && preview?.isVisible==false && preview?.contentView==nil;selectFixture();openCoach()
+        model.previewContext();await settle();results["fixture_previewRequiresHeldPixels"] = model.contextPreview == nil && model.inspector != .context
+        model.context.startLive();await until{model.context.latest != nil};model.previewContext();await settle();let previewHeld=model.inspector == .context && model.contextPreview != nil;model.stopSharing();await settle();results["fixture_stopSharingClosesPreviewPixels"]=previewHeld && model.contextPreview == nil && model.inspector != .context;selectFixture();openWorkspace()
         model.send("Explain the synthetic window",guideRequested:true);await until{pending != nil}
         results["fixture_requestUsesFreshSelectedFrame"]=selectedFrameSent && model.busy
         results["fixture_onDemandDoesNotKeepPreviewPixels"]=model.context.latest==nil
-        await settle();try snapshot(coach,to:output.appendingPathComponent("13-loading.png"))
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("13-loading.png"))
         bytes=first;let stale=pending;pending=nil;stale?(.success(TutorReply(text:"This reply used the earlier synthetic frame.",point:PointTarget(x:0.35,y:0.3,width:0.3,height:0.4,label:"Fixture shape"),guide:GuidePlan(title:"Old frame",steps:["Read old frame","Act on old frame"]))))
         await until{model.active?.messages.last?.screenChanged==true}
         results["fixture_changedScreenSuppressesPointAndMarksReply"]=model.active?.messages.last?.screenChanged==true && pointCount==0
         results["fixture_staleScreenCannotInstallNewGuide"]=model.active?.guide==nil
-        await settle();try snapshot(coach,to:output.appendingPathComponent("14-window-changed.png"))
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("14-window-changed.png"))
         model.send("A generated connection failure");await until{pending != nil};let failure=pending;pending=nil;failure?(.failure(AppError("Fixture connection interrupted. Your message is saved.")))
         await until{!model.busy};let count=model.active?.messages.count ?? 0
         results["fixture_failedReplyKeepsMessageAndShowsError"]=model.error != nil && model.active?.messages.last?.role=="user"
-        await settle();try snapshot(coach,to:output.appendingPathComponent("15-error-retry.png"))
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("15-error-retry.png"))
         model.retry();await until{pending != nil};let retry=pending;pending=nil;retry?(.success(TutorReply(text:"Recovered from the synthetic connection failure.")));await until{!model.busy}
         results["fixture_retryDoesNotDuplicateUserMessage"]=model.error==nil && model.active?.messages.count==count+1 && model.active?.messages.last?.role=="assistant"
         model.send("Delayed fixture reply");await until{pending != nil};let late=pending;pending=nil;let oldID=model.activeID
@@ -66,7 +66,7 @@ extension AppController {
         model.setConversation(true);let nextToken=model.voice.fixtureRecognitionToken
         model.voice.simulateUtterance("One more fixture question",token:nextToken);await until{model.voice.speaking};let playback=model.voice.fixturePlaybackToken;model.voice.simulatePlaybackFinished(token:playback);await until{model.voice.listening}
         results["fixture_conversationRearmsAfterCurrentPlayback"]=model.conversation && model.voice.listening && !model.voice.speaking
-        model.context.startLive();await until{model.context.latest != nil};await settle();try snapshot(coach,to:output.appendingPathComponent("17-conversation.png"));try snapshot(capsule,to:output.appendingPathComponent("17b-conversation-capsule.png"))
+        model.context.startLive();await until{model.context.latest != nil};await settle();try snapshot(workspace,to:output.appendingPathComponent("17-conversation.png"))
         let pausedToken=model.voice.fixtureRecognitionToken;model.togglePause();let messages=model.active?.messages.count
         model.voice.simulateUtterance("STALE-SPEECH",token:pausedToken);await settle()
         results["fixture_pauseStopsActiveVoiceLiveCaptureAndLateSpeech"]=model.paused && !model.conversation && !model.voice.listening && !model.voice.speaking && !model.context.hasSelection && model.context.latest==nil && model.active?.messages.count==messages
@@ -91,18 +91,18 @@ extension AppController {
         results["fixture_nextGuideStepCapturesFreshContext"]=model.active?.guide?.index==1 && captureCount>beforeStep
         let saved=try SessionStore(directory:output.appendingPathComponent("test-library")).load().first{$0.id==model.activeID}
         results["fixture_guideProgressPersists"]=saved?.guide?.index==1
-        await settle();try snapshot(coach,to:output.appendingPathComponent("19-step-guide.png"))
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("19-step-guide.png"))
         let pointsBefore=pointCount;model.context.installFixture(pointVisible:false){captureCount+=1;return snapshotFor(first)};model.pointItOut();await until{model.active?.messages.last?.highlightUnavailable==true};results["fixture_occludedPointIsSuppressedAndExplained"]=pointCount==pointsBefore && model.active?.messages.last?.highlightUnavailable==true
-        await settle();try snapshot(coach,to:output.appendingPathComponent("20-occluded-highlight.png"));selectFixture()
-        model.endGuide();if model.expanded{model.expandCoach?();await settle()}
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("20-occluded-highlight.png"));selectFixture()
+        model.endGuide()
         model.updateActive{$0.messages=(0..<30).map{Message(role:"user",text:"Generated earlier context message \($0)")}}
-        await settle();results["fixture_contextLimitIsExposed"]=model.active?.contextLimited==true;try snapshot(coach,to:output.appendingPathComponent("21-context-limit.png"))
+        await settle();results["fixture_contextLimitIsExposed"]=model.active?.contextLimited==true;try snapshot(workspace,to:output.appendingPathComponent("21-context-limit.png"))
         model.newSession(title:"Own-window keyboard checks");selectFixture();model.context.startLive();model.setConversation(true);await settle()
         let previousID=model.activeID
-        if let key=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.command,timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"n",charactersIgnoringModifiers:"n",isARepeat:false,keyCode:45){NSApp.sendEvent(key)}
+        if let key=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.command,timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"n",charactersIgnoringModifiers:"n",isARepeat:false,keyCode:45){NSApp.sendEvent(key)}
         await settle();results["fixture_commandNStartsCleanChat"]=model.activeID != previousID && !model.conversation && !model.voice.listening && !model.context.hasSelection
         selectFixture();model.context.startLive();model.setConversation(true);await settle()
-        if let key=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\u{1b}",charactersIgnoringModifiers:"\u{1b}",isARepeat:false,keyCode:53){NSApp.sendEvent(key)}
+        if let key=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"\u{1b}",charactersIgnoringModifiers:"\u{1b}",isARepeat:false,keyCode:53){NSApp.sendEvent(key)}
         await settle();results["fixture_escapeStopsConversationAndSharing"] = !model.conversation && !model.voice.listening && !model.context.hasSelection && !model.busy
         var repeated=true
         for _ in 0..<3{selectFixture();model.context.startLive();model.setConversation(true);await until{model.context.latest != nil};systemSuspend();repeated = repeated && model.paused && !model.voice.listening && !model.conversation && !model.context.hasSelection && model.context.latest==nil;model.togglePause()}
@@ -113,7 +113,7 @@ extension AppController {
             model.newSession(title:"Real provider · synthetic window");selectFixture();model.provider.fixtureReply=nil
             model.draft="This is a synthetic test window showing a red circle. Give a concise three-step guide to describe this shape and its color, one step at a time."
             model.startGuide();await waitForReply();await until{model.active?.guide?.plan.isValid==true};results["realProviderGuideWithSyntheticScreen"]=model.active?.messages.last?.role=="assistant" && model.active?.guide?.plan.isValid==true
-            await settle();try snapshot(coach,to:output.appendingPathComponent("24-real-guide-synthetic-screen.png"))
+            await settle();try snapshot(workspace,to:output.appendingPathComponent("24-real-guide-synthetic-screen.png"))
         }
     }
     func deletionFixtures(output:URL,source:Data,results:inout [String:Bool])async throws{
@@ -133,12 +133,12 @@ extension AppController {
         denied.removeFile(record);results["fixture_fileDeletionFailureKeepsAttachmentAndReportsError"]=denied.active?.files.contains(record)==true && denied.fileStore?.image(for:record) != nil && denied.error != nil
         denied.delete(id);results["fixture_forgetFailureKeepsRetryableChat"]=denied.sessions.contains{$0.id==id} && denied.error != nil
         denied.selectedID=id
-        let window=NSWindow(contentRect:NSRect(x:0,y:0,width:900,height:650),styleMask:[.titled,.closable],backing:.buffered,defer:false)
-        window.isReleasedWhenClosed=false;window.appearance=NSAppearance(named:.darkAqua)
-        let host=NSHostingView(rootView:LibraryView(model:denied));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:900,height:650));window.center();window.makeKeyAndOrderFront(nil)
-        await settle();try snapshot(window,to:output.appendingPathComponent("22-deletion-error.png"))
+        let originalContent = workspace.contentView
+        let host = NSHostingView(rootView: WorkspaceView(model: denied)); host.sizingOptions = []; host.autoresizingMask = [.width, .height]
+        workspace.contentView = host; workspace.setContentSize(NSSize(width: 1040, height: 740))
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("22-deletion-error.png"))
         fault.recover();denied.delete(id);results["fixture_retryForgetRemovesBytesAndChat"]=denied.sessions.isEmpty && denied.fileStore?.image(for:record)==nil && denied.error==nil
-        await settle();try snapshot(window,to:output.appendingPathComponent("23-forget-recovered.png"));window.close()
-        denied.suspend();fixture.suspend();model.error=nil;openCoach()
+        await settle();try snapshot(workspace,to:output.appendingPathComponent("23-forget-recovered.png"));workspace.contentView = originalContent
+        denied.suspend();fixture.suspend();model.error=nil;openWorkspace()
     }
 }

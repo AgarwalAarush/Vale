@@ -10,13 +10,13 @@ struct ContextStrip:View {
             HStack(spacing:8){
                 Image(systemName:ShareMark.symbol(selected:model.context.hasSelection, live:model.context.live, capturing:model.context.capturing)).font(.system(size:12)).foregroundStyle(model.context.hasSelection ? Theme.accent : Theme.muted)
                 if model.context.hasSelection{
-                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:11)).lineLimit(1)}.buttonStyle(.plain).disabled(!HeldPreview.canShow(held:model.context.preview != nil)).help(model.context.preview != nil ? "Preview exactly what is shared" : "No preview is held")
+                    Button{model.previewContext()}label:{Text(model.contextName ?? "Selected window").font(.system(size:12)).lineLimit(1)}.buttonStyle(.plain).disabled(!HeldPreview.canShow(held:model.context.preview != nil)).help(model.context.preview != nil ? "Preview exactly what is shared" : "No preview is held")
                     Spacer(minLength:4)
-                    Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:10)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
+                    Toggle("Live",isOn:Binding(get:{model.context.live},set:{if $0{model.context.startLive()}else{model.context.stopLive()}})).toggleStyle(.switch).controlSize(.mini).font(.system(size:12)).disabled(model.paused).help("Refresh this window locally every two seconds; send only when you ask")
                     IconButton(symbol:"xmark",label:"Stop window sharing"){model.stopSharing()}
                 }else{
                     Button{model.context.choose()}label:{Label(ShareControl.title,systemImage:"macwindow").font(.system(size:12,weight:.medium))}.buttonStyle(QuietButton()).disabled(model.paused).help("Choose one window. macOS asks the first time; declining leaves typing available.")
-                    Spacer();Text("Optional").font(.system(size:10)).foregroundStyle(Theme.muted)
+                    Spacer();Text("Optional").font(.system(size:12)).foregroundStyle(Theme.muted)
                 }
             }
             if model.context.hasSelection{
@@ -25,9 +25,9 @@ struct ContextStrip:View {
                     Spacer(minLength:3)
                     if model.context.capturing{Text("Refreshing…").foregroundStyle(Theme.accent)}
                     else if CaptureAge.shows(live:model.context.live,hasCapture:model.context.lastCapture != nil),let date=model.context.lastCapture{Text("\(max(0,Int(Date().timeIntervalSince(date))))s ago").monospacedDigit()}
-                }.font(.system(size:9)).foregroundStyle(Theme.muted)
+                }.font(.system(size:12)).foregroundStyle(Theme.muted)
             }
-        }.padding(.horizontal,12).padding(.vertical,8).background(.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius:9)).padding(.horizontal,18)
+        }.padding(12).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 struct GuideCard:View {
@@ -35,7 +35,7 @@ struct GuideCard:View {
     let guide:GuideProgress
     var body:some View{
         VStack(alignment:.leading,spacing:9){
-            HStack{Text("STEP \(guide.index+1) OF \(guide.plan.steps.count)").font(.system(size:9,weight:.medium)).tracking(0.8).foregroundStyle(Theme.accent);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:10)).foregroundStyle(Theme.muted)}
+            HStack{Text("Step \(guide.index+1) of \(guide.plan.steps.count)").font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent);Spacer();Button("End guide"){model.endGuide()}.buttonStyle(.plain).font(.system(size:12)).foregroundStyle(Theme.muted)}
             Text(GuideStepText.visible(guide.current)).font(.system(size:12,weight:.medium)).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
             HStack(spacing:10){
                 Button("Back"){model.moveGuide(-1)}.buttonStyle(.plain).disabled(guide.index==0)
@@ -43,7 +43,7 @@ struct GuideCard:View {
                 Spacer()
                 if guide.index+1<guide.plan.steps.count{Button("Next step →"){model.moveGuide(1)}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
                 else{Button("Finish guide"){model.endGuide()}.buttonStyle(.plain).foregroundStyle(Theme.accent)}
-            }.font(.system(size:10)).disabled(model.busy || model.paused)
+            }.font(.system(size:12)).disabled(model.busy || model.paused)
         }.padding(12).background(Theme.accent.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.accent.opacity(0.16),lineWidth:0.7)).padding(.horizontal,18).padding(.top,10)
     }
 }

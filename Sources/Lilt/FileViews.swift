@@ -28,13 +28,14 @@ struct PDFPreview: View {
     @State private var loaded=false
     var body:some View {
         VStack(spacing:0){
-            HStack(spacing:14){
-                IconButton(symbol:"chevron.left",label:"Previous page"){pageIndex-=1;render()}.disabled(!loaded || pageIndex==0)
-                Text(PreviewRead.pageLabel(loaded:loaded,index:pageIndex,count:document?.pageCount ?? 0)).font(.system(size:12)).foregroundStyle(Theme.muted).monospacedDigit()
-                IconButton(symbol:"chevron.right",label:"Next page"){pageIndex+=1;render()}.disabled(!loaded || pageIndex+1 >= (document?.pageCount ?? 0))
-                Spacer()
-                Button("Copy page text"){NSPasteboard.general.clearContents();NSPasteboard.general.setString(document?.page(at:pageIndex)?.string ?? "",forType:.string)}.buttonStyle(QuietButton()).disabled(document?.page(at:pageIndex)?.string?.isEmpty != false)
-            }.padding(.horizontal,18).padding(.vertical,9)
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    IconButton(symbol: "chevron.left", label: "Previous page") { pageIndex -= 1; render() }.disabled(!loaded || pageIndex == 0)
+                    Text(PreviewRead.pageLabel(loaded: loaded, index: pageIndex, count: document?.pageCount ?? 0)).font(.system(size: 12)).foregroundStyle(Theme.muted).monospacedDigit()
+                    IconButton(symbol: "chevron.right", label: "Next page") { pageIndex += 1; render() }.disabled(!loaded || pageIndex + 1 >= (document?.pageCount ?? 0))
+                }
+                Button("Copy page text") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(document?.page(at: pageIndex)?.string ?? "", forType: .string) }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent).disabled(document?.page(at: pageIndex)?.string?.isEmpty != false)
+            }.frame(maxWidth: .infinity).padding(12)
             Divider().overlay(Theme.line)
             if let image{Image(nsImage:image).resizable().scaledToFit().padding(20).frame(maxWidth:.infinity,maxHeight:.infinity)}
             else if PreviewRead.showsFailure(loaded:loaded,hasPage:false){Text("This page couldn’t be previewed.").font(.system(size:13)).foregroundStyle(Theme.muted).frame(maxWidth:.infinity,maxHeight:.infinity)}
@@ -51,7 +52,7 @@ struct FilePreviewView: View {
             if record.kind == .pdf{PDFPreview(url:store.url(for:record))}
             else if let image=store.image(for:record){Image(nsImage:image).resizable().scaledToFit().padding(18).frame(maxWidth:.infinity,maxHeight:.infinity)}
             else{ScrollView{Text(textPreview).font(.system(size:13,design:.monospaced)).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading).padding(24)}}
-        }.background(Theme.background).foregroundStyle(Theme.ink).preferredColorScheme(.dark)
+        }.background(Theme.background).foregroundStyle(Theme.ink)
     }
     private var textPreview:String{
         guard let text=try? String(contentsOf:store.url(for:record),encoding:.utf8) else{return "File unavailable."}

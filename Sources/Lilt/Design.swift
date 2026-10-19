@@ -3,37 +3,27 @@ import AppKit
 import LiltCore
 
 enum Theme {
-    static let inkColor = NSColor(srgbRed: 0.94, green: 0.95, blue: 0.96, alpha: 1)
+    static func adaptive(_ light: UInt32, _ dark: UInt32) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let value = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255, alpha: 1)
+        }
+    }
+    static let inkColor = adaptive(0x252629, 0xf0f0ed)
     static let ink = Color(nsColor: inkColor)
-    static let muted = Color(red: 0.61, green: 0.64, blue: 0.68)
-    static let accent = Color(red: 0.57, green: 0.67, blue: 1)
-    static let line = Color.white.opacity(0.09)
-    /// Quiet warm charcoal for opaque windows. Distinct from the cool glass tint.
-    static let windowBackground = NSColor(srgbRed: 0.165, green: 0.145, blue: 0.125, alpha: 1)
+    static let muted = Color(nsColor: adaptive(0x67686b, 0xb0b1b8))
+    static let accentColor = adaptive(0x5759c6, 0xb9bcff)
+    static let accent = Color(nsColor: accentColor)
+    static let line = Color(nsColor: adaptive(0xddddd6, 0x363840))
+    static let windowBackground = adaptive(0xf7f6f2, 0x18191d)
     static let background = Color(nsColor: windowBackground)
-    /// Deeper warm recess for the history rail.
-    static let rail = Color(nsColor: NSColor(srgbRed: 0.11, green: 0.095, blue: 0.08, alpha: 1))
-    static let fill = Color.white.opacity(0.045)
-    static let fillRaised = Color.white.opacity(0.08)
-    static let fillPressed = Color.white.opacity(0.12)
-    /// Capsule and coach glass tint. Unchanged so those panels keep their current fill.
-    static let glassTint = Color(red: 0.10, green: 0.11, blue: 0.12)
-}
-struct GlassMaterial: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView(); view.material = .hudWindow; view.blendingMode = .behindWindow; view.state = .active
-        view.appearance = NSAppearance(named: .darkAqua); return view
-    }
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
-}
-struct GlassSurface: ViewModifier {
-    var radius: CGFloat = 20
-    func body(content: Content) -> some View {
-        content.background(GlassMaterial().overlay(Theme.glassTint.opacity(0.86)))
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.7))
-            .foregroundStyle(Theme.ink).preferredColorScheme(.dark)
-    }
+    static let rail = Color(nsColor: adaptive(0xeeede8, 0x141519))
+    static let fill = Color(nsColor: adaptive(0xeeede8, 0x292b32))
+    static let fillRaised = Color(nsColor: adaptive(0xffffff, 0x22242a))
+    static let fillPressed = Color(nsColor: adaptive(0xe2e1da, 0x363840))
+    static let action = Color(nsColor: adaptive(0x28292d, 0xecece8))
+    static let onAction = Color(nsColor: adaptive(0xffffff, 0x252629))
+    static let warning = Color(nsColor: adaptive(0x825010, 0xecc48a))
 }
 struct QuietField: ViewModifier {
     func body(content: Content) -> some View {
@@ -148,7 +138,7 @@ struct DraftEditor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false
-        editor.font = .systemFont(ofSize: 15); editor.textColor = NSColor(white: 0.94, alpha: 1); editor.insertionPointColor = NSColor(red: 0.57, green: 0.67, blue: 1, alpha: 1)
+        editor.font = .systemFont(ofSize: 15); editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
         editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
         editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false; editor.isAutomaticTextReplacementEnabled = false
@@ -168,6 +158,7 @@ struct DraftEditor: NSViewRepresentable {
         context.coordinator.parent = self
         keepFieldClear(nsView)
         guard let editor = nsView.documentView as? ComposerTextView else { return }
+        editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         installCommit { [weak editor, weak coordinator = context.coordinator] in
             guard let editor, let coordinator else { return }

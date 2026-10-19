@@ -22,9 +22,14 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     @Published var draft = "" { didSet { if !loading { updateActive { $0.draft = draft }; scheduleSave() } } }
     @Published var selectedID: UUID?
-    @Published var settings = false
-    @Published var settingsInCoach = false
-    @Published var coachOpen = false
+    @Published var workspaceRoute: WorkspaceRoute = .chat
+    @Published var inspector: WorkspaceInspector?
+    @Published var sidebarVisible = true
+    @Published var compactHistoryVisible = false
+    @Published var historyQuery = ""
+    @Published var historyFocus = 0
+    @Published var workspaceOpen = false
+    @Published var contextPreview: NSImage?
     @Published var composerFocus = 0
     var commitComposer: (() -> Void)?
     var sentAt = Date.distantPast
@@ -53,15 +58,12 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var spokenReplyGeneration = UUID()
     private var conversationTask:Task<Void,Never>?
     @Published var shortcutWarning:String?
-    var showCoach: (() -> Void)?
-    var showLibrary: (() -> Void)?
+    var showWorkspace: (() -> Void)?
     var hideOverlay: (() -> Void)?
     var showPoint: ((PointTarget, ContextSnapshot) -> Void)?
     var contextReset:(()->Void)?
     var filesRemoved:((Set<UUID>)->Void)?
     var showPreview: ((NSImage) -> Void)?
-    var expandCoach:(()->Void)?
-    @Published var expanded=false
     var showFile: ((AttachmentRecord) -> Void)?
     var closePreview: (() -> Void)?
     var active: LearningSession? { sessions.first { $0.id == activeID } }
@@ -97,36 +99,45 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         provider.locateWithLoginShell()
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
-    func openSettings() { settings = true; showLibrary?() }
-    func showHistory() {
-        selectedID = HistoryFocus.selection(active: activeID, selected: selectedID, openingHistory: true)
-        settings = HistoryFocus.showsSettings(openingHistory: true, settings: settings)
-        showLibrary?()
+    func openSettings() {
+        commitComposer?(); workspaceRoute = .settings; showWorkspace?()
     }
-    /// Recovery and the pre-send notice stay on the coach. They do not open the history window.
-    func openSettingsInCoach() { settingsInCoach = true }
+    func showHistory() {
+        commitComposer?(); workspaceRoute = .chat; sidebarVisible = true; compactHistoryVisible = true; historyFocus += 1; showWorkspace?()
+    }
+    func backToChat() { workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
+    func navigateToChat(_ id: UUID) {
+        guard sessions.contains(where: { $0.id == id }) else { return }
+        if activeID != id { resume(id) }
+        else { commitComposer?(); workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
+    }
+    func showInspector(_ detail: WorkspaceInspector) {
+        commitComposer?(); if detail != .context { contextPreview = nil }; inspector = detail; workspaceRoute = .chat; showWorkspace?()
+    }
+    func closeInspector() { inspector = nil; contextPreview = nil; composerFocus += 1 }
     func showError(_ message: String, settings: Bool = false) { settingsForNextError = settings; error = message }
     func prepareChat() {
-        guard active == nil else { showCoach?(); return }
+        guard active == nil else { showWorkspace?(); return }
         if let recent=LaunchSelection.resumeID(in: sessions) { resume(recent) }
         else { newSession() }
     }
     func newSession(title: String = "New chat", minutes: Int = 0, mode: ChatMode = .assistant) {
         guard store != nil else { error="The chat library is unavailable. Restore the library folder before starting."; return }
-        settingsInCoach = false
+        commitComposer?(); workspaceRoute = .chat; compactHistoryVisible = false; closeInspector()
         suspend()
         if !importing, let old = active, EmptyChat.canDiscard(title: old.title, messageCount: old.messages.count, draft: old.draft, fileCount: old.files.count, duration: old.duration, mode: old.mode, webEnabled: old.webEnabled) { sessions.removeAll { $0.id == old.id } }
         let title=title.trimmingCharacters(in:.whitespacesAndNewlines)
         let chat=LearningSession(title:title.isEmpty ? "New chat" : String(title.prefix(100)),duration:minutes>0 ? max(5,min(180,minutes))*60 : 0,mode:mode)
         sessions.insert(chat,at:0); activeID=chat.id; selectedID=chat.id
         loading=true; draft=""; loading=false; paused=false; lastTick=Date(); error=nil; failedQuestion=nil
-        persist(); showCoach?()
+        persist(); showWorkspace?()
     }
     func resume(_ id: UUID) {
+        commitComposer?(); workspaceRoute = .chat; compactHistoryVisible = false; closeInspector()
         suspend(); guard let chat=sessions.first(where:{$0.id==id}) else{return}
         activeID=id; selectedID=id; loading=true; draft=chat.draft; loading=false
         updateActive{$0.completed=false}; paused=false; lastTick=Date(); error=nil; failedQuestion=nil
-        persist(); showCoach?()
+        persist(); showWorkspace?()
     }
     func setMode(_ mode: ChatMode) {
         conversation=false; conversationTask?.cancel(); voice.stopListening()
@@ -146,8 +157,9 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     func togglePause() {if paused {paused=false; lastTick=Date(); error=nil} else{tick();suspend()};persist()}
     func suspend() {paused=true;conversation=false;conversationTask?.cancel();voice.stop();cancel();context.stop();hideOverlay?();persist()}
     func complete() {
+        commitComposer?(); closeInspector(); workspaceRoute = .chat
         tick();updateActive{$0=LaunchSelection.chatAfterClose($0)};suspend();selectedID=activeID;activeID=nil
-        loading=true;draft="";loading=false;persist();showLibrary?()
+        loading=true;draft="";loading=false;persist();showWorkspace?()
     }
     func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
     func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false,preserveDraft:Bool=false) {
@@ -242,7 +254,6 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                                 if let plan=reply.guide,installGuide{chat.guide=GuideProgress(plan:plan)}
                             }
                             guard self.requestID==id,self.activeID==chatID else{self.persist();return}
-                            if installGuide,reply.guide != nil,!self.expanded{self.expandCoach?()}
                             let shouldSpeak = self.readAloud || self.conversation || (spoken && self.spokenReplyGeneration == requestedSpeechGeneration)
                             if !changed,shouldSpeak{self.voice.speak(checked.text)}
                             else if changed,shouldSpeak{self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
@@ -412,12 +423,12 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             filesRemoved?(Set(chat.files.map(\.id)))
             sessions.removeAll{$0.id==id};if selectedID==id{selectedID=nil}
             if activeID==id{activeID=nil;loading=true;draft="";loading=false}
-            deletionToRetry=nil;error=nil;showLibrary?()
+            deletionToRetry=nil;error=nil;showWorkspace?()
         }catch{
             removeReferences(removed,from:id);filesRemoved?(removed);persist()
             deletionToRetry=id
             self.error="Couldn’t finish forgetting this chat. It was kept so you can retry. Some files may already have been removed."
-            showLibrary?()
+            showWorkspace?()
         }
     }
     func export(_ chat:LearningSession){

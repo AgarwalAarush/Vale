@@ -1,153 +1,6 @@
 import SwiftUI
 import LiltCore
 
-struct LibraryView: View {
-    @ObservedObject var model: AppModel
-    @State private var query=""
-    @State private var deleteID: UUID?
-    @State private var renameID: UUID?
-    @State private var newTitle=""
-    var filtered:[LearningSession]{HistoryLists.sidebar(model.sessions,query:query,searchVisible:true)}
-    var body:some View{
-        HStack(spacing:0){
-            VStack(alignment:.leading,spacing:0){
-                HStack(spacing:10){LogoMark(size:26);Text("Vale").font(.system(size:18,weight:.semibold)).tracking(-0.5)}.padding(.horizontal,22).padding(.top,35).padding(.bottom,28)
-                Button{model.newSession()}label:{Label("New chat",systemImage:"square.and.pencil").font(.system(size:13,weight:.medium)).frame(maxWidth:.infinity,alignment:.leading).padding(12).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius:8))}.buttonStyle(.plain).padding(.horizontal,12)
-                Button{model.selectedID=nil;model.settings=false}label:{Label("All chats",systemImage:"rectangle.stack").font(.system(size:12)).foregroundStyle(Theme.muted).padding(.horizontal,12).padding(.vertical,13)}.buttonStyle(.plain).padding(.horizontal,12)
-                Text("RECENT").font(.system(size:9,weight:.medium)).tracking(1.2).foregroundStyle(Theme.muted).padding(.horizontal,24).padding(.top,17).padding(.bottom,12)
-                ScrollView{
-                    VStack(spacing:4){ForEach(filtered){chat in
-                        Button{model.selectedID=chat.id;model.settings=false}label:{
-                            HStack(spacing:9){Image(systemName:chat.mode == .learn ? "lightbulb" : HistoryMark.symbol).font(.system(size:12)).foregroundStyle(Theme.muted);Text(chat.title).font(.system(size:12)).lineLimit(1);Spacer(minLength:0)}.padding(.horizontal,12).padding(.vertical,10).background(model.selectedID == chat.id && !model.settings ? Theme.fillRaised : .clear).clipShape(RoundedRectangle(cornerRadius:8))
-                        }.buttonStyle(.plain).contextMenu{Button("Rename…"){renameID=chat.id;newTitle=chat.title};Button("Export…"){model.export(chat)};Button("Forget chat…",role:.destructive){deleteID=chat.id}}
-                    }}.padding(.horizontal,12)
-                }.scrollIndicators(.hidden)
-                Spacer(minLength:15)
-                Button{model.settings=true}label:{Label("Settings",systemImage:"slider.horizontal.3").font(.system(size:12)).foregroundStyle(Theme.muted)}.buttonStyle(.plain).padding(24)
-            }.frame(width:194).background(Theme.rail)
-            Rectangle().fill(Theme.line).frame(width:1)
-            Group{
-                if model.settings{SettingsView(model:model)}
-                else if let chat=model.selected{SessionDetail(model:model,session:chat,deleteAction:{deleteID=chat.id},renameAction:{renameID=chat.id;newTitle=chat.title})}
-                else{home}
-            }.frame(maxWidth:.infinity,maxHeight:.infinity)
-        }.foregroundStyle(Theme.ink).background(Theme.background).preferredColorScheme(.dark)
-        .environment(\.openURL,OpenURLAction{url in AnswerLink.canOpen(url) ? .systemAction : .discarded})
-        .confirmationDialog("Forget this chat and its uploaded files?",isPresented:Binding(get:{deleteID != nil},set:{if !$0{deleteID=nil}}),titleVisibility:.visible){
-            Button("Forget chat",role:.destructive){if let id=deleteID{model.delete(id)};deleteID=nil}
-            Button("Cancel",role:.cancel){deleteID=nil}
-        }.alert("Rename chat",isPresented:Binding(get:{renameID != nil},set:{if !$0{renameID=nil}})){
-            TextField("Chat title",text:$newTitle)
-            Button("Cancel",role:.cancel){renameID=nil}
-            Button("Save") { guard let id = renameID, ChatTitle.saved(newTitle) != nil else { return }; model.rename(id, to: newTitle); renameID = nil }.disabled(ChatTitle.saved(newTitle) == nil)
-        }
-    }
-    var home:some View{
-        ScrollView{
-            VStack(alignment:.leading,spacing:0){
-                HStack{Text("Your chats").font(.system(size:29,weight:.medium)).tracking(-0.8);Spacer();Button("New chat"){model.newSession()}.buttonStyle(QuietButton(filled:true))}.padding(.bottom,23)
-                HStack(spacing:10){Image(systemName:"magnifyingglass").foregroundStyle(Theme.muted);TextField("Search messages, notes, and files",text:$query).textFieldStyle(.plain).font(.system(size:13))}.padding(12).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).padding(.bottom,27)
-                if filtered.isEmpty{
-                    VStack(alignment:.leading,spacing:12){
-                        Text(query.isEmpty ? "A place to pick up the thread." : "No chats found.").font(.system(size:18,weight:.medium))
-                        Text(query.isEmpty ? "Write, plan, debug, compare images, or make sense of a document. Your conversations will be here." : "Try a different phrase or filename.").font(.system(size:13)).foregroundStyle(Theme.muted).lineSpacing(4)
-                    }.padding(.top,20)
-                }
-                ForEach(filtered){chat in
-                    Button{model.selectedID=chat.id}label:{
-                        HStack(spacing:15){
-                            VStack(alignment:.leading,spacing:7){
-                                Text(chat.title).font(.system(size:15,weight:.medium)).lineLimit(1)
-                                Text(verbatim: ChatListLine.text(from: chat.historyPreview(matching: query)) ?? "Ready when you are.").font(.system(size:12)).foregroundStyle(Theme.muted).lineLimit(1)
-                            }
-                            Spacer(minLength:20);Text(chat.updated,style:.date).font(.system(size:11)).foregroundStyle(Theme.muted);Image(systemName:"chevron.right").font(.system(size:10)).foregroundStyle(Theme.muted)
-                        }.padding(.vertical,18)
-                    }.buttonStyle(.plain)
-                    Divider().overlay(Theme.line)
-                }
-                if let error=model.error{
-                    VStack(alignment:.leading,spacing:8){
-                        Text(error).font(.system(size:12)).foregroundStyle(.orange.opacity(0.9))
-                        if model.errorOffersSettings{Button("Open Settings"){model.openSettings()}.buttonStyle(.plain).font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent)}
-                    }.padding(.top,20)
-                }
-            }.padding(.horizontal,42).padding(.top,56).padding(.bottom,40).frame(maxWidth:.infinity,alignment:.leading)
-        }.scrollIndicators(.hidden)
-    }
-}
-
-struct SessionDetail: View {
-    @ObservedObject var model:AppModel
-    let session:LearningSession
-    let deleteAction:()->Void
-    let renameAction:()->Void
-    @State private var note=""
-    @State private var noteID:UUID?
-    @State private var storedNote=""
-    var body:some View{
-        ScrollView{
-            VStack(alignment:.leading,spacing:22){
-                HStack(alignment:.top){
-                    VStack(alignment:.leading,spacing:9){let count=ChatSummary.messageCount(session.messages);Text(session.title).font(.system(size:27,weight:.medium)).tracking(-0.7);Text("\(session.mode.label) · \(count) \(count == 1 ? "message" : "messages")").font(.system(size:11)).foregroundStyle(Theme.muted)}
-                    Spacer()
-                    Menu{Button("Rename…",action:renameAction);Button("Export chat…"){model.export(session)};Button("Forget chat…",role:.destructive,action:deleteAction)}label:{Image(systemName:"ellipsis").frame(width:25,height:25)}.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                }
-                if let error=model.error{VStack(alignment:.leading,spacing:10){Text(error).font(.system(size:12)).foregroundStyle(.orange).textSelection(.enabled).fixedSize(horizontal:false,vertical:true);if model.errorOffersSettings{Button("Open Settings"){model.openSettings()}.buttonStyle(.plain).font(.system(size:12,weight:.medium)).foregroundStyle(Theme.accent)};if model.deletionToRetry==session.id{Button("Retry Forget"){model.delete(session.id)}.buttonStyle(QuietButton())}}}
-                Button(session.id == model.activeID ? "Return to chat" : "Continue chat"){if session.id == model.activeID{model.showCoach?()}else{model.resume(session.id)}}.buttonStyle(QuietButton(filled:true))
-                if let draft = session.unsentDraft {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("UNSENT").font(.system(size: 10, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
-                        Text(verbatim: draft).font(.system(size: 14)).lineSpacing(4).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                if let steps = session.guide?.savedSteps {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("STEPS").font(.system(size: 10, weight: .medium)).tracking(1.1).foregroundStyle(Theme.muted)
-                        Text(steps).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                if !session.files.isEmpty{ScrollView(.horizontal){HStack(spacing:8){ForEach(session.files){record in FileChip(record:record,among:session.files,model:model)}}}.scrollIndicators(.hidden).fixedSize(horizontal:false,vertical:true)}
-                Divider().overlay(Theme.line)
-                VStack(alignment:.leading,spacing:10){
-                    Text(session.mode == .learn ? "WHAT CLICKED?" : "NOTES").font(.system(size:10,weight:.medium)).tracking(1.1).foregroundStyle(Theme.muted)
-                    TextEditor(text:$note).font(.system(size:14)).scrollContentBackground(.hidden).frame(minHeight:70).padding(9).background(Theme.fill).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Theme.line,lineWidth:0.7)).accessibilityLabel("Chat notes")
-                        .onAppear {
-                            let hasLocalEdit = noteID == session.id && note != storedNote
-                            note = NoteEdit.next(local: note, stored: session.takeaway, sameSession: hasLocalEdit)
-                            storedNote = session.takeaway; noteID = session.id
-                        }
-                        .onChange(of: session.id) { note = session.takeaway; storedNote = session.takeaway; noteID = session.id }
-                        .onChange(of: session.takeaway) {
-                            // Adopt external updates only when no newer local text is waiting.
-                            if note == storedNote { note = session.takeaway }
-                            storedNote = session.takeaway
-                        }
-                        .onChange(of: note) {
-                            guard noteID == session.id else { return }
-                            storedNote = note
-                            if note != session.takeaway { model.setTakeaway(note, for: session.id) }
-                        }
-                }
-                if !session.messages.isEmpty{Divider().overlay(Theme.line)}
-                ForEach(session.messages){message in
-                    HStack(alignment: .top, spacing: 0) {
-                    if SpeakerTurn.trails(message.role) { Spacer(minLength: SpeakerTurn.leadingClearance).layoutPriority(-1) }
-                    VStack(alignment:.leading,spacing:9){
-                        MessageHeading(message: message)
-                        if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: HistoryReply.usesIntrinsicHeight) }
-                        if !message.attachments.isEmpty { MessageAttachments(model: model, session: session, records: message.attachments) }
-                        if StaleWindowAnswer.applies(to: message) { Text(StaleWindowAnswer.notice).font(.system(size: 11)).foregroundStyle(Theme.muted) }
-                        if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
-                        if FailedAnswer.shows(failed: message.answerFailed, waiting: false) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
-                    }.layoutPriority(1).padding(.vertical,5)
-                        .padding(.leading, ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0)
-                        .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.8)).frame(width: ReplyTurn.ruleWidth) } }
-                    }
-                }
-            }.padding(.horizontal,42).padding(.top,54).padding(.bottom,40)
-        }.scrollIndicators(.hidden)
-    }
-}
 private final class SignInWait: @unchecked Sendable {
     private let lock = NSLock()
     private var timedOut = false
@@ -157,21 +10,23 @@ private final class SignInWait: @unchecked Sendable {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
-    var embeddedInCoach = false
     @AppStorage("codexPath") private var codexPath = ""
     @AppStorage("model") private var modelName = ""
+    @AppStorage("valeAppearance") private var appearance = "system"
     @State private var connection = ""
     @State private var signInToken = UUID()
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                Text("Settings").font(.system(size: embeddedInCoach ? 22 : 28, weight: .medium)).tracking(-0.7)
+                Text("Settings").font(.system(size: 26, weight: .regular)).tracking(-0.5)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("ChatGPT via Codex").font(.system(size: 16, weight: .medium))
                     Text(connection.isEmpty ? (model.provider.executable == nil ? "Codex wasn’t found in ~/.local/bin, Homebrew, the app bundle, or your PATH." : "Uses the sign-in saved by your Codex CLI.") : connection).font(.system(size: 12)).foregroundStyle(Theme.muted)
                     Button("Check connection") { checkConnection() }.buttonStyle(QuietButton())
                     Text("To sign in, run codex login in Terminal.").font(.system(size: 11)).foregroundStyle(Theme.muted).textSelection(.enabled)
                 }
+                Divider().overlay(Theme.line)
+                UpdateSettingsView(updates: model.updates)
                 Divider().overlay(Theme.line)
                 Toggle("Read typed replies aloud", isOn: $model.readAloud).toggleStyle(.switch).font(.system(size: 13))
                 Text("The microphone starts when you choose Talk or Conversation. Conversation listens again after each answer; Pause or Escape stops it. Apple’s on-device speech recognition is used when available.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
@@ -182,11 +37,6 @@ struct SettingsView: View {
                     Text("Your messages, uploaded files, and the window you explicitly share are sent when you ask. Live refresh keeps only the latest selected-window preview in memory, every two seconds. Images are sent when you ask, not on every refresh. A selected window includes whichever page is visible inside it.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
                     Text("Chats and uploaded files are retained locally. Forget removes a chat and its files. Captured screens and microphone recordings are not saved to chat history.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
                 }
-                VStack(alignment:.leading,spacing:12){
-                    Text("Updates").font(.system(size:16,weight:.medium))
-                    Text(model.updates.status).font(.system(size:12)).foregroundStyle(Theme.muted).lineSpacing(4)
-                    Button("Check for Updates…"){model.updates.check()}.buttonStyle(QuietButton()).disabled(!model.updates.canCheck)
-                }
                 Divider().overlay(Theme.line)
                 DisclosureGroup("Advanced") {
                     VStack(alignment: .leading, spacing: 10) {
@@ -196,10 +46,11 @@ struct SettingsView: View {
                         TextField("Codex default", text: $modelName).font(.system(size: 12)).modifier(QuietField())
                     }.padding(.top, 15)
                 }.font(.system(size: 12))
-                Text("Open coach anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                Text("Vale\((Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String).map { " \($0)" } ?? "") · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted.opacity(0.7))
-            }.padding(.horizontal, 42).padding(.top, 54).padding(.bottom, 40)
-        }.scrollIndicators(.hidden)
+                Picker("Appearance", selection: $appearance) { Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark") }.font(.system(size: 13))
+                Text("Open Vale anywhere: Control–Option–Space").font(.system(size: 12)).foregroundStyle(Theme.muted)
+                Text("Vale\((Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String).map { " \($0)" } ?? "") · Your companion, wherever you work").font(.system(size: 11)).foregroundStyle(Theme.muted)
+            }.padding(32).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
+        }.scrollIndicators(.automatic).background(Theme.background)
     }
     func checkConnection() {
         guard let path = model.provider.executable else { connection = "Codex wasn’t found. Choose its path below."; return }
@@ -220,5 +71,24 @@ struct SettingsView: View {
             connection = SignInCheck.result(status: 0, output: "", timedOut: true)
             process.terminate()
         }
+    }
+}
+
+struct UpdateSettingsView: View {
+    @ObservedObject var updates: UpdateController
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Updates").font(.system(size: 16, weight: .medium))
+                Spacer()
+                Text("Version " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")).font(.system(size: 12)).foregroundStyle(Theme.muted)
+            }
+            Text(updates.status).font(.system(size: 13)).foregroundStyle(Theme.muted).lineSpacing(4).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+            Toggle("Automatically check for updates", isOn: Binding(get: { updates.automaticallyChecks }, set: { updates.setAutomaticChecks($0) })).toggleStyle(.switch).disabled(!updates.isConfigured)
+            Toggle("Download updates automatically", isOn: Binding(get: { updates.automaticallyDownloads }, set: { updates.setAutomaticDownloads($0) })).toggleStyle(.switch).disabled(!updates.isConfigured)
+            Text("Installation and restart stay under your control.").font(.system(size: 12)).foregroundStyle(Theme.muted)
+            if let date = updates.lastCheckDate { Text("Last checked \(date.formatted(date: .abbreviated, time: .shortened))").font(.system(size: 12)).foregroundStyle(Theme.muted) }
+            Button("Check for Updates…") { updates.check() }.buttonStyle(QuietButton()).disabled(!updates.canCheck)
+        }.font(.system(size: 13)).accessibilityElement(children: .contain)
     }
 }

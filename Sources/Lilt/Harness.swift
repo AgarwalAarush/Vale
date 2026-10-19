@@ -32,12 +32,12 @@ extension AppController {
         do{
             try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
             model.voice.enableFixtures();model.sessions=[];model.activeID=nil;model.selectedID=nil;model.prepareChat();await settle()
-            results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && coach.isVisible && !library.isVisible
-            try snapshot(coach,to:output.appendingPathComponent("01-new-chat.png"));try snapshot(capsule,to:output.appendingPathComponent("02-capsule.png"))
+            results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && workspace.isVisible
+            try snapshot(workspace,to:output.appendingPathComponent("01-new-chat.png"))
             func findEditor(_ view:NSView)->ComposerTextView?{if let editor=view as? ComposerTextView{return editor};for child in view.subviews{if let found=findEditor(child){return found}};return nil}
-            let editor=findEditor(coach.contentView!);results["composerGetsKeyboardFocus"]=coach.firstResponder === editor
+            let editor=findEditor(workspace.contentView!);results["composerGetsKeyboardFocus"]=workspace.firstResponder === editor
             model.draft="First line";await settle()
-            if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.shift,timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){editor.setSelectedRange(NSRange(location:editor.string.utf16.count,length:0));NSApp.sendEvent(enter);results["shiftReturnAddsNewline"]=model.draft.contains("\n")}
+            if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.shift,timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){editor.setSelectedRange(NSRange(location:editor.string.utf16.count,length:0));NSApp.sendEvent(enter);results["shiftReturnAddsNewline"]=model.draft.contains("\n")}
             model.send("Cancellation probe");model.cancel();await settle();results["cancelDiscardsPendingCompletion"] = !model.busy && model.active?.messages.last?.role == "user";model.updateActive{$0.messages=[];$0.title="New chat"}
             let fixtures=try makeFixtures(in:output);await model.importFiles(fixtures)
             results["multipleImagePDFTextImports"]=model.pendingFiles.count==4
@@ -62,63 +62,73 @@ extension AppController {
             results["textFileExtraction"]=files.text.contains("bring a notebook")
             results["twoImagesPrepared"]=files.images.count==2
             model.draft="Compare the two images and summarize the PDF and notes."
-            await settle();try snapshot(coach,to:output.appendingPathComponent("03-attachments.png"))
-            if let pdf=model.pendingFiles.first(where:{$0.kind == .pdf}){model.showFile?(pdf);await settle();if let window=NSApp.windows.first(where:{$0.title == pdf.name}){try snapshot(window,to:output.appendingPathComponent("04-PDF-preview.png"));window.orderOut(nil)}}
+            await settle();try snapshot(workspace,to:output.appendingPathComponent("03-attachments.png"))
+            if let pdf=model.pendingFiles.first(where:{$0.kind == .pdf}){model.showFile?(pdf);await settle();try snapshot(workspace,to:output.appendingPathComponent("04-PDF-preview.png"));model.closeInspector()}
             model.togglePause();results["pausePreservesDraftAndFiles"]=model.draft.contains("Compare") && model.pendingFiles.count==4
             results["pauseStopsMicAndSharing"] = !model.voice.listening && model.context.filter == nil && !model.busy
-            await settle();try snapshot(coach,to:output.appendingPathComponent("05-paused.png"));model.togglePause()
+            await settle();try snapshot(workspace,to:output.appendingPathComponent("05-paused.png"));model.togglePause()
             model.setMode(.learn);results["modeSwitchPreservesContext"]=model.pendingFiles.count==4 && !model.draft.isEmpty
-            await settle();try snapshot(coach,to:output.appendingPathComponent("06-optional-learn-mode.png"));model.setMode(.assistant)
+            await settle();try snapshot(workspace,to:output.appendingPathComponent("06-optional-learn-mode.png"));model.setMode(.assistant)
             if CommandLine.arguments.contains("--integration-test"){
                 model.draft="Compare the two images, then give the verification token in the PDF and the reminder in the text file. Be brief."
                 await settle()
-                if editor != nil,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:coach.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){NSApp.sendEvent(enter)}
+                if editor != nil,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){NSApp.sendEvent(enter)}
                 results["returnSendsMessage"]=model.active?.messages.last?.role == "user" && model.draft.isEmpty
                 await waitForReply()
                 let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text.lowercased() : ""
                 results["realMultiImagePDFTextReply"]=answer.contains("red") && answer.contains("blue") && answer.contains("harbor-73") && answer.contains("notebook")
                 results["messageRetainsAttachments"]=model.active?.messages.first?.attachments.count==4 && model.pendingFiles.isEmpty
-                await settle();try snapshot(coach,to:output.appendingPathComponent("07-real-general-reply.png"))
+                await settle();try snapshot(workspace,to:output.appendingPathComponent("07-real-general-reply.png"))
             }else{
                 let records=model.pendingFiles
                 model.updateActive{$0.messages=[Message(role:"user",text:"Compare these and summarize the documents.",attachments:records),Message(role:"assistant",text:"A shows a red circle; B shows a blue square. The PDF’s verification token is HARBOR-73. Your note says to bring a notebook.")];$0.pendingAttachments=[];$0.title="Compare images and documents"}
                 model.draft="Turn that into a short checklist."
-                await settle();try snapshot(coach,to:output.appendingPathComponent("07-general-reply-fixture.png"))
+                await settle();try snapshot(workspace,to:output.appendingPathComponent("07-general-reply-fixture.png"))
             }
             let id=model.activeID!;model.draft="A draft to preserve";model.persist();model.complete()
-            results["closeChatHidesFloatingWindows"] = !coach.isVisible && !capsule.isVisible
+            results["closeChatKeepsSingleWorkspace"] = workspace.isVisible && model.activeID == nil
             let relaunched=AppModel(dataDirectory:output.appendingPathComponent("test-library"))
-            relaunched.voice.enableFixtures();var launchPresented=false;relaunched.showCoach={launchPresented=true};relaunched.prepareChat()
+            relaunched.voice.enableFixtures();var launchPresented=false;relaunched.showWorkspace={launchPresented=true};relaunched.prepareChat()
             results["coldLaunchResumesClosedChatAndDraft"] = launchPresented && relaunched.activeID==id && relaunched.draft=="A draft to preserve" && relaunched.active?.files.count==4
             relaunched.suspend()
-            model.setTakeaway("A circle and a square; HARBOR-73; bring a notebook.",for:id);model.persist();await settle();try snapshot(library,to:output.appendingPathComponent("08-chat-history.png"))
+            model.setTakeaway("A circle and a square; HARBOR-73; bring a notebook.",for:id);model.persist();await settle();try snapshot(workspace,to:output.appendingPathComponent("08-chat-history.png"))
             model.resume(id);results["resumeRestoresFilesAndDraft"]=model.active?.files.count==4 && model.draft == "A draft to preserve"
             model.rename(id,to:"Images and planning notes");results["renameAndSearch"] = model.active?.title == "Images and planning notes" && model.active?.matches("Brief.pdf")==true
             if let image=model.active?.files.first(where:{$0.kind == .image}){model.removeFile(image);results["sentFileStaysWithItsQuestion"]=model.fileStore?.image(for:image) != nil && model.active?.files.count==4}
             model.pasteImage(try Data(contentsOf:fixtures[0]))
             if let unsent=model.pendingFiles.last{model.removeFile(unsent);results["removeDeletesUnsentManagedFile"]=model.fileStore?.image(for:unsent)==nil && model.pendingFiles.isEmpty && model.active?.files.count==4}
-            model.showLibrary?();model.settings=true;await settle();try snapshot(library,to:output.appendingPathComponent("09-settings-updates.png"))
+            model.openSettings();await settle();try snapshot(workspace,to:output.appendingPathComponent("09-settings-updates.png"))
             func scrollSettings(_ view:NSView)->Bool {
-                if let scroll=view as? NSScrollView,scroll.convert(.zero,to:library.contentView).x>190,let document=scroll.documentView{
+                if let scroll=view as? NSScrollView,scroll.convert(.zero,to:workspace.contentView).x>190,let document=scroll.documentView{
                     document.scroll(NSPoint(x:0,y:document.isFlipped ? max(0,document.bounds.height-scroll.contentView.bounds.height) : 0));scroll.reflectScrolledClipView(scroll.contentView);return true
                 }
                 for child in view.subviews{if scrollSettings(child){return true}};return false
             }
-            _=scrollSettings(library.contentView!);await settle();try snapshot(library,to:output.appendingPathComponent("09b-update-controls.png"))
+            _=scrollSettings(workspace.contentView!);await settle();try snapshot(workspace,to:output.appendingPathComponent("09b-update-controls.png"))
             results["unconfiguredUpdaterStaysInactive"] = !model.updates.canCheck && model.updates.configuration==nil
-            results["stableWindowSizes"]=library.contentView?.bounds.size==NSSize(width:900,height:650) && capsule.frame.size==NSSize(width:430,height:62) && coach.frame.size==NSSize(width:410,height:480)
+            results["singleStableWorkspace"]=workspace.contentView?.bounds.size==NSSize(width:1040,height:740) && NSApp.windows.filter{$0.identifier?.rawValue == "vale.workspace"}.count == 1
             results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==4}
-            model.error="The connection stopped. Your message and attachments are saved.";openCoach();await settle();try snapshot(coach,to:output.appendingPathComponent("10-recovery.png"))
+            model.error="The connection stopped. Your message and attachments are saved.";model.backToChat();openWorkspace();await settle();try snapshot(workspace,to:output.appendingPathComponent("10-recovery.png"))
             if CommandLine.arguments.contains("--integration-test"){
                 model.newSession(title:"Web search verification");model.setWeb(true)
                 model.send("Search the web for Apple’s official ScreenCaptureKit documentation. Give one direct link to the developer.apple.com documentation page, with a brief description. You must actually use web search.")
                 await waitForReply()
                 let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text : ""
                 results["explicitWebSearchUsesRealTool"]=model.provider.usedWebSearch && answer.contains("developer.apple.com/documentation/screencapturekit")
-                await settle();try snapshot(coach,to:output.appendingPathComponent("11-live-web-search.png"))
+                await settle();try snapshot(workspace,to:output.appendingPathComponent("11-live-web-search.png"))
                 model.setWeb(false);results["webSearchCanBeTurnedOff"]=model.active?.webEnabled == false
             }
             try await runInteractionFixtures(output:output,results:&results)
+            do {
+                let defaults = UserDefaults.standard
+                let savedAppearance = defaults.object(forKey: "valeAppearance")
+                defaults.set("system", forKey: "valeAppearance")
+                defer {
+                    if let savedAppearance { defaults.set(savedAppearance, forKey: "valeAppearance") }
+                    else { defaults.removeObject(forKey: "valeAppearance") }
+                }
+                try await runWorkspaceAcceptance(output:output,results:&results)
+            }
             let data=try JSONSerialization.data(withJSONObject:results,options:[.prettyPrinted,.sortedKeys]);try data.write(to:output.appendingPathComponent("results.json"));print(String(data:data,encoding:.utf8)!);model.suspend();exit(results.values.allSatisfy{$0} ? 0 : 1)
         }catch{print("Harness failed: \(error)");exit(1)}
     }

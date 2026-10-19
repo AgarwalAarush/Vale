@@ -3,148 +3,102 @@ import SwiftUI
 import Carbon
 import LiltCore
 
-final class FloatingPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
-}
-
-@MainActor final class AppController: NSObject, NSApplicationDelegate,NSMenuItemValidation,NSWindowDelegate {
+@MainActor final class AppController: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSWindowDelegate {
     var model: AppModel!
-    var capsule: FloatingPanel!
-    var coach: FloatingPanel!
-    var library: NSWindow!
+    var workspace: NSWindow!
     var statusItem: NSStatusItem!
     var annotation: NSWindow?
     private var annotationTimer: Timer?
     private var hotKey: EventHotKeyRef?
     private var hotHandler: EventHandlerRef?
     private var monitor: Any?
-    private var auxiliary: [NSWindow] = []
-    private var contextPreviews:[NSWindow]=[]
-    private var filePreviews:[ObjectIdentifier:UUID]=[:]
     private var statusMenu: NSMenu?
     private var showingStatusMenu = false
     private var testing = false
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
         testing = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")
-        let testDirectory = testing ? URL(fileURLWithPath: CommandLine.arguments.last!).appendingPathComponent("test-library") : nil
-        model = AppModel(dataDirectory: testDirectory)
-        setupWindows(); setupMenu(); if !testing{registerHotKey()}
-        model.showCoach = { [weak self] in self?.openCoach() }
-        model.showLibrary = { [weak self] in self?.openLibrary() }
+        let directory = testing ? URL(fileURLWithPath: CommandLine.arguments.last!).appendingPathComponent("test-library") : nil
+        model = AppModel(dataDirectory: directory)
+        setupWorkspace(); setupMenu()
+        if !testing { registerHotKey() }
+        model.showWorkspace = { [weak self] in self?.openWorkspace() }
         model.hideOverlay = { [weak self] in self?.clearAnnotation() }
         model.showPoint = { [weak self] point, snapshot in self?.point(point, snapshot: snapshot) }
-        model.contextReset = { [weak self] in guard let self else{return};for window in self.contextPreviews{window.close()} }
-        model.filesRemoved = { [weak self] ids in guard let self else{return};for window in self.auxiliary.filter({self.filePreviews[ObjectIdentifier($0)].map{ids.contains($0)} ?? false}){window.close()} }
-        model.showPreview = { [weak self] image in self?.preview(image) }
+        model.contextReset = { [weak self] in
+            guard let self else { return }
+            self.model.contextPreview = nil
+            if self.model.inspector == .context { self.model.closeInspector() }
+        }
+        model.filesRemoved = { [weak self] ids in
+            guard let self, case .file(let id) = self.model.inspector, ids.contains(id) else { return }
+            self.model.closeInspector()
+        }
+        model.showPreview = { [weak self] image in self?.model.contextPreview = image; self?.model.showInspector(.context) }
+        model.showFile = { [weak self] record in self?.model.showInspector(.file(record.id)) }
+        model.closePreview = { [weak self] in
+            self?.model.contextPreview = nil
+            if self?.model.inspector == .context { self?.model.closeInspector() }
+        }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+            let dialog = self.workspace.attachedSheet != nil || NSApp.modalWindow != nil || NSApp.keyWindow?.attachedSheet != nil
             if event.keyCode == 53 {
-                let dialog = self.coach.attachedSheet != nil || NSApp.modalWindow != nil || NSApp.keyWindow?.attachedSheet != nil
                 if EscapeKey.stopsSession(dialogOpen: dialog) { self.model.stopInteraction(); self.clearAnnotation(); return nil }
-                return event
             }
-            if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "," { self.model.settings = true; self.openLibrary(); return nil }
-            if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" { self.model.newSession(); return nil }
-            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
-            if CoachClose.hidesTheCoach(key: event.charactersIgnoringModifiers ?? "", command: mods.contains(.command), shift: mods.contains(.shift), option: mods.contains(.option), control: mods.contains(.control), coachIsKey: self.coach.isKeyWindow, blocked: self.coach.attachedSheet != nil || NSApp.modalWindow != nil) {
-                self.model.coachOpen = false
-                self.coach.orderOut(nil); return nil
+            guard !dialog else { return event }
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
+            if modifiers == .command {
+                switch event.charactersIgnoringModifiers {
+                case ",": self.model.openSettings(); return nil
+                case "n": self.model.newSession(); return nil
+                default: break
+                }
             }
             return event
         }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.willSleepNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemSuspend), name: NSWorkspace.screensDidSleepNotification, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(systemSuspend), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
-        model.expandCoach = { [weak self] in self?.toggleCoachSize() }
-        model.showFile = { [weak self] record in self?.previewFile(record) }
-        model.closePreview = { [weak self] in self?.contextPreviews.forEach { $0.close() } }
-        if testing { Task { await runHarness() } } else { model.prepareChat(); if model.active == nil { openCoach() } }
+        if testing { Task { await runHarness() } }
+        else { model.prepareChat(); openWorkspace() }
     }
-    private func setupWindows() {
-        let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        capsule = makePanel(size: NSSize(width: 430, height: 62))
-        capsule.contentView = NSHostingView(rootView: CapsuleView(model: model, openCoach: { [weak self] in self?.openCoach() }))
-        coach = makePanel(size: NSSize(width: 410, height: 480))
-        let coachHost=NSHostingView(rootView:CoachView(model:model,close:{[weak self]in self?.model.coachOpen=false;self?.coach.orderOut(nil)}));coachHost.sizingOptions=[];coachHost.autoresizingMask=[.width,.height];coach.contentView=coachHost;coach.setContentSize(NSSize(width:410,height:480))
-        coach.setFrameOrigin(NSPoint(x: visible.maxX - 430, y: visible.minY + 24))
-        seatCapsule()
-        NotificationCenter.default.addObserver(self, selector: #selector(coachMoved), name: NSWindow.didMoveNotification, object: coach)
-        NotificationCenter.default.addObserver(self, selector: #selector(coachMoved), name: NSWindow.didResizeNotification, object: coach)
-        library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 650), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-        library.title = "Vale"; library.titlebarAppearsTransparent = true; library.titleVisibility = .hidden
-        library.backgroundColor = Theme.windowBackground; library.appearance = NSAppearance(named: .darkAqua)
-        let libraryHost = NSHostingView(rootView: LibraryView(model: model))
-        libraryHost.sizingOptions = []
-        libraryHost.frame = NSRect(x: 0, y: 0, width: 900, height: 650)
-        libraryHost.autoresizingMask = [.width, .height]
-        library.contentView = libraryHost
-        library.setContentSize(NSSize(width: 900, height: 650))
-        library.minSize = NSSize(width: 760, height: 540); library.isReleasedWhenClosed = false; library.center()
-        if !testing {
-            library.setFrameAutosaveName("LiltLibrary")
-            if library.frame.width > visible.width || library.frame.height > visible.height { library.setContentSize(NSSize(width: min(900, visible.width), height: min(650, visible.height - 30))); library.center() }
-            bringLibraryOnScreen()
+
+    private func setupWorkspace() {
+        workspace = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 740), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        workspace.title = "Vale"; workspace.titleVisibility = .hidden; workspace.titlebarAppearsTransparent = true
+        workspace.backgroundColor = Theme.windowBackground; workspace.isReleasedWhenClosed = false; workspace.delegate = self
+        workspace.identifier = NSUserInterfaceItemIdentifier("vale.workspace")
+        workspace.minSize = NSSize(width: 740, height: 560)
+        let host = NSHostingView(rootView: WorkspaceView(model: model))
+        host.sizingOptions = []; host.autoresizingMask = [.width, .height]
+        workspace.contentView = host; workspace.setContentSize(NSSize(width: 1040, height: 740)); workspace.center()
+        if !testing { workspace.setFrameAutosaveName("ValeWorkspace"); bringWorkspaceOnScreen() }
+    }
+    private func bringWorkspaceOnScreen() {
+        let screens = NSScreen.screens.map { DisplayRect(x: $0.visibleFrame.minX, y: $0.visibleFrame.minY, width: $0.visibleFrame.width, height: $0.visibleFrame.height) }
+        let frame = workspace.frame
+        if !WindowPlacement.isVisible(DisplayRect(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height), on: screens) { workspace.center() }
+        if let screen = workspace.screen ?? NSScreen.main, frame.width > screen.visibleFrame.width || frame.height > screen.visibleFrame.height {
+            workspace.setFrame(screen.visibleFrame.insetBy(dx: 12, dy: 12), display: true)
         }
     }
-    private func bringLibraryOnScreen() {
-        let window=DisplayRect(x:library.frame.origin.x,y:library.frame.origin.y,width:library.frame.width,height:library.frame.height)
-        let screens=NSScreen.screens.map{DisplayRect(x:$0.frame.origin.x,y:$0.frame.origin.y,width:$0.frame.width,height:$0.frame.height)}
-        if !WindowPlacement.isVisible(window,on:screens){library.center()}
-    }
-    private func makePanel(size: NSSize) -> FloatingPanel {
-        let panel = FloatingPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
-        panel.level = .floating; panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true; panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
-        panel.appearance = NSAppearance(named: .darkAqua)
-        return panel
-    }
-    func openCoach() {
-        if model.active == nil, model.error == nil { model.prepareChat(); return }
-        guard LaunchPresentation.presentsCoach(hasActiveChat: model.active != nil, hasError: model.error != nil) else { return }
-        model.coachOpen=true
-        library?.orderOut(nil)
-        seatCapsule()
-        capsule.orderFrontRegardless(); coach.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-        focusComposer(attemptsLeft: ComposerFocus.attempts)
+    func openWorkspace() {
+        bringWorkspaceOnScreen(); model.workspaceOpen = true
+        workspace.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        if model.workspaceRoute == .chat, model.inspector == nil, !model.compactHistoryVisible || workspace.frame.width >= 860 { focusComposer(attemptsLeft: ComposerFocus.attempts) }
+        else { workspace.makeFirstResponder(nil) }
     }
     private func focusComposer(attemptsLeft: Int) {
-        guard let root = coach?.contentView else { return }
+        guard let root = workspace.contentView else { return }
         func editor(_ view: NSView) -> NSView? {
             if view.identifier?.rawValue == "lilt.composer" { return view }
-            for child in view.subviews { if let found = editor(child) { return found } }
-            return nil
+            return view.subviews.lazy.compactMap { editor($0) }.first
         }
-        if let input = editor(root) { coach.makeFirstResponder(input); return }
+        if let input = editor(root) { workspace.makeFirstResponder(input); return }
         guard ComposerFocus.shouldRetry(found: false, attemptsLeft: attemptsLeft) else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now()+0.05) { [weak self] in self?.focusComposer(attemptsLeft: attemptsLeft-1) }
-    }
-    func openLibrary() { bringLibraryOnScreen(); model.coachOpen = false; coach?.orderOut(nil); if model.active == nil { capsule?.orderOut(nil) }; library.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
-    private func toggleCoachSize(){
-        model.expanded.toggle();let visible=NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
-        let size=NSSize(width:min(model.expanded ? 560 : 410,visible.width-32),height:min(model.expanded ? 700 : 480,visible.height-40))
-        let origin=NSPoint(x:max(visible.minX+16,min(coach.frame.maxX-size.width,visible.maxX-size.width-16)),y:max(visible.minY+20,min(coach.frame.minY,visible.maxY-size.height-20)))
-        let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = reduce ? 0 : 0.22
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            coach.animator().setFrame(NSRect(origin: origin, size: size), display: true)
-        } completionHandler: { [weak self] in self?.seatCapsule() }
-    }
-    /// The capsule shares the coach’s right edge and sits in the gap above it.
-    private func seatCapsule() {
-        guard CapsuleSeat.onTheCoach else { return }
-        let screen = coach.screen ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let y = CapsuleSeat.y(coachMaxY: coach.frame.maxY, capsuleHeight: capsule.frame.height, visibleMaxY: visible.maxY)
-        let x = min(max(visible.minX + 16, coach.frame.maxX - capsule.frame.width), visible.maxX - capsule.frame.width - 16)
-        capsule.setFrameOrigin(NSPoint(x: x, y: y))
-    }
-    @objc private func coachMoved() {
-        guard coach.isVisible else { return }
-        seatCapsule()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.focusComposer(attemptsLeft: attemptsLeft - 1) }
     }
     private func setupMenu() {
         let main = NSMenu()
@@ -164,12 +118,12 @@ final class FloatingPanel: NSPanel {
         NSApp.mainMenu = main
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vale")
-        statusItem.button?.toolTip = "Vale · click to type · Control–Option–Space"
+        statusItem.button?.toolTip = "Vale · open workspace · Control–Option–Space"
         statusItem.button?.target = self
         statusItem.button?.action = #selector(statusItemClicked)
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         let menu = NSMenu()
-        for (title, action) in [("Open assistant", #selector(menuCoach)), ("Chat history", #selector(menuLibrary)), ("Pause chat", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
+        for (title, action) in [("Open Vale", #selector(menuWorkspace)), ("Chat history", #selector(menuLibrary)), ("Pause chat", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item)
         }
         menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit)
@@ -181,7 +135,7 @@ final class FloatingPanel: NSPanel {
         let handler: EventHandlerUPP = { _, _, data in
             guard let data else { return OSStatus(eventNotHandledErr) }
             let controller = Unmanaged<AppController>.fromOpaque(data).takeUnretainedValue()
-            DispatchQueue.main.async { controller.openCoach() }; return noErr
+            DispatchQueue.main.async { controller.openWorkspace() }; return noErr
         }
         InstallEventHandler(GetApplicationEventTarget(), handler, 1, &event, pointer, &hotHandler)
         let id = EventHotKeyID(signature: 0x4C696C74, id: 1)
@@ -223,68 +177,40 @@ final class FloatingPanel: NSPanel {
         }
     }
     func clearAnnotation() { annotationTimer?.invalidate(); annotationTimer = nil; annotation?.orderOut(nil); annotation = nil }
-    private func preview(_ image: NSImage) {
-        closeOldestScreenPreviewIfNeeded(addingFile: false)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 520), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        window.title = "Shared context preview"; window.isReleasedWhenClosed = false; window.appearance = NSAppearance(named: .darkAqua); window.backgroundColor = Theme.windowBackground
-        let host=NSHostingView(rootView: Image(nsImage: image).resizable().scaledToFit().padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:520));window.delegate=self;contextPreviews.append(window)
-        window.center(); auxiliary.append(window); window.makeKeyAndOrderFront(nil)
-    }
-    private func previewFile(_ record:AttachmentRecord) {
-        guard let files=model.fileStore else{return}
-        let window=NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:550),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
-        closeOldestScreenPreviewIfNeeded(addingFile: true)
-        window.title=record.name;window.isReleasedWhenClosed=false;window.delegate=self;filePreviews[ObjectIdentifier(window)]=record.id;window.appearance=NSAppearance(named:.darkAqua);window.backgroundColor=Theme.windowBackground
-        let host=NSHostingView(rootView:FilePreviewView(record:record,store:files));host.sizingOptions=[];window.contentView=host;window.setContentSize(NSSize(width:800,height:550));window.center()
-        let visible=coach.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
-        let origin=FilePreviewPlace.origin(screenX:visible.minX,screenY:visible.minY,screenWidth:visible.width,screenHeight:visible.height,previewWidth:800,previewHeight:550,coachX:coach.frame.minX,coachWidth:coach.frame.width)
-        window.setFrameOrigin(NSPoint(x:origin.x,y:origin.y))
-        auxiliary.append(window);window.makeKeyAndOrderFront(nil)
-    }
-    private func closeOldestScreenPreviewIfNeeded(addingFile: Bool) {
-        let kinds=auxiliary.map { window in contextPreviews.contains { $0 === window } ? PreviewRoom.Kind.screen : .file }
-        if let index=PreviewRoom.indexToClose(existing:kinds,adding:addingFile ? .file : .screen) { auxiliary[index].close() }
-    }
-    func windowWillClose(_ notification:Notification){
-        guard let window=notification.object as? NSWindow else{return}
-        auxiliary.removeAll{$0===window};contextPreviews.removeAll{$0===window};filePreviews.removeValue(forKey:ObjectIdentifier(window));window.contentView=nil
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if sender === workspace {
+            model.commitComposer?(); model.stopInteraction(); model.persist(); model.workspaceOpen = false
+            model.contextPreview = nil
+            if model.inspector == .context { model.closeInspector() }
+            clearAnnotation()
+        }
+        return true
     }
     @objc func systemSuspend() { model.suspend() }
-    @objc private func menuClose() {
-        let blocked = coach.attachedSheet != nil || NSApp.modalWindow != nil
-        if CoachClose.hidesTheCoach(key: "w", command: true, shift: false, option: false, control: false, coachIsKey: coach.isKeyWindow, blocked: blocked) {
-            model.coachOpen = false
-            coach.orderOut(nil)
-            return
-        }
-        NSApp.keyWindow?.performClose(nil)
-    }
+    @objc private func menuClose() { NSApp.keyWindow?.performClose(nil) }
     @objc private func menuNew() { model.newSession() }
     @objc private func menuUpdates() { model.updates.check() }
-    func validateMenuItem(_ item:NSMenuItem)->Bool {
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(menuUpdates) { return model.updates.canCheck }
         if item.action == #selector(menuPause) { item.title = model.paused && model.active != nil ? "Resume" : "Pause chat"; return model.active != nil }
         return true
     }
     @objc private func statusItemClicked() {
         let event = NSApp.currentEvent
-        let wantsMenu = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
-        if wantsMenu, !showingStatusMenu, let menu = statusMenu, let button = statusItem.button {
-            showingStatusMenu = true
-            statusItem.menu = menu
-            button.performClick(nil)
-            statusItem.menu = nil
-            showingStatusMenu = false
-            return
+        if (event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true), !showingStatusMenu, let menu = statusMenu, let button = statusItem.button {
+            showingStatusMenu = true; statusItem.menu = menu; button.performClick(nil); statusItem.menu = nil; showingStatusMenu = false; return
         }
-        if showingStatusMenu { return }
-        openCoach()
+        if !showingStatusMenu { openWorkspace() }
     }
-    @objc private func menuCoach() { openCoach() }
+    @objc private func menuWorkspace() { openWorkspace() }
     @objc private func menuLibrary() { model.showHistory() }
     @objc private func menuPause() { if model.active != nil { model.togglePause() } }
-    @objc private func menuSettings() { model.settings = true; openLibrary() }
+    @objc private func menuSettings() { model.openSettings() }
     @objc private func menuQuit() { NSApp.terminate(nil) }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { openCoach(); return true }
-    func applicationWillTerminate(_ notification: Notification) { model.suspend(); if let hotKey { UnregisterEventHotKey(hotKey) }; if let monitor { NSEvent.removeMonitor(monitor) } }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { openWorkspace(); return true }
+    func applicationWillTerminate(_ notification: Notification) {
+        model.commitComposer?(); model.suspend()
+        if let hotKey { UnregisterEventHotKey(hotKey) }
+        if let monitor { NSEvent.removeMonitor(monitor) }
+    }
 }
