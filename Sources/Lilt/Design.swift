@@ -206,7 +206,7 @@ struct DraftEditor: NSViewRepresentable {
     var onMeasuredHeight: ((CGFloat) -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
     static func measuredHeight(_ editor: NSTextView) -> CGFloat {
-        guard let layout = editor.layoutManager, let container = editor.textContainer else { return 61 }
+        guard let layout = editor.layoutManager, let container = editor.textContainer else { return CGFloat(ComposerHeight.minimum) }
         layout.ensureLayout(for: container)
         return layout.usedRect(for: container).height + editor.textContainerInset.height * 2
     }

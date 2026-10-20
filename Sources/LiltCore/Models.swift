@@ -387,7 +387,7 @@ public enum AttachmentFileKind {
 }
 
 public enum ComposerHeight {
-    public static let minimum = 61.0
+    public static let minimum = 28.0
     public static let maximum = 140.0
     public static func clamped(_ measured: Double) -> Double {
         guard measured.isFinite else { return minimum }

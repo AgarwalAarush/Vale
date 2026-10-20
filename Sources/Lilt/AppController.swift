@@ -15,6 +15,7 @@ import LiltCore
     private var statusMenu: NSMenu?
     private var showingStatusMenu = false
     private var testing = false
+    private var workspaceToolbar: NativeWorkspaceToolbar?
     /// AppKit can dispatch menu key equivalents even when a local monitor yields
     /// to a sheet. Share this boundary with validation, actions and focus retries.
     private var nativeDialogOpen: Bool {
@@ -78,15 +79,9 @@ import LiltCore
     }
 
     private func setupWorkspace() {
-        workspace = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 740), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-        workspace.title = "Vale"; workspace.titleVisibility = .hidden; workspace.titlebarAppearsTransparent = true
-        workspace.backgroundColor = Theme.windowBackground; workspace.isReleasedWhenClosed = false; workspace.delegate = self
-        workspace.identifier = NSUserInterfaceItemIdentifier("vale.workspace")
-        workspace.minSize = NSSize(width: 740, height: 560)
-        let host = NSHostingView(rootView: WorkspaceView(model: model))
-        host.sizingOptions = []; host.autoresizingMask = [.width, .height]
-        workspace.contentView = host; workspace.setContentSize(NSSize(width: 1040, height: 740)); workspace.center()
-        if !testing { workspace.setFrameAutosaveName("ValeWorkspace"); bringWorkspaceOnScreen() }
+        let window = NativeWorkspaceWindow(model: model, rememberFrame: !testing)
+        workspace = window; workspace.delegate = self; workspaceToolbar = window.chrome
+        if !testing { bringWorkspaceOnScreen() }
     }
     private func bringWorkspaceOnScreen() {
         let screens = NSScreen.screens.map { DisplayRect(x: $0.visibleFrame.minX, y: $0.visibleFrame.minY, width: $0.visibleFrame.width, height: $0.visibleFrame.height) }
@@ -104,8 +99,8 @@ import LiltCore
         else { workspace.makeFirstResponder(nil) }
     }
     private var composerMayReceiveFocus: Bool {
-        !nativeDialogOpen && workspace.isVisible && !workspace.isMiniaturized && model.workspaceRoute == .chat && model.inspector == nil &&
-        (!model.compactHistoryVisible || (workspace.contentView?.bounds.width ?? 0) >= 860)
+        let layout = WorkspaceLayout(width: workspace.contentView?.bounds.width ?? 0, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
+        return !nativeDialogOpen && workspace.isVisible && !workspace.isMiniaturized && model.workspaceRoute == .chat && layout.chatVisible
     }
     private func focusComposer(attemptsLeft: Int) {
         guard composerMayReceiveFocus, let root = workspace.contentView else { return }
@@ -127,11 +122,21 @@ import LiltCore
         let appQuit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); appQuit.target = self; appMenu.addItem(appQuit)
         let fileItem = NSMenuItem(); main.addItem(fileItem); let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
         let newItem = NSMenuItem(title: "New chat", action: #selector(menuNew), keyEquivalent: "n"); newItem.target = self; fileMenu.addItem(newItem)
+        let attachItem = NSMenuItem(title: "Attach files…", action: #selector(menuAttach), keyEquivalent: "a"); attachItem.keyEquivalentModifierMask = [.command, .shift]; attachItem.target = self; fileMenu.addItem(attachItem)
+        fileMenu.addItem(.separator())
         let closeItem = NSMenuItem(title: "Close window", action: #selector(menuClose), keyEquivalent: "w"); closeItem.target = self; fileMenu.addItem(closeItem)
         let editItem = NSMenuItem(); main.addItem(editItem); let editMenu = NSMenu(title: "Edit"); editItem.submenu = editMenu
         for (title, selector, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
             editMenu.addItem(NSMenuItem(title: title, action: NSSelectorFromString(selector), keyEquivalent: key))
         }
+        editMenu.addItem(.separator())
+        let findItem = NSMenuItem(title: "Find in chats", action: #selector(menuLibrary), keyEquivalent: "f"); findItem.target = self; editMenu.addItem(findItem)
+        let viewItem = NSMenuItem(); main.addItem(viewItem); let viewMenu = NSMenu(title: "View"); viewItem.submenu = viewMenu
+        let sidebarItem = NSMenuItem(title: "Toggle sidebar", action: #selector(menuSidebar), keyEquivalent: "s"); sidebarItem.keyEquivalentModifierMask = [.command, .control]; sidebarItem.target = self; viewMenu.addItem(sidebarItem)
+        let detailsItem = NSMenuItem(title: "Show files and notes", action: #selector(menuDetails), keyEquivalent: "i"); detailsItem.keyEquivalentModifierMask = [.command, .option]; detailsItem.target = self; viewMenu.addItem(detailsItem)
+        viewMenu.addItem(.separator())
+        let backItem = NSMenuItem(title: "Back to chat", action: #selector(menuBack), keyEquivalent: "["); backItem.target = self; viewMenu.addItem(backItem)
+        let chatItem = NSMenuItem(); main.addItem(chatItem); chatItem.submenu = workspaceToolbar?.chatMenu()
         NSApp.mainMenu = main
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vale")
@@ -208,10 +213,13 @@ import LiltCore
     @objc private func menuNew() { guard !nativeDialogOpen else { return }; model.newSession() }
     @objc private func menuUpdates() { guard !nativeDialogOpen, model.updates.canCheck else { return }; model.updates.check() }
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        let guardedActions = [#selector(menuNew), #selector(menuSettings), #selector(menuLibrary), #selector(menuPause), #selector(menuUpdates), #selector(menuWorkspace), #selector(menuClose)]
+        let guardedActions = [#selector(menuNew), #selector(menuSettings), #selector(menuLibrary), #selector(menuPause), #selector(menuUpdates), #selector(menuWorkspace), #selector(menuClose), #selector(menuAttach), #selector(menuSidebar), #selector(menuDetails), #selector(menuBack)]
         if nativeDialogOpen, let action = item.action, guardedActions.contains(action) { return false }
         if item.action == #selector(menuUpdates) { return model.updates.canCheck }
         if item.action == #selector(menuPause) { item.title = model.paused && model.active != nil ? "Resume" : "Pause chat"; return model.active != nil }
+        if item.action == #selector(menuAttach) { return model.active != nil && !model.importing }
+        if item.action == #selector(menuDetails) { return model.active != nil }
+        if item.action == #selector(menuBack) { return model.workspaceRoute != .chat || model.inspector != nil || model.compactHistoryVisible }
         return true
     }
     @objc private func statusItemClicked() {
@@ -223,6 +231,10 @@ import LiltCore
     }
     @objc private func menuWorkspace() { openWorkspace() }
     @objc private func menuLibrary() { guard !nativeDialogOpen else { return }; model.showHistory() }
+    @objc private func menuAttach() { guard !nativeDialogOpen, model.active != nil, !model.importing else { return }; model.attachFiles() }
+    @objc private func menuSidebar() { guard !nativeDialogOpen else { return }; workspaceToolbar?.toggleSidebar() }
+    @objc private func menuDetails() { guard !nativeDialogOpen, model.active != nil else { return }; workspaceToolbar?.toggleDetails() }
+    @objc private func menuBack() { guard !nativeDialogOpen else { return }; model.backToChat() }
     @objc private func menuPause() { guard !nativeDialogOpen, model.active != nil else { return }; model.togglePause() }
     @objc private func menuSettings() { guard !nativeDialogOpen else { return }; model.openSettings() }
     @objc private func menuQuit() { NSApp.terminate(nil) }

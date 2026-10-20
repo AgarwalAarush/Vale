@@ -4,51 +4,40 @@ import LiltCore
 struct CoachView: View {
     @ObservedObject var model: AppModel
     var chatVisible = true
-    @State private var composerHeight: CGFloat = 61
+    @State private var composerHeight: CGFloat = CGFloat(ComposerHeight.minimum)
     @State private var composerFocused = false
-    @State private var welcomeContentHeight: CGFloat = 150
-    private var sendReady: Bool { model.hasInput && PausedTyping.allowsQuestion(paused: model.paused) && model.active != nil && !model.importing }
+    private var account: ChatGPTAccount { model.provider.account }
+    private var sendReady: Bool { account.permitsPlanUsage && model.hasInput && PausedTyping.allowsQuestion(paused: model.paused) && model.active != nil && !model.importing }
     private var webEnabled: Bool { model.active?.webEnabled == true }
-    private var centersWelcome: Bool { model.active?.messages.isEmpty == true && model.active?.guide == nil && !model.busy }
+    private var empty: Bool { model.active?.messages.isEmpty == true && model.active?.guide == nil && !model.busy }
+    private var voiceActive: Bool { model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
     var body: some View {
         VStack(spacing: 0) {
             if let warning = ShortcutNotice.text(model.shortcutWarning) { notice(warning) }
             if model.active?.showsEarlierContextNotice == true {
                 Text("Using recent messages. Full history stays saved here.").font(.system(size: 12)).foregroundStyle(Theme.muted).padding(.top, 12)
             }
-            if let guide = model.active?.guide { GuideCard(model: model, guide: guide).frame(maxWidth: 740) }
-            Spacer(minLength: 0).frame(maxHeight: centersWelcome ? .infinity : 0).layoutPriority(-1)
+            if let guide = model.active?.guide { GuideCard(model: model, guide: guide).frame(maxWidth: 728) }
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: centersWelcome ? 0 : 28) {
+                    VStack(alignment: .leading, spacing: 24) {
                         if let session = model.active {
-                            if session.messages.isEmpty { EmptyGreeting(model: model, session: session) }
                             ForEach(session.messages) { message in CoachMessage(model: model, session: session, message: message).id(message.id) }
                         } else {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("A place to pick up the thread.").font(.system(size: 28))
-                                Text("Choose a chat from history, or start something new.").font(.system(size: 15)).foregroundStyle(Theme.muted)
-                                Button("New chat") { model.newSession() }.buttonStyle(QuietButton(filled: true))
-                            }.padding(.vertical, 32)
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Choose a chat or start a new one.").font(.system(size: 20))
+                                Button("New chat") { model.newSession() }.buttonStyle(QuietButton())
+                            }.padding(.vertical, 12)
                         }
                         if model.busy { HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking…").font(.system(size: 13)).foregroundStyle(Theme.muted) }.id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
-                    }.padding(.horizontal, 32).padding(.top, centersWelcome ? 0 : 28).padding(.bottom, 24).frame(maxWidth: 740, alignment: .leading).frame(maxWidth: .infinity)
-                        .background {
-                            GeometryReader { geometry in
-                                Color.clear.preference(key: WelcomeContentHeight.self, value: centersWelcome ? geometry.size.height : 0)
-                            }
-                        }
-                }
-                .clipped()
+                    }.frame(maxWidth: 680, alignment: .leading).padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 20).frame(maxWidth: .infinity)
+                }.clipped()
                 .onChange(of: model.active?.messages.count) { revealLatest(proxy) }
                 .onChange(of: model.busy) { revealLatest(proxy) }
                 .onChange(of: model.activeID) { revealLatest(proxy) }
-            }.frame(minHeight: 0, maxHeight: centersWelcome ? welcomeContentHeight : .infinity)
-                .onPreferenceChange(WelcomeContentHeight.self) { height in
-                    if centersWelcome, height > 0, abs(welcomeContentHeight - height) > 0.5 { welcomeContentHeight = height }
-                }
-            VStack(spacing: 12) {
+            }.frame(minHeight: 0, maxHeight: .infinity)
+            VStack(alignment: .leading, spacing: 10) {
                 if let error = model.error {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .top) { Text(error).font(.system(size: 12)).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true); Spacer(minLength: 4); IconButton(symbol: "xmark", label: "Dismiss message") { model.error = nil } }
@@ -57,9 +46,9 @@ struct CoachView: View {
                             if model.context.hasSelection { Button("Change window") { model.context.choose() } }
                             if let id = model.deletionToRetry { Button("Retry Forget") { model.delete(id) } }
                         }.font(.system(size: 12)).buttonStyle(ActionButton()).foregroundStyle(Theme.accent)
-                    }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Theme.warning.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 8))
+                    }.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(Theme.warning.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                if model.canRetry { HStack { Button("Retry message") { model.retry() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent); Spacer() }.font(.system(size: 13)) }
+                if model.canRetry { Button("Retry message") { model.retry() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent).font(.system(size: 13)).disabled(!account.permitsPlanUsage) }
                 if model.active != nil {
                     if model.context.hasSelection { ContextStrip(model: model).fixedSize(horizontal: false, vertical: true) }
                     if model.paused { HStack { Text("Paused · mic and sharing off").foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent) }.font(.system(size: 12)) }
@@ -68,22 +57,13 @@ struct CoachView: View {
                             Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb") }
                             Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays") }
                             Spacer()
-                        }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused)
+                        }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused || !account.permitsPlanUsage)
                     }
+                    if empty, account.permitsPlanUsage, let session = model.active { EmptyGreeting(model: model, session: session) }
+                    connectionStatus
                     composer
-                    HStack {
-                        Text(model.status).font(.system(size: 12)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
-                        Spacer()
-                        Button { model.setConversation(!model.conversation) } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: model.conversation ? "waveform.circle.fill" : "waveform.circle").symbolRenderingMode(.monochrome).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)
-                                Text(ConversationControl.title(on: model.conversation))
-                            }
-                        }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted).disabled(model.paused).help("Opt in to spoken turn-taking. Escape stops voice and sharing.")
-                    }.padding(.horizontal, 2)
                 }
-            }.fixedSize(horizontal: false, vertical: true).layoutPriority(1).padding(.horizontal, 32).padding(.bottom, 22).frame(maxWidth: 740).frame(maxWidth: .infinity)
-            Spacer(minLength: 0).frame(maxHeight: centersWelcome ? .infinity : 0).layoutPriority(-1)
+            }.fixedSize(horizontal: false, vertical: true).layoutPriority(1).frame(maxWidth: 680).padding(.horizontal, 24).padding(.bottom, 20).frame(maxWidth: .infinity)
         }.background(Theme.background)
         .dropDestination(for: URL.self) { urls, _ in
             model.keepDroppedLinks(urls)
@@ -91,21 +71,35 @@ struct CoachView: View {
             return !files.isEmpty || DroppedLink.text(from: urls) != nil
         }
     }
+    @ViewBuilder private var connectionStatus: some View {
+        if account.permitsPlanUsage {
+            HStack(spacing: 8) {
+                Text("Using ChatGPT plan")
+                Link("Manage usage", destination: URL(string: "https://chatgpt.com/settings/usage")!).foregroundStyle(Theme.accent)
+                Spacer(minLength: 0)
+            }.font(.system(size: 12)).foregroundStyle(Theme.muted)
+        } else {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(account.isSigningIn ? "Finish connecting in your browser. Your draft stays here." : account.needsIdentityValidation ? "Verify your ChatGPT connection to send." : "Connect ChatGPT to send.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.muted)
+                if let error = account.error { Text(error).font(.system(size: 12)).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true).textSelection(.enabled) }
+            }
+        }
+    }
     private var composer: some View {
         VStack(spacing: 8) {
             if !model.pendingFiles.isEmpty { ScrollView(.horizontal) { HStack(spacing: 8) { ForEach(model.pendingFiles) { FileChip(record: $0, among: model.pendingFiles, model: model, removable: true) } } }.scrollIndicators(.hidden).fixedSize(horizontal: false, vertical: true) }
             ZStack(alignment: .topLeading) {
-                if FieldPrompt.showsIdle(model.draft) { Text(model.busy ? "Add a thought for your next message…" : "Message Vale…").font(.system(size: 15)).foregroundStyle(Theme.muted).padding(.top, 5).padding(.leading, 2).allowsHitTesting(false) }
-                DraftEditor(text: Binding(get: { model.draft }, set: { model.editDraft($0) }), draftID: model.activeID, focusToken: model.composerFocus, permitsFocus: { window in
-                    model.workspaceRoute == .chat && model.inspector == nil &&
-                    (!model.compactHistoryVisible || (window.contentView?.bounds.width ?? 0) >= 860)
-                }, submit: { if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
+                if FieldPrompt.showsIdle(model.draft) { Text(model.busy ? "Add a thought for your next message…" : "Message Vale…").font(.system(size: 15)).foregroundStyle(Theme.muted).padding(.top, 5).padding(.leading, 2).allowsHitTesting(false).accessibilityHidden(true) }
+                DraftEditor(text: Binding(get: { model.draft }, set: { model.editDraft($0) }), draftID: model.activeID, focusToken: model.composerFocus, permitsFocus: { _ in
+                    chatVisible && model.workspaceRoute == .chat
+                }, submit: { if account.permitsPlanUsage && ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
                     let height = CGFloat(ComposerHeight.clamped(Double(measured))); if abs(composerHeight - height) > 0.5 { composerHeight = height }
                 }, onFocusChange: { composerFocused = $0 }).frame(height: composerHeight)
-            }.help("Return sends. Shift–Return adds a line.")
-            HStack(spacing: 10) {
-                Button { model.attachFiles() } label: { Label("Attach", systemImage: "plus") }.disabled(model.importing)
-                if !model.context.hasSelection { Button { model.context.choose() } label: { Label("Share window", systemImage: "macwindow") }.disabled(model.paused) }
+            }.help(account.permitsPlanUsage ? "Return sends. Shift–Return adds a line." : "Your draft is saved locally. Continue with ChatGPT to send. Shift–Return adds a line.")
+            HStack(spacing: 8) {
+                IconButton(symbol: "paperclip", label: "Attach files") { model.attachFiles() }.disabled(model.importing)
+                if !model.context.hasSelection { IconButton(symbol: "macwindow", label: "Share a window") { model.context.choose() }.disabled(model.paused) }
                 Menu {
                     Toggle("Web search", isOn: Binding(get: { model.active?.webEnabled == true }, set: { model.setWeb($0) })).disabled(!WebToggle.changes(waiting: model.busy))
                     Text("Availability depends on your ChatGPT account and selected model.")
@@ -114,14 +108,47 @@ struct CoachView: View {
                 }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .help(webEnabled ? "Web search is enabled for this chat. Availability depends on your account and model." : "Web search is off for this chat.")
                     .accessibilityLabel("Web search").accessibilityValue(webEnabled ? "On" : "Off")
-                Spacer(minLength: 8)
-                if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
-                IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : "Talk", tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused)
-                Button { if model.busy { model.stopIfSeparate() } else { model.send() } } label: {
-                    Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30)
-                }.buttonStyle(ActionButton(background: sendReady || model.busy ? Theme.action : Theme.muted, feedback: Theme.onAction)).disabled(!model.busy && !sendReady).help(model.busy ? "Stop response" : "Send message (Return)").accessibilityLabel(model.busy ? "Stop response" : "Send message")
+                voiceControl
+                Spacer(minLength: 4)
+                submitControl
             }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.muted)
-        }.padding(12).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(composerFocused && chatVisible ? Theme.accent : Theme.line, lineWidth: 1))
+        }.padding(10).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(composerFocused && chatVisible ? Theme.accent : Theme.line, lineWidth: 1))
+    }
+    @ViewBuilder private var voiceControl: some View {
+        if voiceActive {
+            HStack(spacing: 6) {
+                if model.voice.listening { Button("Finish speaking") { model.toggleVoice() }.foregroundStyle(Theme.accent) }
+                Button { model.stopInteraction() } label: { Label("Stop voice", systemImage: "stop.fill") }
+                    .help(model.status + ". Stop voice and sharing.").accessibilityLabel("Stop voice and sharing. " + model.status)
+            }
+        } else {
+            Menu {
+                Button("Talk") { model.toggleVoice() }.disabled(model.paused || !account.permitsPlanUsage)
+                Button("Start conversation") { model.setConversation(true) }.disabled(model.paused || !account.permitsPlanUsage)
+                Divider()
+                Toggle("Read typed replies aloud", isOn: $model.readAloud)
+                Text("Talk records one turn. Conversation listens again after each answer.")
+            } label: { Label("Voice", systemImage: "mic") }
+                .menuStyle(.borderlessButton).fixedSize().help("Talk or start a spoken conversation")
+        }
+    }
+    @ViewBuilder private var submitControl: some View {
+        if model.busy {
+            Button { model.stopIfSeparate() } label: { Image(systemName: "stop.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30) }
+                .buttonStyle(ActionButton(background: Theme.action, feedback: Theme.onAction)).help("Stop response (Escape)").accessibilityLabel("Stop response")
+        } else if !account.permitsPlanUsage {
+            if account.isSigningIn {
+                HStack(spacing: 8) { ProgressView().controlSize(.small); Button("Cancel") { account.cancelSignIn() }.buttonStyle(.bordered) }.accessibilityLabel("Connecting to ChatGPT")
+            } else if account.needsIdentityValidation {
+                Button("Retry connection") { account.refreshModels() }.buttonStyle(.borderedProminent).tint(Theme.action).disabled(account.isSigningOut)
+            } else {
+                Button("Continue with ChatGPT") { if account.isSignedIn { account.enablePlanUsage() } else { account.signIn() } }
+                    .buttonStyle(.borderedProminent).tint(Theme.action).disabled(account.isSigningOut)
+            }
+        } else {
+            Button { model.send() } label: { Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30) }
+                .buttonStyle(ActionButton(background: Theme.action, feedback: Theme.onAction)).disabled(!sendReady).help("Send message (Return)").accessibilityLabel("Send message")
+        }
     }
     private func notice(_ text: String) -> some View { Text(text).font(.system(size: 12)).foregroundStyle(Theme.warning).frame(maxWidth: .infinity, alignment: .leading).padding(12) }
     private func revealLatest(_ proxy: ScrollViewProxy) {
@@ -131,11 +158,6 @@ struct CoachView: View {
         else if let id = latest?.id { proxy.scrollTo(id, anchor: opensAtStart ? .top : .bottom) }
         else { proxy.scrollTo("bottom", anchor: .bottom) }
     }
-}
-
-private struct WelcomeContentHeight: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 private struct CoachMessage: View {
@@ -148,15 +170,15 @@ private struct CoachMessage: View {
             VStack(alignment: .leading, spacing: 7) {
                 MessageHeading(message: message)
                 if !message.text.isEmpty { MessageText(message: message).font(.system(size: 15)).lineSpacing(6).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
-                if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
-                if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
+                if StoppedReply.shows(role: message.role, stopped: message.replyStopped) { Text(StoppedReply.label).font(.system(size: 12)).foregroundStyle(Theme.muted) }
+                if FailedAnswer.shows(failed: message.answerFailed, waiting: model.busy && message.id == session.messages.last?.id) { Text(FailedAnswer.label).font(.system(size: 12)).foregroundStyle(Theme.muted) }
                 if !message.attachments.isEmpty { MessageAttachments(model: model, session: session, records: message.attachments) }
-                if message.highlightUnavailable { Label("Highlight unavailable · check your selected window", systemImage: "eye.slash").font(.system(size: 10)).foregroundStyle(Theme.muted) }
+                if message.highlightUnavailable { Label("Highlight unavailable · check your selected window", systemImage: "eye.slash").font(.system(size: 12)).foregroundStyle(Theme.muted) }
                 if StaleWindowAnswer.applies(to: message) {
                     HStack {
                         Image(systemName: "arrow.clockwise"); Text(StaleWindowAnswer.notice)
                         if message.id == model.active?.messages.last?.id { Button("Refresh") { model.refreshAnswer() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent) }
-                    }.font(.system(size: 10)).foregroundStyle(Theme.muted)
+                    }.font(.system(size: 12)).foregroundStyle(Theme.muted)
                 }
                 if message.role == "assistant" { ReplyTools(model: model, message: message) }
             }.frame(maxWidth: .infinity, alignment: .leading).layoutPriority(1)
@@ -172,8 +194,8 @@ struct MessageHeading: View {
     var body: some View {
         HStack(spacing: 6) {
             if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.accent) }
-            Text(message.role == "user" ? "You" : ReplySpeaker.name.localizedCapitalized).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.muted)
-            if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted) }
+            Text(message.role == "user" ? "You" : ReplySpeaker.name.localizedCapitalized).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+            if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 12)).foregroundStyle(Theme.muted) }
         }
     }
 }
@@ -196,7 +218,7 @@ struct MessageAttachments: View {
             Button { model.showFile?(record) } label: {
                 VStack(alignment: .leading, spacing: 4) {
                     Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading).clipShape(RoundedRectangle(cornerRadius: 8))
-                    Text(FileName.shown(record.name)).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    Text(FileName.shown(record.name)).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
                 }
             }.buttonStyle(ActionButton()).help("Preview \(record.name)").accessibilityLabel("Preview \(record.name)")
         } else {
@@ -274,33 +296,7 @@ struct EmptyGreeting: View {
     @ObservedObject var model: AppModel
     let session: LearningSession
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(session.mode == .learn ? "What are we working through?" : "How can I help?").font(.system(size: 30, weight: .regular)).tracking(-0.6)
-            Text(session.mode == .learn ? "Take it one step at a time, with a little guidance." : "Think something through, make sense of a file, or start with a question.").font(.system(size: 15)).foregroundStyle(Theme.muted).lineSpacing(4)
-            if !model.provider.account.permitsPlanUsage { ChatGPTSignInPrompt(account: model.provider.account).padding(.top, 8) }
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 16)
-    }
-}
-
-struct ChatGPTSignInPrompt: View {
-    @ObservedObject var account: ChatGPTAccount
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(account.isSigningIn ? "Finish connecting in your browser." : "Connect ChatGPT to start a conversation.")
-                .font(.system(size: 13)).foregroundStyle(Theme.muted)
-            HStack(spacing: 10) {
-                if account.isSigningIn {
-                    ProgressView().controlSize(.small)
-                    Button("Cancel sign-in") { account.cancelSignIn() }.buttonStyle(QuietButton())
-                } else if account.isSignedIn {
-                    Button("Enable ChatGPT plan usage") { account.enablePlanUsage() }.buttonStyle(QuietButton(filled: true))
-                } else {
-                    Button("Continue with ChatGPT") { account.signIn() }.buttonStyle(QuietButton(filled: true))
-                }
-            }.disabled(account.isSigningOut)
-            if let error = account.error {
-                Text(error).font(.system(size: 12)).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true)
-            }
-        }.accessibilityElement(children: .contain)
+        Text(session.mode == .learn ? "What are we working through?" : "What would you like to work on?")
+            .font(.system(size: 20, weight: .regular)).foregroundStyle(Theme.ink).padding(.bottom, 2)
     }
 }

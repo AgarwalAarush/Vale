@@ -4,6 +4,21 @@ import LiltCore
 enum WorkspaceRoute: String { case chat, settings }
 enum WorkspaceInspector: Equatable { case notes, files, file(UUID), context }
 
+/// Keep panel decisions in one place so editor focus follows the visible layout.
+struct WorkspaceLayout {
+    static let sidebarThreshold: CGFloat = 860
+    static let sidebarWidth: CGFloat = 200
+    static let inspectorWidth: CGFloat = 320
+    let width: CGFloat
+    let sidebarVisible: Bool
+    let historyOverlay: Bool
+    let inspectorOpen: Bool
+    var compact: Bool { width < Self.sidebarThreshold }
+    var showsSidebar: Bool { sidebarVisible && !compact }
+    var inlineInspector: Bool { width - (showsSidebar ? Self.sidebarWidth + 1 : 0) - Self.inspectorWidth - 1 >= 560 }
+    var chatVisible: Bool { (!inspectorOpen || inlineInspector) && (!compact || !historyOverlay) }
+}
+
 struct WorkspaceView: View {
     @ObservedObject var model: AppModel
     @AppStorage("valeAppearance") private var appearance = "system"
@@ -12,40 +27,35 @@ struct WorkspaceView: View {
     @State private var forgetID: UUID?
     @State private var walkthrough = false
     @State private var confirmGuide = false
+    @State private var planConfirmationAccount: String?
 
     private var colorScheme: ColorScheme? { appearance == "light" ? .light : appearance == "dark" ? .dark : nil }
     var body: some View {
         GeometryReader { geometry in
-            let compact = geometry.size.width < 860
-            let showRail = model.sidebarVisible && !compact
-            let inlineInspector = geometry.size.width >= 1120 && model.workspaceRoute == .chat
-            let chatVisible = model.workspaceRoute == .chat && (model.inspector == nil || inlineInspector) && (!compact || !model.compactHistoryVisible)
+            let layout = WorkspaceLayout(width: geometry.size.width, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
+            let chatVisible = model.workspaceRoute == .chat && layout.chatVisible
             HStack(spacing: 0) {
-                if showRail {
-                    navigation.frame(width: 224)
+                if layout.showsSidebar {
+                    navigation.frame(width: WorkspaceLayout.sidebarWidth)
                     Rectangle().fill(Theme.line).frame(width: 1)
                 }
-                VStack(spacing: 0) {
-                    toolbar(compact: compact, chatCovered: !chatVisible)
-                    Rectangle().fill(Theme.line).frame(height: 1)
-                    HStack(spacing: 0) {
-                        ZStack {
-                            // Retain the native editor and transcript across secondary routes.
-                            CoachView(model: model, chatVisible: chatVisible)
-                                .opacity(chatVisible ? 1 : 0)
-                                .allowsHitTesting(chatVisible)
-                                .accessibilityHidden(!chatVisible)
-                            if model.workspaceRoute == .settings { SettingsView(model: model) }
-                            else if model.inspector != nil && !inlineInspector { inspector(inline: false) }
-                            else if compact && model.compactHistoryVisible { compactNavigation }
-                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
-                        if inlineInspector, model.inspector != nil {
-                            Rectangle().fill(Theme.line).frame(width: 1)
-                            inspector(inline: true).frame(width: 320)
-                        }
+                HStack(spacing: 0) {
+                    ZStack {
+                        // Keep the actual NSTextView mounted across every secondary route.
+                        CoachView(model: model, chatVisible: chatVisible)
+                            .opacity(chatVisible ? 1 : 0)
+                            .allowsHitTesting(chatVisible)
+                            .accessibilityHidden(!chatVisible)
+                        if model.workspaceRoute == .settings { SettingsView(model: model) }
+                        else if model.inspector != nil && !layout.inlineInspector { inspector(inline: false) }
+                        else if layout.compact && model.compactHistoryVisible { compactNavigation }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if model.workspaceRoute == .chat, layout.inlineInspector, model.inspector != nil {
+                        Rectangle().fill(Theme.line).frame(width: 1)
+                        inspector(inline: true).frame(width: WorkspaceLayout.inspectorWidth)
                     }
                 }.frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
-            }.padding(.top, 28).background(Theme.background).foregroundStyle(Theme.ink)
+            }.background(Theme.background).foregroundStyle(Theme.ink)
         }
         .preferredColorScheme(colorScheme)
         .environment(\.openURL, OpenURLAction { AnswerLink.canOpen($0) ? .systemAction : .discarded })
@@ -66,100 +76,51 @@ struct WorkspaceView: View {
             Button("Keep writing", role: .cancel) {}
             Button("Start guide") { model.startGuide() }
         } message: { Text("This sends what you have typed and clears the composer.") }
+        .onReceive(NotificationCenter.default.publisher(for: NativeWorkspaceToolbar.command, object: model)) { notification in
+            switch notification.userInfo?["action"] as? String {
+            case "rename": if let chat = model.active { rename(chat) }
+            case "forget": forgetID = model.activeID
+            case "walkthrough": walkthrough = true
+            case "guide":
+                if GuideStart.needsConfirmation(draft: model.draft, attachmentCount: model.pendingFiles.count) { confirmGuide = true }
+                else { model.startGuide() }
+            default: break
+            }
+        }
+        .onChange(of: model.provider.account.permitsPlanUsage) { wasEnabled, enabled in
+            let account = model.provider.account
+            guard !wasEnabled, enabled, !account.isDisposableFixture, !account.needsIdentityValidation,
+                  let id = account.activeAccountID,
+                  !UserDefaults.standard.bool(forKey: "vale.planUsageAcknowledged.\(id)") else { return }
+            planConfirmationAccount = id
+        }
+        .alert("ChatGPT is connected", isPresented: Binding(get: { planConfirmationAccount != nil }, set: { if !$0 { acknowledgePlanUsage() } })) {
+            Button("Got it") { acknowledgePlanUsage() }
+        } message: { Text("Eligible requests in Vale use your ChatGPT plan and app limits. You can manage usage or disconnect Vale in ChatGPT Settings → Usage. Your draft is ready when you choose to send it.") }
     }
 
     private var navigation: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 9) { LogoMark(size: 25); Text("Vale").font(.system(size: 17, weight: .medium)); Spacer() }
-                .padding(.horizontal, 20).padding(.top, 15).padding(.bottom, 24)
-            Button { model.newSession() } label: {
-                Label("New chat", systemImage: "square.and.pencil").font(.system(size: 13, weight: .medium)).frame(maxWidth: .infinity, alignment: .leading).padding(10)
-            }.buttonStyle(ActionButton()).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 12)
-            WorkspaceHistory(model: model, rename: rename, forget: { forgetID = $0 }).padding(.top, 18)
-            Spacer(minLength: 8)
+            WorkspaceHistory(model: model, rename: rename, forget: { forgetID = $0 }).padding(.top, 12)
             Button { model.openSettings() } label: {
-                Label("Settings", systemImage: "gearshape").font(.system(size: 13)).frame(maxWidth: .infinity, alignment: .leading).padding(10)
-            }.buttonStyle(ActionButton()).foregroundStyle(model.workspaceRoute == .settings ? Theme.ink : Theme.muted)
-                .background(model.workspaceRoute == .settings ? Theme.fillPressed : .clear).clipShape(RoundedRectangle(cornerRadius: 8)).padding(12)
+                Label("Settings", systemImage: "gearshape").font(.system(size: 13)).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8).padding(.vertical, 7)
+            }.buttonStyle(ActionButton(background: model.workspaceRoute == .settings ? Theme.fillPressed : .clear))
+                .foregroundStyle(model.workspaceRoute == .settings ? Theme.ink : Theme.muted).padding(8)
         }.frame(maxHeight: .infinity).background(Theme.rail)
     }
     private var compactNavigation: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("Your chats").font(.system(size: 22, weight: .medium)); Spacer(); Button("Back to chat") { model.compactHistoryVisible = false; model.backToChat() }.buttonStyle(QuietButton()) }
-            Button { model.newSession(); model.compactHistoryVisible = false } label: { Label("New chat", systemImage: "square.and.pencil") }.buttonStyle(QuietButton())
-            WorkspaceHistory(model: model, rename: rename, forget: { forgetID = $0 }, selected: { model.compactHistoryVisible = false })
-        }.padding(24).background(Theme.background)
+        WorkspaceHistory(model: model, rename: rename, forget: { forgetID = $0 }, selected: { model.compactHistoryVisible = false })
+            .padding(.top, 12).padding(.bottom, 12).background(Theme.background)
     }
     private func rename(_ chat: LearningSession) { model.commitComposer?(); renameID = chat.id; renameTitle = chat.title }
-
-    private func toolbar(compact: Bool, chatCovered: Bool) -> some View {
-        HStack(spacing: 12) {
-            IconButton(symbol: "sidebar.left", label: (compact ? model.compactHistoryVisible : model.sidebarVisible) ? "Hide chat history" : "Show chat history") { model.commitComposer?(); if compact { if model.compactHistoryVisible { model.backToChat() } else { model.showHistory() } } else { model.compactHistoryVisible = false; model.sidebarVisible.toggle() } }
-            if model.workspaceRoute == .settings {
-                Button { model.backToChat() } label: { Label("Back to chat", systemImage: "chevron.left") }.buttonStyle(ActionButton()).font(.system(size: 13))
-            } else {
-                Text(model.active?.title ?? "Your chats").font(.system(size: 14, weight: .medium)).lineLimit(1).help(model.active?.title ?? "Your chats")
-            }
-            Spacer(minLength: 12)
-            if chatCovered && hasTransientActivity {
-                HStack(spacing: 8) {
-                    Label(activityLabel, systemImage: model.voice.listening || model.voice.speaking ? "waveform" : "macwindow").lineLimit(1).font(.system(size: 12)).foregroundStyle(Theme.accent)
-                    Button("Stop") { model.stopInteraction() }.buttonStyle(QuietButton())
-                }
-            }
-            if model.workspaceRoute == .chat, let chat = model.active {
-                if chat.duration > 0 { Text(chat.timerText).font(.system(size: 12, design: .monospaced)).monospacedDigit().foregroundStyle(Theme.muted) }
-                Menu {
-                    Button("Assistant") { model.setMode(.assistant) }
-                    Button("Learn with hints") { model.setMode(.learn) }
-                } label: { Text(chat.mode == .learn ? "Learn" : "Assistant").font(.system(size: 12)).foregroundStyle(Theme.muted) }.menuStyle(.borderlessButton).fixedSize().help("Choose chat mode")
-                IconButton(symbol: "sidebar.right", label: model.inspector == nil ? "Show files and notes" : "Hide details") { if model.inspector == nil { model.showInspector(.notes) } else { model.closeInspector() } }
-                Menu {
-                    Button("Chat notes") { model.showInspector(.notes) }
-                    Button("Files") { model.showInspector(.files) }
-                    Divider()
-                    Button("Rename…") { rename(chat) }
-                    Button("Export chat…") { model.export(chat) }
-                    Button("Forget chat…", role: .destructive) { forgetID = chat.id }
-                    Divider()
-                    Toggle("Read typed replies aloud", isOn: $model.readAloud)
-                    if chat.mode == .learn {
-                        Button("Start step-by-step guide…") { if GuideStart.needsConfirmation(draft: model.draft, attachmentCount: model.pendingFiles.count) { confirmGuide = true } else { model.startGuide() } }.disabled(model.busy || model.paused)
-                        Button("Show full walkthrough…") { walkthrough = true }.disabled(chat.messages.isEmpty || model.busy)
-                    }
-                    if FocusTimer.shows(mode: chat.mode, running: chat.duration > 0) {
-                        Menu("Focus timer") {
-                            Button("30 minutes") { model.setFocus(minutes: 30) }
-                            Button("60 minutes") { model.setFocus(minutes: 60) }
-                            Button("No timer") { model.setFocus(minutes: 0) }
-                        }
-                    }
-                    Button(model.paused ? "Resume chat" : "Pause chat") { model.togglePause() }
-                    Button("Close chat") { model.complete() }
-                    Divider()
-                    Button("Settings…") { model.openSettings() }
-                } label: { Label("Chat actions", systemImage: "ellipsis").labelStyle(.iconOnly).frame(width: 30, height: 30) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Chat actions")
-            }
-        }.padding(.horizontal, 18).frame(height: 52)
-    }
-
-    private var hasTransientActivity: Bool { model.busy || model.context.hasSelection || model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
-    private var activityLabel: String {
-        if model.voice.starting { return "Starting microphone…" }
-        if model.voice.listening { return "Listening" }
-        if model.voice.speaking { return "Speaking" }
-        if model.busy { return "Thinking…" }
-        if model.conversation { return "Conversation on" }
-        return model.context.live ? "Live window" : "Window shared"
+    private func acknowledgePlanUsage() {
+        if let id = planConfirmationAccount { UserDefaults.standard.set(true, forKey: "vale.planUsageAcknowledged.\(id)") }
+        planConfirmationAccount = nil
     }
 
     private func inspector(inline: Bool) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                if !inline {
-                    Button { model.closeInspector() } label: { Label("Back to chat", systemImage: "chevron.left") }.buttonStyle(ActionButton()).foregroundStyle(Theme.muted)
-                    Spacer(minLength: 8)
-                }
                 if model.inspector == .context { Text("Window preview").fontWeight(.medium) }
                 if case .file = model.inspector { Text("File preview").fontWeight(.medium) }
                 Button { model.showInspector(.notes) } label: { Text("Notes").padding(.horizontal, 8).padding(.vertical, 6) }
@@ -210,39 +171,41 @@ private struct WorkspaceHistory: View {
     var forget: (UUID) -> Void
     var selected: () -> Void = {}
     @FocusState private var searchFocused: Bool
-    private var chats: [LearningSession] { HistoryLists.sidebar(model.sessions, query: model.historyQuery, searchVisible: true) }
+    private var chats: [LearningSession] {
+        HistoryLists.sidebar(model.sessions, query: model.historyQuery, searchVisible: true).filter { chat in
+            let pristine = chat.id == model.activeID && !model.importing && chat.takeaway.isEmpty && chat.guide == nil && EmptyChat.canDiscard(title: chat.title, messageCount: chat.messages.count, draft: chat.draft, fileCount: chat.files.count, duration: chat.duration, mode: chat.mode, webEnabled: chat.webEnabled)
+            return !pristine
+        }
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
-                TextField("", text: $model.historyQuery, prompt: Text("")).textFieldStyle(.plain).focused($searchFocused).accessibilityLabel("Search messages, notes, and files")
-                    .overlay(alignment: .leading) {
-                        if model.historyQuery.isEmpty {
-                            Text("Search chats").foregroundStyle(Theme.muted).allowsHitTesting(false).accessibilityHidden(true)
-                        }
-                    }
+                TextField("Search chats", text: $model.historyQuery).textFieldStyle(.plain).focused($searchFocused).accessibilityLabel("Search messages, notes, and files")
                 if !model.historyQuery.isEmpty { Button { model.historyQuery = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(ActionButton()).accessibilityLabel("Clear search").foregroundStyle(Theme.muted) }
-            }.font(.system(size: 12)).padding(9).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(searchFocused ? Theme.accent : .clear, lineWidth: 1)).padding(.horizontal, 12)
+            }.font(.system(size: 12)).padding(.horizontal, 7).padding(.vertical, 6).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(searchFocused ? Theme.accent : Theme.line, lineWidth: 1)).padding(.horizontal, 8)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 3) {
                     if chats.isEmpty { Text(model.historyQuery.isEmpty ? "Your chats will be here." : "No chats found.").font(.system(size: 12)).foregroundStyle(Theme.muted).padding(12) }
                     ForEach(chats) { chat in
                         Button { model.navigateToChat(chat.id); selected() } label: {
-                            VStack(alignment: .leading, spacing: 5) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 6) {
                                     Text(chat.title).font(.system(size: 13)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                                     if chat.unsentDraft != nil || !chat.pendingAttachments.isEmpty { Image(systemName: "pencil").font(.system(size: 10)).help("Unsent draft").accessibilityLabel("Unsent draft") }
                                 }
-                                if !model.historyQuery.isEmpty { Text(chat.historyExcerpt(matching: model.historyQuery)).font(.system(size: 11)).foregroundStyle(Theme.muted).lineLimit(2) }
-                            }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.vertical, 10)
-                        }.buttonStyle(ActionButton(background: chat.id == model.activeID && model.workspaceRoute == .chat ? Theme.fillPressed : .clear)).help(chat.title).contextMenu {
+                                if !model.historyQuery.isEmpty { Text(chat.historyExcerpt(matching: model.historyQuery)).font(.system(size: 12)).foregroundStyle(Theme.muted).lineLimit(2) }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8).padding(.vertical, 7)
+                        }.buttonStyle(ActionButton(background: chat.id == model.activeID && model.workspaceRoute == .chat ? Theme.fillPressed : .clear)).help(chat.title)
+                            .accessibilityValue(chat.id == model.activeID && model.workspaceRoute == .chat ? "Selected chat" : "")
+                            .contextMenu {
                             Button("Rename…") { rename(chat) }; Button("Export chat…") { model.export(chat) }; Button("Forget chat…", role: .destructive) { forget(chat.id) }
                         }
                     }
-                }.padding(.horizontal, 12)
+                }.padding(.horizontal, 8)
             }
-        }.onAppear { if model.compactHistoryVisible { searchFocused = true } }
+        }.frame(maxHeight: .infinity).onAppear { if model.compactHistoryVisible { searchFocused = true } }
         .onChange(of: model.historyFocus) { searchFocused = true }
     }
 }
