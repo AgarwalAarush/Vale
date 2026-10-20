@@ -1,5 +1,7 @@
 import Foundation
 import LiltCore
+import Security
+import CryptoKit
 
 var failures: [String] = []
 var passed = 0
@@ -2719,6 +2721,140 @@ final class LiltCoreTests {
         XCTAssertFalse(CapsuleMic.idleIsQuiet(listening: true, speaking: false, busy: false))
     }
 
+    func testChatGPTAuthorizationUsesFreshPKCEAndExactCallbackBinding() throws {
+        let callback = URL(string: "http://127.0.0.1:54321/auth/callback")!
+        let initial = try ChatGPTAuthorization(redirectURI: callback)
+        let next = try ChatGPTAuthorization(redirectURI: callback)
+        XCTAssertFalse(initial.state == next.state)
+        XCTAssertFalse(initial.nonce == next.nonce)
+        XCTAssertFalse(initial.verifier == next.verifier)
+        XCTAssertTrue(initial.verifier.count >= 43 && initial.verifier.count <= 128)
+        XCTAssertEqual(initial.challenge, ChatGPTOAuth.base64URL(Data(SHA256.hash(data: Data(initial.verifier.utf8)))))
+        let url = try initial.authorizationURL(endpoint: URL(string: "https://auth.openai.com/api/accounts/authorize")!, hostID: "urn:uuid:generated-fixture")
+        let query = Dictionary(uniqueKeysWithValues: URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!.map { ($0.name, $0.value!) })
+        XCTAssertEqual(query["client_id"], "dynamic_agent_client")
+        XCTAssertEqual(query["agent_name_hint"], "Vale")
+        XCTAssertEqual(query["resource"], "https://api.openai.com/v1")
+        XCTAssertEqual(query["scope"], ChatGPTOAuth.scopes)
+        XCTAssertEqual(query["redirect_uri"], callback.absoluteString)
+        XCTAssertNil(query["client_secret"])
+        let returned = URL(string: callback.absoluteString + "?state=\(initial.state)&code=generated-code&client_id=oaiapp_fixture")!
+        try XCTAssertEqual(initial.callback(returned).clientID, "oaiapp_fixture")
+        XCTAssertThrowsError(try initial.callback(URL(string: callback.absoluteString + "?state=wrong&code=x&client_id=oaiapp_fixture")!))
+        XCTAssertThrowsError(try initial.callback(URL(string: callback.absoluteString + "?state=\(initial.state)&code=x")!))
+        XCTAssertThrowsError(try initial.callback(URL(string: callback.absoluteString + "?state=\(initial.state)&state=\(initial.state)&code=x&client_id=oaiapp_fixture")!))
+        XCTAssertThrowsError(try initial.callback(URL(string: "http://127.0.0.1:54322/auth/callback?state=\(initial.state)&code=x&client_id=oaiapp_fixture")!))
+        XCTAssertThrowsError(try initial.callback(returned, now: initial.expiresAt.addingTimeInterval(1)))
+        XCTAssertThrowsError(try ChatGPTAuthorization(redirectURI: URL(string: "http://localhost:54321/auth/callback")!))
+        let returning = try ChatGPTAuthorization(redirectURI: callback, clientID: "oaiapp_saved")
+        try XCTAssertEqual(returning.callback(URL(string: callback.absoluteString + "?state=\(returning.state)&code=x")!).clientID, "oaiapp_saved")
+        XCTAssertThrowsError(try returning.callback(URL(string: callback.absoluteString + "?state=\(returning.state)&code=x&client_id=oaiapp_other")!))
+        let returningURL = try returning.authorizationURL(endpoint: URL(string: "https://auth.openai.com/api/accounts/authorize")!, hostID: "urn:uuid:generated-fixture", requestConsent: true)
+        let items = URLComponents(url: returningURL, resolvingAgainstBaseURL: false)!.queryItems!
+        XCTAssertFalse(items.contains { $0.name == "agent_name_hint" })
+        XCTAssertTrue(items.contains { $0.name == "prompt" && $0.value == "consent" })
+        do { _ = try initial.callback(URL(string: callback.absoluteString + "?state=\(initial.state)&error=access_denied")!); XCTAssertTrue(false) }
+        catch { XCTAssertEqual((error as? ChatGPTError)?.code, "access_denied") }
+    }
+
+    func testChatGPTIdentityRequiresVerifiedSignatureAndOIDCClaims() throws {
+        var keyError: Unmanaged<CFError>?
+        guard let key = SecKeyCreateRandomKey([kSecAttrKeyType: kSecAttrKeyTypeRSA, kSecAttrKeySizeInBits: 2048] as CFDictionary, &keyError) else { throw ChatGPTError("Generated test RSA key failed: \(keyError?.takeRetainedValue().localizedDescription ?? "unknown")") }
+        let publicKey = SecKeyCopyPublicKey(key)!
+        let der = SecKeyCopyExternalRepresentation(publicKey, nil)! as Data
+        let bytes = Array(der)
+        var index = 0
+        func readLength() -> Int {
+            let first = Int(bytes[index]); index += 1
+            if first < 128 { return first }
+            var length = 0
+            for _ in 0..<(first & 127) { length = (length << 8) | Int(bytes[index]); index += 1 }
+            return length
+        }
+        index += 1; _ = readLength()
+        func readInteger() -> Data {
+            index += 1; let length = readLength(); let data = Data(bytes[index..<(index + length)]); index += length
+            return data.first == 0 ? Data(data.dropFirst()) : data
+        }
+        let modulus = readInteger(); let exponent = readInteger()
+        let jwks = try JSONSerialization.data(withJSONObject: ["keys": [["kty": "RSA", "kid": "generated-key", "use": "sig", "alg": "RS256", "n": ChatGPTOAuth.base64URL(modulus), "e": ChatGPTOAuth.base64URL(exponent)]]])
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let base: [String: Any] = ["iss": ChatGPTOAuth.issuer, "sub": "generated-subject", "aud": "oaiapp_fixture", "iat": now.timeIntervalSince1970 - 10, "exp": now.timeIntervalSince1970 + 300, "nonce": "generated-nonce", "name": "Generated account", "email": "generated@example.invalid"]
+        func token(_ changes: [String: Any] = [:], algorithm: String = "RS256", kid: String = "generated-key") throws -> String {
+            let header = ChatGPTOAuth.base64URL(try JSONSerialization.data(withJSONObject: ["alg": algorithm, "kid": kid]))
+            let payload = ChatGPTOAuth.base64URL(try JSONSerialization.data(withJSONObject: base.merging(changes) { _, new in new }))
+            let input = header + "." + payload
+            let signature = SecKeyCreateSignature(key, .rsaSignatureMessagePKCS1v15SHA256, Data(input.utf8) as CFData, nil)! as Data
+            return input + "." + ChatGPTOAuth.base64URL(signature)
+        }
+        let valid = try token()
+        let identity = try ChatGPTIdentityValidator.validate(valid, jwks: jwks, clientID: "oaiapp_fixture", nonce: "generated-nonce", now: now)
+        XCTAssertEqual(identity.subject, "generated-subject")
+        XCTAssertEqual(identity.name, "Generated account")
+        for changes: [String: Any] in [["iss": "https://example.invalid"], ["aud": "another-client"], ["exp": now.timeIntervalSince1970 - 60], ["iat": now.timeIntervalSince1970 + 60], ["nbf": now.timeIntervalSince1970 + 60], ["sub": ""], ["nonce": "another-nonce"], ["aud": ["oaiapp_fixture", "another-client"]]] {
+            XCTAssertThrowsError(try ChatGPTIdentityValidator.validate(token(changes), jwks: jwks, clientID: "oaiapp_fixture", nonce: "generated-nonce", now: now))
+        }
+        XCTAssertThrowsError(try ChatGPTIdentityValidator.validate(token(algorithm: "none"), jwks: jwks, clientID: "oaiapp_fixture", nonce: "generated-nonce", now: now))
+        XCTAssertThrowsError(try ChatGPTIdentityValidator.validate(token(kid: "unknown-key"), jwks: jwks, clientID: "oaiapp_fixture", nonce: "generated-nonce", now: now))
+        let pieces = valid.split(separator: ".").map(String.init)
+        let tampered = pieces[0] + "." + ChatGPTOAuth.base64URL(try JSONSerialization.data(withJSONObject: base.merging(["sub": "tampered"]) { _, new in new })) + "." + pieces[2]
+        XCTAssertThrowsError(try ChatGPTIdentityValidator.validate(tampered, jwks: jwks, clientID: "oaiapp_fixture", nonce: "generated-nonce", now: now))
+        XCTAssertThrowsError(try ChatGPTIdentityValidator.validate("not.a.jwt", jwks: jwks, clientID: "oaiapp_fixture", nonce: "generated-nonce", now: now))
+    }
+
+    func testChatGPTRequestsUseDiscoveredModelsAndOnlyExplicitWebTools() throws {
+        let data = Data(#"{"models":[{"slug":"hidden","display_name":"Hidden","visibility":"hide"},{"slug":"eligible-b","display_name":"Eligible B","visibility":"list"},{"slug":"eligible-a","display_name":"Eligible A","visibility":"list","supports_structured_outputs":true},{"slug":"eligible-b","display_name":"Duplicate","visibility":"list"}]}"#.utf8)
+        let models = try ChatGPTModel.catalog(data)
+        XCTAssertEqual(models.map(\.slug), ["eligible-b", "eligible-a"])
+        let schema = Data(#"{"type":"object"}"#.utf8)
+        let body = try JSONSerialization.jsonObject(with: ChatGPTResponses.request(model: models[0], instructions: "Generated instructions", prompt: "Generated question", images: [Data([1,2,3])], search: false, schema: schema)) as! [String: Any]
+        XCTAssertEqual(body["model"] as? String, "eligible-b")
+        XCTAssertEqual(body["store"] as? Bool, false)
+        XCTAssertEqual(body["stream"] as? Bool, true)
+        XCTAssertNil(body["tools"])
+        XCTAssertNil(body["text"])
+        for unsupported in ["previous_response_id", "max_output_tokens", "temperature", "conversation", "metadata", "background", "prompt", "user"] { XCTAssertNil(body[unsupported]) }
+        let input = body["input"] as! [[String: Any]]
+        let content = input[0]["content"] as! [[String: Any]]
+        XCTAssertEqual(content[1]["type"] as? String, "input_image")
+        XCTAssertEqual(content[1]["image_url"] as? String, "data:image/png;base64,AQID")
+        let web = try JSONSerialization.jsonObject(with: ChatGPTResponses.request(model: models[1], instructions: "Instructions", prompt: "Question", images: [], search: true, schema: schema)) as! [String: Any]
+        XCTAssertEqual((web["tools"] as? [[String: String]])?.map { $0["type"]! }, ["web_search"])
+        XCTAssertNotNil(web["text"])
+        XCTAssertThrowsError(try ChatGPTModel.catalog(Data(#"{"data":[]}"#.utf8)))
+        let restricted = try ChatGPTModel.catalog(Data(#"{"models":[{"slug":"restricted","display_name":"Restricted","visibility":"list","supports_images":false,"supports_web_search":false}]}"#.utf8))[0]
+        XCTAssertThrowsError(try ChatGPTResponses.request(model: restricted, instructions: "", prompt: "", images: [], search: true, schema: schema))
+        XCTAssertThrowsError(try ChatGPTResponses.request(model: restricted, instructions: "", prompt: "", images: [Data()], search: false, schema: schema))
+    }
+
+    func testChatGPTStreamRejectsPartialAndLateFailureAnswers() throws {
+        func send(_ event: [String: Any], to stream: inout ChatGPTResponseStream) throws {
+            let data = try JSONSerialization.data(withJSONObject: event)
+            try stream.consume(line: "data: " + String(data: data, encoding: .utf8)!); try stream.consume(line: "")
+        }
+        let answer = #"{"text":"Generated answer","point":null,"guide":{"title":"A guide","steps":["Read","Try"]}}"#
+        var interrupted = ChatGPTResponseStream()
+        try send(["type": "response.output_text.delta", "delta": answer], to: &interrupted)
+        XCTAssertThrowsError(try interrupted.finish())
+        var completed = ChatGPTResponseStream()
+        try send(["type": "response.output_text.delta", "delta": answer], to: &completed)
+        try send(["type": "response.completed", "response": ["status": "completed", "output": [["type": "web_search_call", "status": "completed"], ["type": "message", "content": [["type": "output_text", "text": answer]]]]]], to: &completed)
+        let reply = try completed.finish()
+        XCTAssertEqual(reply.text, "Generated answer")
+        XCTAssertEqual(reply.guide?.steps, ["Read", "Try"])
+        XCTAssertTrue(completed.usedWebSearch)
+        var limit = ChatGPTResponseStream()
+        try send(["type": "response.output_text.delta", "delta": answer], to: &limit)
+        do { try send(["type": "response.failed", "response": ["error": ["code": "subscription_sharing_usage_limit_exceeded"]]], to: &limit); XCTAssertTrue(false) }
+        catch { XCTAssertEqual((error as? ChatGPTError)?.code, "subscription_sharing_usage_limit_exceeded") }
+        var incomplete = ChatGPTResponseStream()
+        XCTAssertThrowsError(try send(["type": "response.incomplete", "response": [:]], to: &incomplete))
+        var invalid = ChatGPTResponseStream()
+        XCTAssertThrowsError(try send(["type": "response.completed", "response": ["status": "completed", "output": [["type": "message", "content": [["type": "output_text", "text": "not JSON"]]]]]], to: &invalid))
+        XCTAssertTrue(ChatGPTError("fixture", code: "refresh_token_reused").invalidatesSession)
+        XCTAssertFalse(ChatGPTError("fixture", code: "subscription_sharing_usage_unavailable", status: 503).invalidatesSession)
+    }
+
 }
 
 @main struct CoreChecks {
@@ -2726,6 +2862,10 @@ static func main() {
 let tests = LiltCoreTests()
 
 let cases: [(String, () throws -> Void)] = [
+ ("ChatGPT OAuth fresh PKCE and callback registration binding", tests.testChatGPTAuthorizationUsesFreshPKCEAndExactCallbackBinding),
+ ("ChatGPT generated RSA signatures and OIDC identity validation", tests.testChatGPTIdentityRequiresVerifiedSignatureAndOIDCClaims),
+ ("ChatGPT direct request model discovery and explicit tool policy", tests.testChatGPTRequestsUseDiscoveredModelsAndOnlyExplicitWebTools),
+ ("ChatGPT SSE completion, interruption and late usage failure", tests.testChatGPTStreamRejectsPartialAndLateFailureAnswers),
  ("Session timer", tests.testSessionTimeDoesNotBecomeNegative),
  ("Atomic session storage and file permissions", tests.testStorageRoundTripPreservesDraftAndTakeaway),
  ("Corrupt library preservation", tests.testCorruptLibraryIsNotSilentlyOverwritten),
