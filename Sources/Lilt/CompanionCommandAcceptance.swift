@@ -34,6 +34,30 @@ extension AppController {
             panel.delegate = nil; panel.close(); background.close()
         }
 
+        var startupSelectionReads = 0, startupCaptures = 0
+        fixture.workContext.installFixture(selection: {
+            startupSelectionReads += 1
+            return .init(text: "Generated selection after explicit summon")
+        }, capture: {
+            startupCaptures += 1
+            return ContextSnapshot(data: Data("GENERATED-STARTUP-CONTEXT".utf8), image: NSImage(size: NSSize(width: 2, height: 2)),
+                                   windowID: nil, frame: CGRect(x: 0, y: 0, width: 2, height: 2), generation: UUID(), capturedAt: Date())
+        })
+        panel.orderOut(nil)
+        controller.presentInitially()
+        await settle(); applyHarnessCompanionLayout(panel)
+        let startupEditor = companionCommandEditor(in: panel.contentView)
+        results["companionInitialPresentationPreparesIdentityWithoutSelectionScreenOrMicrophone"] = panel.isVisible && panel.isKeyWindow &&
+            startupEditor != nil && panel.firstResponder === startupEditor && fixture.workspaceOpen &&
+            fixture.workContext.sourceName != nil && startupSelectionReads == 0 && startupCaptures == 0 &&
+            !fixture.workContext.hasSelectionText && !fixture.voice.starting && !fixture.voice.listening
+        controller.performCompanionCommand(.toggleVisibility); await settle()
+        controller.performCompanionCommand(.toggleVisibility); await settle()
+        results["companionExplicitSummonReadsSelectionAfterIdentityOnlyStartup"] = panel.isVisible && panel.firstResponder === startupEditor &&
+            startupSelectionReads == 1 && startupCaptures == 0 && fixture.workContext.hasSelectionText && !fixture.voice.listening
+        // The rest of this fixture isolates the existing command/editor tests.
+        fixture.workContext.setEnabled(false)
+
         panel.orderOut(nil)
         controller.performCompanionCommand(.toggleVisibility)
         await settle(); applyHarnessCompanionLayout(panel)

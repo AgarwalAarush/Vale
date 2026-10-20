@@ -22,6 +22,7 @@ import LiltCore
     private var workspaceToolbar: NativeWorkspaceToolbar?
     private var previousApplication: NSRunningApplication?
     private var preparingInputRoute = false
+    private var presentingInitially = false
     /// AppKit can dispatch menu key equivalents even when a local monitor yields
     /// to a sheet. Share this boundary with validation, actions and focus retries.
     private var nativeDialogOpen: Bool {
@@ -82,7 +83,7 @@ import LiltCore
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(systemSuspend), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
         if let releaseCheck { Task { await runReleaseFeedAcceptance(releaseCheck) } }
         else if testing { Task { await runHarness() } }
-        else { model.prepareChat(); openWorkspace() }
+        else { presentInitially() }
     }
 
     private func setupWorkspace() {
@@ -97,10 +98,18 @@ import LiltCore
         if !onScreen { panel.summon() }
         else { panel.applyCompanionLayout(animated: false) }
     }
+    /// Automatic launch presents/focuses Ready while preparing identity only.
+    /// Selection enters RAM on an explicit summon or question, never startup.
+    func presentInitially() {
+        presentingInitially = true
+        defer { presentingInitially = false }
+        model.prepareChat()
+        openWorkspace()
+    }
     func openWorkspace() {
         guard !nativeDialogOpen, !preparingInputRoute else { return }
         let screen = workspace.isVisible ? workspace.screen : pointerScreen
-        model.workContext.prepareInvocation(screen: screen)
+        model.workContext.prepareInvocation(screen: screen, readSelectedText: !presentingInitially)
         rememberPreviousApplication()
         if !workspace.isVisible { (workspace as? NativeWorkspaceWindow)?.summon(on: screen) }
         finishOpeningWorkspace()

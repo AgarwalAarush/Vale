@@ -68,6 +68,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var saveWork: DispatchWorkItem?
     private var requestID = UUID()
     private var captureTask: Task<Void, Never>?
+    private var contextAssemblyID: UUID?
     private var loading = false
     private var observerTokens: [AnyCancellable] = []
     private var failedQuestion: String?
@@ -203,18 +204,26 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     /// Hiding keeps an already-sent answer running, but never leaves voice or
     /// local context sampling active behind a hidden panel.
     func companionDidHide() {
+        let assembling = contextAssemblyID == requestID
+        if assembling { contextAssemblyID = nil }
+        captureTask?.cancel(); captureTask = nil
         companionHiddenByUser = true
         spokenReplyGeneration = UUID()
         conversation = false; conversationTask?.cancel(); conversationTask = nil
-        voice.stop(); context.stopLive(); workContext.suspend()
+        voice.stop(); context.suspendCapture(); workContext.suspend()
         contextPreview = nil; hideOverlay?()
+        if assembling {
+            busy = false; setAnswerFailed(true)
+            error = "Vale was hidden before the question went out. It’s saved; try again."
+            persist()
+        }
     }
     func complete() {
         commitComposer?(); closeInspector(); workspaceRoute = .chat
         tick();updateActive{$0=LaunchSelection.chatAfterClose($0)};suspend();selectedID=activeID;activeID=nil
         loading=true;draft="";loading=false;persist();showWorkspace?()
     }
-    func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
+    func cancel() {requestID=UUID();contextAssemblyID=nil;captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
     private func accountConnectionWillChange() {
         let interrupted = busy
         conversation = false; conversationTask?.cancel(); conversationTask = nil
@@ -275,10 +284,12 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let wantsGuide = guideRequested || GuideRequest.explicit(question)
         let startedGuide = guideEpoch
         let requestedSpeechGeneration = spokenReplyGeneration
+        contextAssemblyID = id
         captureTask=Task { [weak self] in
             guard let self else{return}
             var handedOff=false
             defer {
+                if self.contextAssemblyID == id { self.contextAssemblyID = nil }
                 if QuestionSend.shouldClearWaiting(request:id, current:self.requestID, handedOff:handedOff) {
                     self.busy=false
                     if self.error==nil { self.error="That question didn’t go out. It’s saved; try again." }
@@ -300,6 +311,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                 if QuestionPreview.shouldCloseOpenedPreview(questionWasSent: true) { self.closePreview?() }
                 let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:wantsGuide,hasCurrentScreen:currentWork.screen != nil,selectedText:currentWork.selectedText,contextNotice:currentWork.notice)
                 handedOff=true
+                if self.contextAssemblyID == id { self.contextAssemblyID = nil }
                 self.provider.ask(prompt:prompt,images:images,search:wantsSearch) { [weak self] result in
                     Task { @MainActor [weak self] in
                         guard let self, ReplyDelivery.shouldApply(request: id, current: self.requestID, chat: chatID, active: self.activeID) else{return}
@@ -316,8 +328,13 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             }
                             self.persist()
                             var fresh:ContextSnapshot?
+                            let verificationGeneration = self.context.generation
+                            let verifyingManualContext = snapshot != nil && self.context.hasSelection && !self.companionHiddenByUser
                             if snapshot != nil,self.context.hasSelection,!self.companionHiddenByUser{fresh=try? await self.context.capture()}
                             guard ReplyDelivery.shouldApply(request: id, current: self.requestID, chat: chatID, active: self.activeID) else { return }
+                            // Hide suspends capture and changes its generation. Even
+                            // a rapid show must not revive this earlier verification.
+                            guard !verifyingManualContext || (!self.companionHiddenByUser && self.context.generation == verificationGeneration) else { return }
                             let matches: Bool? = snapshot == nil ? nil : fresh.map { snapshot!.evidence.reflectsSameView($0.evidence) }
                             let changed = WindowCheck.changed(matches: matches)
                             let checked=shown.withWindowChanged(changed)
@@ -336,7 +353,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             if !changed,shouldSpeak{self.voice.speak(checked.text)}
                             else if changed,shouldSpeak{self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
-                            if canPoint,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
+                            if canPoint,!self.companionHiddenByUser,self.context.generation == verificationGeneration,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
                             self.persist()
                         case .failure(let failure):
                             self.busy=false;self.conversation=false
@@ -349,6 +366,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
 
             } catch {
                 guard self.requestID==id else{return};self.busy=false
+                if Task.isCancelled, self.contextAssemblyID != id { return }
                 self.conversation=false
                 self.setAnswerFailed(true);self.persist()
                 self.error=(error as? AppError)?.message ?? "Couldn’t read the selected context. Your message is saved; check the window or attachments and retry."

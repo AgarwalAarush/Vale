@@ -5,6 +5,7 @@ struct CurrentWorkContextChip: View {
     @ObservedObject var context: CurrentWorkContext
     private var title: String {
         if context.capturing { return "Reading screen…" }
+        if context.screenAuthorized && context.screenUnavailable { return "Screen unavailable" }
         if context.screenAuthorized { return context.hasSelectionText ? "Screen & selected text" : "Current screen" }
         return context.hasSelectionText ? "Selected text · screen off" : "Enable screen context…"
     }

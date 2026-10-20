@@ -29,7 +29,7 @@ extension AppController {
                 })
             fixture.workContext.prepareInvocation()
         }
-        var ready: [Bool] = [], context: [Bool] = [], denied: [Bool] = [], settings: [Bool] = []
+        var ready: [Bool] = [], context: [Bool] = [], unavailable: [Bool] = [], denied: [Bool] = [], settings: [Bool] = []
         for dark in [false, true] {
             let name = dark ? "dark" : "light"
             panel.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
@@ -47,6 +47,14 @@ extension AppController {
                 panel.frame.width == 320 && contextHeight < 190 && contextHeight >= 140 &&
                 input != nil && editor(panel.contentView) === input && panel.firstResponder === input)
             try snapshot(panel, to: output.appendingPathComponent("current-work-selection-ask-" + name + ".png"), provenance: .generatedHarness(account: account))
+            fixture.workContext.installFixture(selection: { .init(text: "Generated unavailable-screen selection") }, capture: {
+                throw AppError("Generated unavailable-screen error")
+            })
+            let fallback = try await fixture.workContext.captureForQuestion()
+            await settle(); applyHarnessCompanionLayout(panel)
+            unavailable.append(fixture.workContext.screenUnavailable && fallback.screen == nil && fallback.notice != nil &&
+                panel.frame.height == contextHeight && editor(panel.contentView) === input && fixture.error == nil)
+            try snapshot(panel, to: output.appendingPathComponent("current-work-unavailable-ask-" + name + ".png"), provenance: .generatedHarness(account: account))
             install(allowed: false); await settle(); applyHarnessCompanionLayout(panel)
             denied.append(!fixture.workContext.screenAuthorized && !fixture.workContext.selectionAuthorized &&
                 !fixture.workContext.hasSelectionText && panel.frame.height == contextHeight && fixture.draft.isEmpty &&
@@ -59,6 +67,7 @@ extension AppController {
         }
         results["currentWorkEnabledPreservesReadyFootprint"] = ready.allSatisfy { $0 }
         results["currentWorkSelectionUsesCompactAskAndSameFocusedEditor"] = context.allSatisfy { $0 }
+        results["currentWorkUnavailableScreenNoticePreservesAskGeometryAndTyping"] = unavailable.allSatisfy { $0 }
         results["currentWorkPermissionNoticeKeepsTypingAndGeometry"] = denied.allSatisfy { $0 }
         results["currentWorkSettingsRetainsCompactRouteAndEditor"] = settings.allSatisfy { $0 }
     }

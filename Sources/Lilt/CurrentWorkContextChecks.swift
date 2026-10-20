@@ -18,6 +18,13 @@ import AppKit
             context.installFixture(selection: { reads += 1; return .init(text: selectionText) }, capture: {
                 captures += 1; return snapshot(byte: UInt8(captures))
             })
+            context.prepareInvocation(readSelectedText: false)
+            results["currentWorkIdentityOnlyPreparationDoesNotReadSelectedText"] = reads == 0 && captures == 0 && !context.hasSelectionText && context.sourceName == "Generated source" && context.screenAuthorized && context.selectionAuthorized
+            context.prepareInvocation()
+            let readsBeforeIdentityOnly = reads
+            let selectionWasPrepared = context.hasSelectionText
+            context.prepareInvocation(readSelectedText: false)
+            results["currentWorkIdentityOnlyPreparationClearsPriorSelectionWithoutReading"] = selectionWasPrepared && readsBeforeIdentityOnly > 0 && reads == readsBeforeIdentityOnly && !context.hasSelectionText && captures == 0
             context.prepareInvocation()
             let readsAtInvocation = reads
             selectionText = "Generated current selection"
@@ -58,6 +65,24 @@ import AppKit
             let deniedBoth = try await context.captureForQuestion()
             results["currentWorkDeniedAccessibilityDoesNotReadSelection"] = deniedBoth.screen == nil && deniedBoth.selectedText == nil && forbiddenSelectionReads == 0 && captures == 0
         } catch { results["currentWorkPermissionFixturesCompleted"] = false }
+
+        do {
+            let context = CurrentWorkContext(isTesting: true)
+            var shouldFail = true, captures = 0
+            let selection = "Generated selection survives an authorized capture error"
+            context.installFixture(selection: { .init(text: selection) }, capture: {
+                captures += 1
+                if shouldFail { throw AppError("Generated authorized screen capture failure") }
+                return snapshot(byte: 6)
+            })
+            let unavailable = try await context.captureForQuestion()
+            results["currentWorkAuthorizedScreenErrorKeepsSelectionWithoutFailingQuestion"] = captures == 1 && unavailable.screen == nil && unavailable.selectedText == selection && unavailable.notice == "Current screen unavailable for this question. Use only the supplied selection and attachments." && context.screenAuthorized && context.screenUnavailable && context.status == "Screen unavailable; you can still ask" && context.isCurrent(unavailable.generation) && !context.capturing && !context.hasSelectionText
+            context.prepareInvocation(readSelectedText: false)
+            let preparationClearedState = !context.screenUnavailable && !context.hasSelectionText
+            shouldFail = false
+            let recovered = try await context.captureForQuestion()
+            results["currentWorkNextPreparationAndQuestionResetScreenUnavailableState"] = preparationClearedState && captures == 2 && recovered.screen?.data == snapshot(byte: 6).data && recovered.notice == nil && recovered.selectedText == selection && !context.screenUnavailable && !context.hasSelectionText
+        } catch { results["currentWorkAuthorizedErrorFixturesCompleted"] = false }
 
         do {
             let context = CurrentWorkContext(isTesting: true)
@@ -106,17 +131,23 @@ import AppKit
     private static func deadlineIsBounded() async -> Bool {
         let context = CurrentWorkContext(isTesting: true)
         let gate = FixtureCaptureGate()
-        context.installFixture(timeout: 0.05, capture: { await gate.wait(); return snapshot(byte: 92) })
+        let selection = "Generated selection survives timed-out capture"
+        context.installFixture(timeout: 0.05, selection: { .init(text: selection) }, capture: { await gate.wait(); return snapshot(byte: 92) })
         let start = Date()
         let question = Task { try await context.captureForQuestion() }
-        let rejected: Bool
-        switch await question.result { case .success: rejected = false; case .failure: rejected = true }
-        let bounded = Date().timeIntervalSince(start) < 1 && gate.waiting && !context.capturing
+        let degraded: Bool
+        switch await question.result {
+        case .success(let result): degraded = result.screen == nil && result.selectedText == selection && result.notice == "Current screen unavailable for this question. Use only the supplied selection and attachments." && context.isCurrent(result.generation)
+        case .failure: degraded = false
+        }
+        let expectedGeneration = context.generation
+        let bounded = Date().timeIntervalSince(start) < 1 && gate.waiting && !context.capturing && context.screenAuthorized && context.screenUnavailable && !context.hasSelectionText
         gate.release()
         for _ in 0..<8 { await Task.yield() }
+        let lateCompletionIgnored = context.generation == expectedGeneration && context.screenUnavailable && !context.capturing && !context.hasSelectionText
         context.installFixture(capture: { snapshot(byte: 93) })
         let fresh = try? await context.captureForQuestion()
-        return rejected && bounded && fresh?.screen?.data == snapshot(byte: 93).data
+        return degraded && bounded && lateCompletionIgnored && fresh?.screen?.data == snapshot(byte: 93).data && !context.screenUnavailable
     }
 
     private static func snapshot(byte: UInt8) -> ContextSnapshot {

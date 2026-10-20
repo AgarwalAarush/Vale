@@ -48,6 +48,7 @@ struct CurrentWorkSnapshot {
 @MainActor final class CurrentWorkContext: NSObject, ObservableObject {
     @Published private(set) var enabled: Bool
     @Published private(set) var screenAuthorized = false
+    @Published private(set) var screenUnavailable = false
     @Published private(set) var selectionAuthorized = false
     @Published private(set) var hasSelectionText = false
     @Published private(set) var sourceName: String?
@@ -92,8 +93,9 @@ struct CurrentWorkSnapshot {
         updateStatus()
     }
 
-    /// Call before activating Vale so the source app's actual selection remains available.
-    func prepareInvocation(screen: NSScreen? = nil) {
+    /// Call before activating Vale. Startup may prepare identity without sampling selection.
+    func prepareInvocation(screen: NSScreen? = nil, readSelectedText: Bool = true) {
+        screenUnavailable = false
         guard enabled else { return }
         if testing {
             guard fixtureSelection != nil else { return }
@@ -104,7 +106,7 @@ struct CurrentWorkSnapshot {
             let chosenID = (chosen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
             if chosenID != displayID { invalidate(); displayID = chosenID }
         }
-        selectedText = readSelection()
+        selectedText = readSelectedText ? readSelection() : nil
         hasSelectionText = selectedText != nil
         updateStatus()
     }
@@ -135,11 +137,12 @@ struct CurrentWorkSnapshot {
 
     func captureForQuestion(includeScreen: Bool = true) async throws -> CurrentWorkSnapshot {
         try Task.checkCancellation()
+        screenUnavailable = false
         guard enabled else { return CurrentWorkSnapshot(screen: nil, selectedText: nil, generation: generation, notice: nil) }
         if !testing {
             refreshPermissions()
             rememberFrontmostApplication()
-            if displayID == nil { prepareInvocation() }
+            if displayID == nil { prepareInvocation(readSelectedText: false) }
         }
         invalidate()
         let expected = generation
@@ -159,8 +162,8 @@ struct CurrentWorkSnapshot {
             return CurrentWorkSnapshot(screen: nil, selectedText: questionSelection, generation: expected, notice: "Screen not included. Allow Screen Recording in Settings.")
         }
         guard let requestedDisplay = displayID else {
-            status = "Current display unavailable"
-            return CurrentWorkSnapshot(screen: nil, selectedText: questionSelection, generation: expected, notice: "Current display unavailable. You can still ask.")
+            screenUnavailable = true; completed = true
+            return CurrentWorkSnapshot(screen: nil, selectedText: questionSelection, generation: expected, notice: "Current screen unavailable for this question. Use only the supplied selection and attachments.")
         }
         let fixture = fixtureCapture
         let timeout = captureTimeout
@@ -191,15 +194,15 @@ struct CurrentWorkSnapshot {
             return CurrentWorkSnapshot(screen: screen, selectedText: questionSelection, generation: expected, notice: nil)
         } catch {
             guard enabled, generation == expected, !Task.isCancelled else { throw CancellationError() }
+            if error is CancellationError { throw error }
             refreshPermissions()
             if !screenAuthorized {
                 completed = true
                 status = "Screen access is off; you can still ask"
                 return CurrentWorkSnapshot(screen: nil, selectedText: questionSelection, generation: expected, notice: "Screen not included. Allow Screen Recording in Settings.")
             }
-            status = "Screen unavailable. Ask again to retry."
-            if error is CancellationError { throw error }
-            throw AppError("Couldn’t read the current screen. Ask again to retry, or turn off automatic context.")
+            screenUnavailable = true; completed = true
+            return CurrentWorkSnapshot(screen: nil, selectedText: questionSelection, generation: expected, notice: "Current screen unavailable for this question. Use only the supplied selection and attachments.")
         }
     }
 
@@ -214,6 +217,7 @@ struct CurrentWorkSnapshot {
     private func invalidate() {
         generation = UUID()
         inFlight?.cancel(); inFlight = nil; capturing = false
+        screenUnavailable = false
         clearSelection()
     }
 
@@ -309,6 +313,7 @@ struct CurrentWorkSnapshot {
 
     private func updateStatus() {
         if !enabled { status = "Automatic context is off" }
+        else if screenUnavailable { status = "Screen unavailable; you can still ask" }
         else if screenAuthorized { status = hasSelectionText ? "Current screen and selected text" : "Current screen on questions" }
         else if hasSelectionText { status = "Selected text ready · screen access off" }
         else { status = "Screen access is off; you can still ask" }

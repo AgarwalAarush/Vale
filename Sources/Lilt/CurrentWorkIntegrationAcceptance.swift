@@ -129,6 +129,9 @@ extension AppController {
             typedOnly?.prompt.contains("Generated typed question with both context permissions off.") == true &&
             typedOnly?.prompt.contains("No screen image is attached") == true && fixture.error == nil && !fixture.busy
 
+        for failure in ["Error", "Timeout"] {
+            try await currentWorkIntegrationCaptureUnavailable(failure, account: account, output: output, results: &results)
+        }
         for invalidation in ["Disable", "SourceChange", "Hide"] {
             try await currentWorkIntegrationInvalidation(invalidation, account: account, output: output, results: &results)
         }
@@ -141,6 +144,56 @@ extension AppController {
         let file = output.appendingPathComponent("current-work-integration-method.json")
         try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+    }
+
+    private func currentWorkIntegrationCaptureUnavailable(_ failure: String, account: ChatGPTAccount, output: URL, results: inout [String: Bool]) async throws {
+        let directory = output.appendingPathComponent("current-work-unavailable-\(failure.lowercased())-integration-fixture")
+        let fixture = try AppModel(testingAccount: account, dataDirectory: directory)
+        fixture.voice.enableFixtures(); fixture.newSession(title: "Generated authorized screen \(failure)")
+        let gate = CurrentWorkIntegrationGate()
+        defer { gate.release(); fixture.provider.fixtureReply = nil; fixture.suspend() }
+        let selectedText = "GENERATED-AUTHORIZED-\(failure.uppercased())-SELECTION"
+        let staleImage = currentWorkIntegrationSnapshot(marker: "GENERATED-LATE-UNAVAILABLE-\(failure.uppercased())-SCREEN")
+        var captures = 0
+        fixture.workContext.installFixture(screenAuthorized: true, timeout: failure == "Timeout" ? 0.05 : 6,
+                                           selection: { .init(text: selectedText) }, capture: {
+            captures += 1
+            if failure == "Error" { throw AppError("Generated authorized SDK capture failure") }
+            await gate.wait()
+            return staleImage
+        })
+        var requests: [CurrentWorkIntegrationRequest] = []
+        fixture.provider.fixtureReply = { prompt, images, _, complete in
+            requests.append(.init(prompt: prompt, images: images))
+            complete(.success(TutorReply(text: "Generated answer without current-screen context.")))
+        }
+        let question = "Generated typed question despite authorized capture \(failure.lowercased())."
+        let start = Date()
+        fixture.draft = question; fixture.send()
+        await until({ !fixture.busy }, seconds: 2)
+        let request = requests.first
+        let notice = "Current screen unavailable for this question. Use only the supplied selection and attachments."
+        results["currentWorkModelAuthorized\(failure)StillSendsExactlyOneQuestionWithoutScreen"] = captures == 1 && requests.count == 1 &&
+            request?.images.isEmpty == true && request?.prompt.contains(question) == true && request?.prompt.contains(selectedText) == true &&
+            request?.prompt.contains("Context availability: " + notice) == true &&
+            request?.prompt.contains("No screen image is attached. Do not imply you can see the screen.") == true &&
+            request?.prompt.contains("fresh selected-window screenshot") == false && request?.prompt.contains("current display, excluding Vale") == false &&
+            fixture.workContext.screenAuthorized && fixture.workContext.screenUnavailable && !fixture.workContext.hasSelectionText && !fixture.workContext.capturing &&
+            !fixture.busy && fixture.error == nil && !fixture.hasFailedQuestion && !fixture.canRetry &&
+            fixture.active?.messages.filter({ $0.role == "user" }).count == 1 && fixture.active?.messages.last?.role == "assistant" &&
+            fixture.active?.messages.contains(where: { $0.answerFailed }) == false && Date().timeIntervalSince(start) < 2 &&
+            (failure != "Timeout" || gate.waiting)
+
+        if failure == "Timeout" {
+            let generationAfterQuestion = fixture.workContext.generation
+            let messagesAfterQuestion = fixture.active?.messages
+            gate.release()
+            await settle()
+            results["currentWorkModelAuthorizedTimeoutLateFrameNeverReachesProviderOrChangesAnswer"] = requests.count == 1 && captures == 1 &&
+                requests.allSatisfy { $0.images.isEmpty && !$0.images.contains(staleImage.data) } &&
+                fixture.workContext.isCurrent(generationAfterQuestion) && fixture.workContext.screenUnavailable && !fixture.workContext.capturing &&
+                fixture.active?.messages == messagesAfterQuestion && !fixture.busy && fixture.error == nil && !fixture.hasFailedQuestion && !fixture.canRetry
+        }
     }
 
     private func currentWorkIntegrationInvalidation(_ invalidation: String, account: ChatGPTAccount, output: URL, results: inout [String: Bool]) async throws {
