@@ -702,18 +702,26 @@ extension AppController {
             let sourceItems = workspace.toolbar?.items.map { $0.itemIdentifier.rawValue } ?? []
             let isolated = toolbar != nil && workspace.toolbar != nil && toolbar?.identifier != workspace.toolbar?.identifier
             let passed = isolated && !workspace.isVisible && !sourceItems.contains("vale.back") && back?.isEnabled == true && back?.action != nil && visible.contains("vale.back") && visible.contains("vale.activity") && activity?.toolTip == expectedStatus && label?.stringValue == expectedStatus && label?.accessibilityLabel() == expectedStatus && activity?.menuFormRepresentation?.title == expectedStatus && toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.stop" }) == false
-            toolbarTrace.append([
-                "state": state, "passed": passed, "expectedStatus": expectedStatus,
-                "windowTitle": window.title, "route": fixture.workspaceRoute.rawValue,
-                "appearance": window.effectiveAppearance.name.rawValue,
-                "frame": ["width": window.frame.width, "height": window.frame.height],
-                "sourceHidden": !workspace.isVisible, "identifiersAreDistinct": isolated,
-                "sourceToolbarIdentifier": workspace.toolbar.map { String(describing: $0.identifier) } ?? "none",
-                "fixtureToolbarIdentifier": toolbar.map { String(describing: $0.identifier) } ?? "none",
-                "sourceItems": sourceItems, "fixtureItems": toolbar?.items.map { $0.itemIdentifier.rawValue } ?? [],
-                "fixtureVisibleItems": visible, "activityTooltip": activity?.toolTip ?? "missing",
-                "activityText": label?.stringValue ?? "missing", "activityAccessibilityLabel": label?.accessibilityLabel() ?? "missing"
-            ])
+            // Keep heterogeneous diagnostics in small typed assignments for the Swift compiler.
+            var row: [String: Any] = [:]
+            row["state"] = state
+            row["passed"] = passed
+            row["expectedStatus"] = expectedStatus
+            row["windowTitle"] = window.title
+            row["route"] = fixture.workspaceRoute.rawValue
+            row["appearance"] = window.effectiveAppearance.name.rawValue
+            row["frame"] = ["width": window.frame.width, "height": window.frame.height]
+            row["sourceHidden"] = !workspace.isVisible
+            row["identifiersAreDistinct"] = isolated
+            row["sourceToolbarIdentifier"] = workspace.toolbar?.identifier.rawValue ?? "none"
+            row["fixtureToolbarIdentifier"] = toolbar?.identifier.rawValue ?? "none"
+            row["sourceItems"] = sourceItems
+            row["fixtureItems"] = toolbar?.items.map { $0.itemIdentifier.rawValue } ?? []
+            row["fixtureVisibleItems"] = visible
+            row["activityTooltip"] = activity?.toolTip ?? "missing"
+            row["activityText"] = label?.stringValue ?? "missing"
+            row["activityAccessibilityLabel"] = label?.accessibilityLabel() ?? "missing"
+            toolbarTrace.append(row)
             return passed
         }
         if let ownerID, let otherID {

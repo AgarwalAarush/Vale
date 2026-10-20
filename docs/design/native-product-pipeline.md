@@ -18,7 +18,7 @@ Layout depends on remaining conversation space. A maximum prose measure is not a
 
 ## 3. Implement with bounded ownership and appropriate checks
 
-The coordinator owns shared build/runner, integration, tracker and acceptance. Delegate nonoverlapping files or reviews. Preserve editor identity, marked text, selection, undo, session/request ownership, files, restored drafts and every retained capability. Keep voice/screen consent explicit. Run meaningful integrated core/native checks; repeat only for changed inputs, failures or unresolved uncertainty. Profile actual stalls rather than adding empty performance ceremony.
+The coordinator owns shared build/runner, integration, tracker and acceptance. Delegate nonoverlapping files or reviews. Preserve editor identity, marked text, selection, undo, session/request ownership, files, restored drafts and every retained capability. Keep voice/screen consent explicit. Compile the candidate and finish required build preflight before freezing it for formal review; syntax parsing alone is insufficient. Independent source review may overlap runtime verification after compilation passes. Run meaningful integrated core/native checks; repeat only for changed inputs, failures or unresolved uncertainty. Profile actual stalls rather than adding empty performance ceremony.
 
 Use Impeccable Operate for hierarchy and fresh critique; installed SwiftUI Pro for native state/accessibility/availability review with explicit macOS14 constraints; general Taste craft only, since its scope excludes complex product UI. Remove arbitrary design dials. Local SwiftUI Pro1.1 and remotely audited2.0.0 differ. Verify introduced APIs in the actual SDK. Factory organizes evidence; no skill certifies aesthetics.
 
