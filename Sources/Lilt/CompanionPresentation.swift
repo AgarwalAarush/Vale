@@ -52,6 +52,7 @@ import AppKit
         let editorHeight = max(inlineReply ? 36 : CompanionEditorMetrics.expandedHeight, min(110, model.companionInputHeight))
         var height: CGFloat = headerHeight + editorHeight + composerBottomInset + (inlineReply ? 0 : toolsHeight)
         if model.context.hasSelection { height += 38 }
+        else if model.workContext.enabled { height += 35 }
         if !model.pendingFiles.isEmpty { height += 36 }
         if model.importStatus != nil { height += 27 }
         if model.error != nil { height += 90 }

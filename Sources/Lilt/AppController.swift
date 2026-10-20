@@ -4,12 +4,16 @@ import Carbon
 import LiltCore
 
 @MainActor final class AppController: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSWindowDelegate {
+    enum CompanionCommand: UInt32, CaseIterable {
+        case toggleVisibility = 1
+        case toggleDictation = 2
+    }
     var model: AppModel!
     var workspace: NSWindow!
     var statusItem: NSStatusItem!
     var annotation: NSWindow?
     private var annotationTimer: Timer?
-    private var hotKey: EventHotKeyRef?
+    private var hotKeys: [CompanionCommand: EventHotKeyRef] = [:]
     private var hotHandler: EventHandlerRef?
     private var monitor: Any?
     private var statusMenu: NSMenu?
@@ -17,6 +21,7 @@ import LiltCore
     private var testing = false
     private var workspaceToolbar: NativeWorkspaceToolbar?
     private var previousApplication: NSRunningApplication?
+    private var preparingInputRoute = false
     /// AppKit can dispatch menu key equivalents even when a local monitor yields
     /// to a sheet. Share this boundary with validation, actions and focus retries.
     private var nativeDialogOpen: Bool {
@@ -32,7 +37,7 @@ import LiltCore
         let directory = testing ? URL(fileURLWithPath: CommandLine.arguments.last!).appendingPathComponent("test-library") : nil
         model = AppModel(dataDirectory: directory)
         setupWorkspace(); setupMenu()
-        if !testing { registerHotKey() }
+        if !testing { registerHotKeys() }
         model.showWorkspace = { [weak self] in self?.openWorkspace() }
         model.requestCompanionEscape = { [weak self] in self?.handleCompanionEscape() }
         model.hideOverlay = { [weak self] in self?.clearAnnotation() }
@@ -93,14 +98,78 @@ import LiltCore
         else { panel.applyCompanionLayout(animated: false) }
     }
     func openWorkspace() {
-        guard !nativeDialogOpen else { return }
-        let frontmost = NSWorkspace.shared.frontmostApplication
-        if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApplication = frontmost }
-        if !workspace.isVisible { (workspace as? NativeWorkspaceWindow)?.summon() }
+        guard !nativeDialogOpen, !preparingInputRoute else { return }
+        let screen = workspace.isVisible ? workspace.screen : pointerScreen
+        model.workContext.prepareInvocation(screen: screen)
+        rememberPreviousApplication()
+        if !workspace.isVisible { (workspace as? NativeWorkspaceWindow)?.summon(on: screen) }
+        finishOpeningWorkspace()
+    }
+    /// Carbon and menu actions share one dispatcher. The global shortcuts have
+    /// no local key-equivalent handler, so one key press executes one command.
+    func performCompanionCommand(_ command: CompanionCommand) {
+        guard canPerformCompanionCommand(command) else { return }
+        switch command {
+        case .toggleVisibility:
+            if workspace.isVisible && workspace.isKeyWindow && NSApp.isActive { dismissCompanion() }
+            else { showCompanionForInput() }
+        case .toggleDictation:
+            if !workspace.isVisible || !workspace.isKeyWindow || !NSApp.isActive || !model.chatSurfaceVisible {
+                showCompanionForInput()
+            } else if composerMayReceiveFocus {
+                focusComposer(attemptsLeft: ComposerFocus.attempts)
+            }
+            model.commitComposer?()
+            model.expandCompanion()
+            model.toggleVoice()
+        }
+    }
+    func canPerformCompanionCommand(_ command: CompanionCommand) -> Bool {
+        guard !nativeDialogOpen else { return false }
+        switch command {
+        case .toggleVisibility: return true
+        case .toggleDictation:
+            return model.active != nil && !model.paused && model.provider.account.permitsPlanUsage
+        }
+    }
+    private var pointerScreen: NSScreen? {
+        NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+    }
+    private func showCompanionForInput() {
+        let screen = pointerScreen
+        // Sample the other app before either AppKit activation or route-driven
+        // focus can transfer the foreground application to Vale.
+        model.workContext.prepareInvocation(screen: screen)
+        rememberPreviousApplication()
+        if !model.chatSurfaceVisible {
+            model.commitComposer?()
+            preparingInputRoute = true
+            model.backToChat()
+            preparingInputRoute = false
+        }
+        (workspace as? NativeWorkspaceWindow)?.summon(on: screen)
+        finishOpeningWorkspace()
+    }
+    private func finishOpeningWorkspace() {
         bringWorkspaceOnScreen(); model.workspaceOpen = true
+        if workspace.isMiniaturized { workspace.deminiaturize(nil) }
         workspace.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         if composerMayReceiveFocus { focusComposer(attemptsLeft: ComposerFocus.attempts) }
         else { workspace.makeFirstResponder(nil) }
+    }
+    private func rememberPreviousApplication() {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        if previousApplication?.isTerminated == true || previousApplication?.processIdentifier == ownPID { previousApplication = nil }
+        guard let frontmost = NSWorkspace.shared.frontmostApplication, !frontmost.isTerminated,
+              frontmost.processIdentifier != ownPID else { return }
+        previousApplication = frontmost
+    }
+    private func restorePreviousApplication() {
+        guard let application = previousApplication, !application.isTerminated,
+              application.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            previousApplication = nil; return
+        }
+        application.activate(options: [])
     }
     func handleCompanionEscape() {
         guard !nativeDialogOpen else { return }
@@ -109,13 +178,14 @@ import LiltCore
             model.stopInteraction(); clearAnnotation(); return
         }
         if !model.chatSurfaceVisible { model.backToChat(); return }
-        if model.companionExpanded { model.collapseCompanion(); previousApplication?.activate(options: []); return }
+        if model.companionExpanded { model.collapseCompanion(); restorePreviousApplication(); return }
         dismissCompanion()
     }
     private func dismissCompanion() {
-        model.commitComposer?(); model.persist(); model.workspaceOpen = false
+        model.commitComposer?(); model.companionDidHide(); model.persist(); model.workspaceOpen = false
+        clearAnnotation()
         workspace.orderOut(nil)
-        previousApplication?.activate(options: [])
+        restorePreviousApplication()
     }
     private var composerMayReceiveFocus: Bool {
         !nativeDialogOpen && workspace.isVisible && !workspace.isMiniaturized && model.chatSurfaceVisible
@@ -140,6 +210,11 @@ import LiltCore
         let appQuit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); appQuit.target = self; appMenu.addItem(appQuit)
         let fileItem = NSMenuItem(); main.addItem(fileItem); let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
         let newItem = NSMenuItem(title: "New chat", action: #selector(menuNew), keyEquivalent: "n"); newItem.target = self; fileMenu.addItem(newItem)
+        // Carbon owns these key presses globally. Text legends make the same
+        // shortcuts discoverable without adding a second menu key handler.
+        let showItem = NSMenuItem(title: "Show or Hide Vale  ⌃⌥Space", action: #selector(menuWorkspace), keyEquivalent: ""); showItem.target = self; fileMenu.addItem(showItem)
+        let dictateItem = NSMenuItem(title: "Dictate a Question  ⌃⌥D", action: #selector(menuDictation), keyEquivalent: ""); dictateItem.target = self; fileMenu.addItem(dictateItem)
+        fileMenu.addItem(.separator())
         let attachItem = NSMenuItem(title: "Attach files…", action: #selector(menuAttach), keyEquivalent: "a"); attachItem.keyEquivalentModifierMask = [.command, .shift]; attachItem.target = self; fileMenu.addItem(attachItem)
         let shareItem = NSMenuItem(title: "Share a window…", action: #selector(menuShareWindow), keyEquivalent: "s"); shareItem.keyEquivalentModifierMask = [.command, .shift]; shareItem.target = self; fileMenu.addItem(shareItem)
         fileMenu.addItem(.separator())
@@ -159,31 +234,61 @@ import LiltCore
         NSApp.mainMenu = main
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vale")
-        statusItem.button?.toolTip = "Vale · Control–Option–Space"
+        statusItem.button?.toolTip = "Show or hide Vale · Control–Option–Space\nDictate a question · Control–Option–D"
         statusItem.button?.target = self
         statusItem.button?.action = #selector(statusItemClicked)
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         let menu = NSMenu()
-        for (title, action) in [("Open Vale", #selector(menuWorkspace)), ("Chat history", #selector(menuLibrary)), ("Pause chat", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
+        for (title, action) in [("Show or Hide Vale  ⌃⌥Space", #selector(menuWorkspace)), ("Dictate a Question  ⌃⌥D", #selector(menuDictation)), ("Chat history", #selector(menuLibrary)), ("Pause chat", #selector(menuPause)), ("Settings…", #selector(menuSettings))] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; menu.addItem(item)
         }
         menu.addItem(.separator()); let quit = NSMenuItem(title: "Quit Vale", action: #selector(menuQuit), keyEquivalent: "q"); quit.target = self; menu.addItem(quit)
         statusMenu = menu
     }
-    private func registerHotKey() {
+    private func registerHotKeys() {
+        guard hotHandler == nil, hotKeys.isEmpty else { return }
         var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let pointer = Unmanaged.passUnretained(self).toOpaque()
-        let handler: EventHandlerUPP = { _, _, data in
-            guard let data else { return OSStatus(eventNotHandledErr) }
+        let handler: EventHandlerUPP = { _, event, data in
+            guard let event, let data else { return OSStatus(eventNotHandledErr) }
+            var identifier = EventHotKeyID(signature: 0, id: 0)
+            let result = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+                                           MemoryLayout<EventHotKeyID>.size, nil, &identifier)
+            guard result == noErr, identifier.signature == 0x4C696C74,
+                  identifier.id == 1 || identifier.id == 2 else { return OSStatus(eventNotHandledErr) }
+            let commandID = identifier.id
             let controller = Unmanaged<AppController>.fromOpaque(data).takeUnretainedValue()
-            DispatchQueue.main.async {
-                if !controller.nativeDialogOpen { (controller.workspace as? NativeWorkspaceWindow)?.summon(); controller.openWorkspace() }
-            }; return noErr
+            DispatchQueue.main.async { [weak controller] in
+                guard let command = CompanionCommand(rawValue: commandID) else { return }
+                controller?.performCompanionCommand(command)
+            }
+            return noErr
         }
-        InstallEventHandler(GetApplicationEventTarget(), handler, 1, &event, pointer, &hotHandler)
-        let id = EventHotKeyID(signature: 0x4C696C74, id: 1)
-        let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), id, GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { model.shortcutWarning = "The shortcut is already in use. Open Vale from the menu bar." }
+        let installed = InstallEventHandler(GetApplicationEventTarget(), handler, 1, &event, pointer, &hotHandler)
+        guard installed == noErr else {
+            hotHandler = nil
+            model.shortcutWarning = "Global shortcuts are unavailable. Use Vale’s menu bar commands."
+            return
+        }
+        var warnings: [String] = []
+        for command in CompanionCommand.allCases {
+            var reference: EventHotKeyRef?
+            let key = command == .toggleVisibility ? kVK_Space : kVK_ANSI_D
+            let identifier = EventHotKeyID(signature: 0x4C696C74, id: command.rawValue)
+            let status = RegisterEventHotKey(UInt32(key), UInt32(controlKey | optionKey), identifier, GetApplicationEventTarget(), 0, &reference)
+            if status == noErr, let reference { hotKeys[command] = reference }
+            else if command == .toggleVisibility {
+                warnings.append("Control–Option–Space is unavailable. Show Vale from the menu bar.")
+            } else {
+                warnings.append("Control–Option–D is unavailable. Use Dictate a Question in the File menu.")
+            }
+        }
+        model.shortcutWarning = warnings.isEmpty ? nil : warnings.joined(separator: " ")
+    }
+    private func unregisterHotKeys() {
+        for reference in hotKeys.values { UnregisterEventHotKey(reference) }
+        hotKeys.removeAll()
+        if let hotHandler { RemoveEventHandler(hotHandler); self.hotHandler = nil }
     }
     func point(_ point: PointTarget, snapshot: ContextSnapshot) {
         clearAnnotation()
@@ -222,20 +327,28 @@ import LiltCore
     func clearAnnotation() { annotationTimer?.invalidate(); annotationTimer = nil; annotation?.orderOut(nil); annotation = nil }
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if sender === workspace {
-            model.commitComposer?(); model.stopInteraction(); model.persist(); model.workspaceOpen = false
-            model.contextPreview = nil
-            if model.inspector == .context { model.closeInspector() }
-            clearAnnotation()
+            guard !nativeDialogOpen else { return false }
+            dismissCompanion()
+            return false
         }
         return true
     }
     @objc func systemSuspend() { model.suspend() }
-    @objc private func menuClose() { guard !nativeDialogOpen else { return }; if NSApp.keyWindow === workspace { model.stopInteraction(); dismissCompanion() } else { NSApp.keyWindow?.performClose(nil) } }
+    @objc private func menuClose() { guard !nativeDialogOpen else { return }; if NSApp.keyWindow === workspace { dismissCompanion() } else { NSApp.keyWindow?.performClose(nil) } }
     @objc private func menuNew() { guard !nativeDialogOpen else { return }; model.newSession() }
     @objc private func menuUpdates() { guard !nativeDialogOpen, model.updates.canCheck else { return }; model.updates.check() }
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        let guardedActions = [#selector(menuNew), #selector(menuSettings), #selector(menuLibrary), #selector(menuPause), #selector(menuUpdates), #selector(menuWorkspace), #selector(menuClose), #selector(menuAttach), #selector(menuShareWindow), #selector(menuSidebar), #selector(menuDetails), #selector(menuBack)]
+        let guardedActions = [#selector(menuNew), #selector(menuSettings), #selector(menuLibrary), #selector(menuPause), #selector(menuUpdates), #selector(menuWorkspace), #selector(menuDictation), #selector(menuClose), #selector(menuAttach), #selector(menuShareWindow), #selector(menuSidebar), #selector(menuDetails), #selector(menuBack)]
         if nativeDialogOpen, let action = item.action, guardedActions.contains(action) { return false }
+        if item.action == #selector(menuWorkspace) {
+            let title = !workspace.isVisible ? "Show Vale" : workspace.isKeyWindow && NSApp.isActive ? "Hide Vale" : "Focus Vale"
+            item.title = title + "  ⌃⌥Space"
+            return canPerformCompanionCommand(.toggleVisibility)
+        }
+        if item.action == #selector(menuDictation) {
+            item.title = (model.voice.listening ? "Finish Speaking and Send" : model.voice.starting || model.voice.speaking ? "Stop Voice" : "Dictate a Question") + "  ⌃⌥D"
+            return canPerformCompanionCommand(.toggleDictation)
+        }
         if item.action == #selector(menuUpdates) { return model.updates.canCheck }
         if item.action == #selector(menuPause) { item.title = model.paused && model.active != nil ? "Resume" : "Pause chat"; return model.active != nil }
         if item.action == #selector(menuAttach) { return model.active != nil && !model.importing }
@@ -249,9 +362,10 @@ import LiltCore
         if (event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true), !showingStatusMenu, let menu = statusMenu, let button = statusItem.button {
             showingStatusMenu = true; statusItem.menu = menu; button.performClick(nil); statusItem.menu = nil; showingStatusMenu = false; return
         }
-        if !showingStatusMenu { openWorkspace() }
+        if !showingStatusMenu { performCompanionCommand(.toggleVisibility) }
     }
-    @objc private func menuWorkspace() { openWorkspace() }
+    @objc private func menuWorkspace() { performCompanionCommand(.toggleVisibility) }
+    @objc private func menuDictation() { performCompanionCommand(.toggleDictation) }
     @objc private func menuLibrary() { guard !nativeDialogOpen else { return }; model.showHistory() }
     @objc private func menuAttach() { guard !nativeDialogOpen, model.active != nil, !model.importing else { return }; model.attachFiles() }
     @objc private func menuShareWindow() {
@@ -268,7 +382,13 @@ import LiltCore
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { openWorkspace(); return true }
     func applicationWillTerminate(_ notification: Notification) {
         model.commitComposer?(); model.suspend()
-        if let hotKey { UnregisterEventHotKey(hotKey) }
+        unregisterHotKeys()
         if let monitor { NSEvent.removeMonitor(monitor) }
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
+    }
+    deinit {
+        for reference in hotKeys.values { UnregisterEventHotKey(reference) }
+        if let hotHandler { RemoveEventHandler(hotHandler) }
     }
 }

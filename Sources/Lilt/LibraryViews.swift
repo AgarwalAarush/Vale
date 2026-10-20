@@ -11,6 +11,8 @@ struct SettingsView: View {
                 Divider()
                 UpdateSettingsView(updates: model.updates)
                 Divider()
+                CurrentWorkContextSettings(context: model.workContext)
+                Divider()
                 VStack(alignment: .leading, spacing: 12) {
                     Picker("Appearance", selection: $appearance) {
                         Text("System").tag("system")
@@ -21,9 +23,9 @@ struct SettingsView: View {
                     VoiceSettings()
                     DisclosureGroup("Privacy") {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Messages, attached files and your selected window are sent when you ask. Live refresh holds one preview locally, refreshed every two seconds; it doesn’t send every refresh. Sharing includes the visible page in that window.")
-                            Text("Chats and attached files stay on this Mac. Forget removes a chat and its files. Screen captures and microphone recordings aren’t saved to chat history.")
-                            Text("The microphone starts only with Talk or Conversation. Conversation listens again after each answer. Pause or Escape stops voice and sharing. On-device speech recognition is used when available.")
+                            Text("With Context on and access allowed, your current display and text selected in your working app are included when you ask. Vale is excluded from screenshots. Sharing a specific window replaces the display screenshot. Some apps don’t expose selected text.")
+                            Text("Chats and attached files stay on this Mac. Forget removes a chat and its files. Automatic screen captures, selected text and microphone recordings aren’t saved to chat history. Live keeps one selected-window preview locally; refreshes aren’t sent until you ask.")
+                            Text("Dictation (⌃⌥D) and Conversation start only when you choose them. Conversation listens again after each answer. Hide, Pause or Escape stops voice and local capture. On-device speech recognition is used when available.")
                         }.font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                             .padding(.top, 8).fixedSize(horizontal: false, vertical: true)
                     }
@@ -31,8 +33,8 @@ struct SettingsView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Vale " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""))
                     Spacer(minLength: 8)
-                    Text("⌃⌥Space to open")
-                        .accessibilityLabel("Control–Option–Space to open Vale")
+                    Text("⌃⌥Space show/hide · ⌃⌥D dictate")
+                        .accessibilityLabel("Control–Option–Space to show or hide Vale. Control–Option–D to dictate.")
                 }
                 .font(.system(size: 11)).foregroundStyle(Theme.muted)
             }.font(.system(size: 13)).controlSize(.small)

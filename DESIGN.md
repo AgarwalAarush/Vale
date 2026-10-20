@@ -41,7 +41,10 @@ scrolls; never restore the old740pt minimum or1040pt default. A permanent toolba
 sidebar, traffic-light titlebar, greeting hero or second assistant workspace
 conflicts with the approved composition.
 
-Control–Option–Space explicitly summons on the pointer's display. Ordinary state
+Control–Option–Space shows Vale on the pointer's display and focuses the composer,
+or hides it when already active. Remember the external source app/display and
+read its selection before activation. Control–Option–D explicitly toggles
+dictation with visible permission/status/Stop handling. Ordinary state
 changes retain the anchor. The floating panel supports all Spaces/fullscreen
 auxiliary behavior; physical display/Space acceptance is separate.
 
@@ -58,11 +61,11 @@ SDKROOT, which pointed to an older CLTSDK. This host runs macOS15: compiling
 the26path does not verify its optics. In-process native rasters do not reproduce
 compositor backdrop blur/shadow exactly.
 
-Use system type and SF Symbols. Current Ready editor12pt, expanded editor14pt,
+Use system type and SF Symbols. Current Ready editor13pt, expanded editor14pt,
 message prose13pt, header12pt and status/context around11–12pt. Preserve labels,
 native hit areas and visible focus. Do not shrink text to force mockup dimensions.
 
-Theme's adaptive source pairs remain: ink #252629/#f0f0ed, muted #67686b/#b0b1b8,
+Theme's adaptive source pairs remain: ink #252629/#f0f0ed, muted #595b60/#c2c3c7,
 accent #5759c6/#b9bcff, action #28292d/#ecece8, on-action #ffffff/#252629.
 Secondary fills are adaptive neutrals; the main shell is a native material.
 Avoid nested glass cards, glow and decorative idle waveforms. A200ms shape
@@ -80,9 +83,24 @@ action replacing unavailable Send. Busy exposes Stop. Failed questions retain
 original retry/file ownership while newer drafts stay unsent. Async imports keep
 their originating owner and show accurate status across routes.
 
-Explicitly selected context has an identifying/removable chip, preview and Live
-controls. Refresh at request time; send only on an explicit request. Screenshot
-and microphone buffers remain transient. Dictation requires explicit activation
+Automatic current-work context defaults on with an off control and a compact
+context row in expanded states. On an explicit question, capture a fresh current
+display screenshot excluding Vale and refresh read-only AXSelectedText from the
+remembered external source app. Invocation reads selection before Vale activates;
+app-activation observation tracks identity only. Keep screenshots at most1600px
+on the long edge and selected text at most16000 UTF-16 units; skip secure/password
+fields. Screen Recording/Accessibility prompts require explicit user actions.
+Denied permissions leave typing available with concise context status. No
+startup capture, background screen/selection polling or simulated clipboard Copy
+to read selection.
+
+Explicitly selected-window context has an identifying/removable chip, preview
+and Live controls, and takes precedence over the automatic display screenshot.
+Refresh at request time; send only on an explicit question/guide request. Screen,
+selection and microphone buffers remain transient in RAM/current provider input;
+never append raw context to saved user questions or retain it as attachments. Disable, pause/hide, sleep/lock and
+session changes clear transient context and invalidate pending capture.
+Dictation requires explicit activation
 and visible status/Stop. Conversation rearming requires opt-in and completed
 playback. Pause, Escape, sleep/lock, session changes and errors stop interaction.
 Do not call this full-duplex streaming.
@@ -95,7 +113,7 @@ Back and applicable Stop/import status.
 ## Compatibility and acceptance
 
 Preserve local.lilt.companion, legacy storage, chats/drafts/files/settings and the
-assistant persona. No startup mic/capture, automatic window selection, paid
+assistant persona. No startup mic/capture, automatic selected-window choice, paid
 fallback, model command/file/app/browser tools, credentials logging or login agent.
 Forget still purges target backup content and exposes deletion failures/retry.
 
@@ -111,4 +129,4 @@ readiness.
 
 ## Owner defect reopening, October20 14:32
 
-The owner screenshots of1.3.3 reject washed-out Ready contrast, raster icon/vertical alignment, caret cutting through placeholder, excess empty Ask space, a translucent-header/solid-dark Settings split and verbose preferences. Placeholder must use actual native text geometry; preserved editor identity and typing behavior remain required. Attachment commands must be discoverable while typing: CmdShiftA files/images, native CmdV image paste, CmdShiftS explicit window chooser. Keep dialog guards and no automatic capture. Earlier preview visual acceptance does not close these defects.
+The owner screenshots of1.3.3 reject washed-out Ready contrast, raster icon/vertical alignment, caret cutting through placeholder, excess empty Ask space, a translucent-header/solid-dark Settings split and verbose preferences. Placeholder must use actual native text geometry; preserved editor identity and typing behavior remain required. Attachment commands must be discoverable while typing: CmdShiftA files/images, native CmdV image paste, CmdShiftS explicit window chooser. Keep dialog guards. The later owner request authorizes automatic current-display/selected-text context at explicit invocation/question time as specified above; startup/background capture remains prohibited. Earlier preview visual acceptance does not close these defects.

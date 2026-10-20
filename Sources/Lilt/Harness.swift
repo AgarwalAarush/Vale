@@ -35,6 +35,10 @@ extension AppController {
                 try await runCompactCompanionAcceptance(output: output, results: &results)
                 try await runImportFeedbackAcceptance(output: output, results: &results)
                 try await runChatGPTWorkspaceVisualAcceptance(output: output, results: &results)
+                for (name, passed) in await CurrentWorkContextChecks.run() { results[name] = passed }
+                try await runCurrentWorkIntegrationAcceptance(output: output, results: &results)
+                try await runCompanionCommandAcceptance(output: output, results: &results)
+                try await runCurrentWorkVisualAcceptance(output: output, results: &results)
                 let data = try JSONSerialization.data(withJSONObject: results, options: [.prettyPrinted, .sortedKeys])
                 try data.write(to: output.appendingPathComponent("results.json")); print(String(data: data, encoding: .utf8)!)
                 model.suspend(); exit(results.values.allSatisfy { $0 } ? 0 : 1)
@@ -155,6 +159,10 @@ extension AppController {
                 try await runWorkspaceAcceptance(output:output,results:&results)
             }
             for (name, passed) in await ChatGPTAccountChecks.run() { results[name] = passed }
+            for (name, passed) in await CurrentWorkContextChecks.run() { results[name] = passed }
+            try await runCurrentWorkIntegrationAcceptance(output: output, results: &results)
+            try await runCompanionCommandAcceptance(output: output, results: &results)
+            try await runCurrentWorkVisualAcceptance(output: output, results: &results)
             let data=try JSONSerialization.data(withJSONObject:results,options:[.prettyPrinted,.sortedKeys]);try data.write(to:output.appendingPathComponent("results.json"));print(String(data:data,encoding:.utf8)!);model.suspend();exit(results.values.allSatisfy{$0} ? 0 : 1)
         }catch{print("Harness failed: \(error)");exit(1)}
     }

@@ -43,7 +43,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var compactHistoryVisible = false
     @Published var historyQuery = ""
     @Published var historyFocus = 0
-    @Published var workspaceOpen = false
+    @Published var workspaceOpen = false { didSet { if workspaceOpen { companionHiddenByUser = false } } }
+    private var companionHiddenByUser = false
     @Published var contextPreview: NSImage?
     @Published var composerFocus = 0
     var commitComposer: (() -> Void)?
@@ -52,10 +53,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet {
         UserDefaults.standard.set(readAloud, forKey: "readAloud")
         guard readAloud != oldValue else { return }
-        if let text = ReadAloud.replyToSpeak(messages: active?.messages ?? [], enabled: readAloud, alreadySpeaking: voice.speaking) { voice.speak(text) }
+        if !companionHiddenByUser, let text = ReadAloud.replyToSpeak(messages: active?.messages ?? [], enabled: readAloud, alreadySpeaking: voice.speaking) { voice.speak(text) }
         else if !readAloud && !conversation { voice.stopSpeaking() }
     } }
     let context = WindowContext()
+    let workContext: CurrentWorkContext
     let voice = VoiceController()
     let provider: TutorProvider
     let updates = UpdateController()
@@ -113,6 +115,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         self.init(dataDirectory: dataDirectory, fileRemoval: nil, account: testingAccount)
     }
     private init(dataDirectory: URL?, fileRemoval: (@Sendable(URL) throws -> Void)?, account: ChatGPTAccount) {
+        workContext = CurrentWorkContext(isTesting: account.isDisposableFixture || CommandLine.arguments.contains("--verify-release-feed"))
         provider = TutorProvider(account: account)
         // Retain the 1.0 storage identifier so the Vale rename never strands chats.
         let directory = dataDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("Lilt")
@@ -122,6 +125,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         store=loadedStore; fileStore=loadedFiles
         updates.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         context.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
+        workContext.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         voice.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         provider.account.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         NotificationCenter.default.publisher(for: ChatGPTAccount.connectionWillChange, object: provider.account)
@@ -195,7 +199,16 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if active?.elapsed.isMultiple(of:30)==true {persist()}
     }
     func togglePause() {if paused {paused=false; lastTick=Date(); error=nil} else{tick();suspend()};persist()}
-    func suspend() {paused=true;conversation=false;conversationTask?.cancel();voice.stop();cancel();context.stop();hideOverlay?();persist()}
+    func suspend() {paused=true;conversation=false;conversationTask?.cancel();voice.stop();cancel();context.stop();workContext.suspend();hideOverlay?();persist()}
+    /// Hiding keeps an already-sent answer running, but never leaves voice or
+    /// local context sampling active behind a hidden panel.
+    func companionDidHide() {
+        companionHiddenByUser = true
+        spokenReplyGeneration = UUID()
+        conversation = false; conversationTask?.cancel(); conversationTask = nil
+        voice.stop(); context.stopLive(); workContext.suspend()
+        contextPreview = nil; hideOverlay?()
+    }
     func complete() {
         commitComposer?(); closeInspector(); workspaceRoute = .chat
         tick();updateActive{$0=LaunchSelection.chatAfterClose($0)};suspend();selectedID=activeID;activeID=nil
@@ -205,7 +218,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private func accountConnectionWillChange() {
         let interrupted = busy
         conversation = false; conversationTask?.cancel(); conversationTask = nil
-        voice.stop(); cancel(); context.stop(); contextPreview = nil; contextReset?()
+        voice.stop(); cancel(); context.stop(); workContext.suspend(); contextPreview = nil; contextReset?()
         if interrupted {
             setAnswerFailed(true)
             showError("Your ChatGPT connection changed. Your question is saved; retry when you’re ready.", settings: true)
@@ -273,14 +286,19 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             }
             var snapshot:ContextSnapshot?
             do {
-                if self.context.hasSelection {snapshot=try await self.context.captureForQuestion()}
+                let manualWindow = self.context.hasSelection
+                let usesAutomaticContext = self.workContext.enabled
+                let currentWork = try await self.workContext.captureForQuestion(includeScreen: !manualWindow)
+                if manualWindow { snapshot = try await self.context.captureForQuestion() }
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
-                let leadingImages = snapshot == nil ? 0 : 1
+                let screen = snapshot ?? currentWork.screen
+                let leadingImages = screen == nil ? 0 : 1
                 let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records, leadingImages: leadingImages) ?? FileContext()}.value
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
-                var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
+                guard !usesAutomaticContext || self.workContext.isCurrent(currentWork.generation) else { throw AppError("Your screen context changed. The question is saved; retry for the current view.") }
+                var images=screen.map{[$0.data]} ?? [];images+=fileContext.images
                 if QuestionPreview.shouldCloseOpenedPreview(questionWasSent: true) { self.closePreview?() }
-                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:wantsGuide)
+                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:wantsGuide,hasCurrentScreen:currentWork.screen != nil,selectedText:currentWork.selectedText,contextNotice:currentWork.notice)
                 handedOff=true
                 self.provider.ask(prompt:prompt,images:images,search:wantsSearch) { [weak self] result in
                     Task { @MainActor [weak self] in
@@ -298,7 +316,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             }
                             self.persist()
                             var fresh:ContextSnapshot?
-                            if snapshot != nil,self.context.hasSelection{fresh=try? await self.context.capture()}
+                            if snapshot != nil,self.context.hasSelection,!self.companionHiddenByUser{fresh=try? await self.context.capture()}
                             guard ReplyDelivery.shouldApply(request: id, current: self.requestID, chat: chatID, active: self.activeID) else { return }
                             let matches: Bool? = snapshot == nil ? nil : fresh.map { snapshot!.evidence.reflectsSameView($0.evidence) }
                             let changed = WindowCheck.changed(matches: matches)
@@ -314,7 +332,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                                 if let plan=reply.guide,installGuide{chat.guide=GuideProgress(plan:plan)}
                             }
                             guard self.requestID==id,self.activeID==chatID else{self.persist();return}
-                            let shouldSpeak = self.readAloud || self.conversation || (spoken && self.spokenReplyGeneration == requestedSpeechGeneration)
+                            let shouldSpeak = !self.companionHiddenByUser && (self.readAloud || self.conversation || (spoken && self.spokenReplyGeneration == requestedSpeechGeneration))
                             if !changed,shouldSpeak{self.voice.speak(checked.text)}
                             else if changed,shouldSpeak{self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
@@ -377,7 +395,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             persist()
         }
     }
-    func stopInteraction(){stopResponse();context.stop();hideOverlay?()}
+    func stopInteraction(){stopResponse();context.stop();workContext.suspend();hideOverlay?()}
     func startGuide(){
         guard !paused,!busy else{return}
         let goal=draft.trimmingCharacters(in:.whitespacesAndNewlines)

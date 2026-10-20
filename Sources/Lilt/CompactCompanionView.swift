@@ -16,7 +16,7 @@ struct CompactCompanionView: View {
     private var hasReply: Bool { model.active?.messages.isEmpty == false || model.busy || model.active?.guide != nil }
     private var voiceActive: Bool { model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
     private var hasSupportingContent: Bool {
-        hasReply || model.context.hasSelection || model.error != nil || model.canRetry || model.paused || voiceActive ||
+        hasReply || model.context.hasSelection || model.workContext.enabled || model.error != nil || model.canRetry || model.paused || voiceActive ||
         model.importStatus != nil || !model.pendingFiles.isEmpty || model.active?.mode == .learn ||
         !account.permitsPlanUsage || ShortcutNotice.text(model.shortcutWarning) != nil
     }
@@ -49,6 +49,7 @@ struct CompactCompanionView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 17).padding(.bottom, 9)
                         }
                     if model.context.hasSelection { contextChip.padding(.horizontal, 16).padding(.bottom, 9) }
+                    else if model.workContext.enabled { CurrentWorkContextChip(context: model.workContext).padding(.horizontal, 16).padding(.bottom, 9) }
                     if hasReply { replies(availableHeight: availableHeight).padding(.horizontal, 17).padding(.bottom, 8) }
                     if let error = model.error { errorNotice(error).padding(.horizontal, 16).padding(.bottom, 8) }
                     if model.canRetry {
@@ -210,6 +211,8 @@ struct CompactCompanionView: View {
                 Button("Stop window sharing") { model.stopSharing() }
             }
             Divider()
+            CurrentWorkContextMenu(context: model.workContext)
+            Divider()
             Toggle("Web search", isOn: Binding(get: { model.active?.webEnabled == true }, set: { model.setWeb($0) })).disabled(!WebToggle.changes(waiting: model.busy))
         } label: {
             Label("Add context", systemImage: "plus").labelStyle(.iconOnly).font(.system(size: 15, weight: .regular)).frame(width: 32, height: 32)
@@ -227,7 +230,7 @@ struct CompactCompanionView: View {
                 .frame(width: expanded ? 32 : 28, height: expanded ? 32 : CompanionEditorMetrics.readyHeight)
                 .background(expanded ? Theme.fill.opacity(0.65) : .clear).clipShape(Circle())
         }.buttonStyle(ActionButton()).disabled(model.active == nil || model.paused || !account.permitsPlanUsage)
-            .help(model.voice.listening ? "Finish speaking and send" : "Dictate one question")
+            .help(model.voice.listening ? "Finish speaking and send (⌃⌥D)" : "Dictate one question (⌃⌥D)")
     }
     @ViewBuilder private var submitButton: some View {
         if model.busy {
