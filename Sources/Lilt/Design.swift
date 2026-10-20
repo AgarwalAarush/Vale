@@ -92,6 +92,20 @@ struct AudioMark: View {
     }
 }
 
+/// The empty part of the native input belongs to the same interaction surface
+/// as its text. Preserve AppKit tracking and never expand on programmatic focus.
+final class ComposerClipView: NSClipView {
+    override func mouseDown(with event: NSEvent) {
+        guard let editor = documentView as? ComposerTextView, editor.permitsInteraction(),
+              let ownerWindow = editor.window, ownerWindow === window else { return }
+        let completed = editor.pointerInteracted
+        super.mouseDown(with: event)
+        guard documentView === editor, editor.window === ownerWindow, editor.permitsInteraction() else { return }
+        ownerWindow.makeFirstResponder(editor)
+        completed?()
+    }
+}
+
 final class ComposerTextView: NSTextView {
     var submit: (() -> Void)?
     var escape: (() -> Void)?
@@ -147,10 +161,11 @@ final class ComposerTextView: NSTextView {
     }
     override func mouseDown(with event: NSEvent) {
         guard permitsInteraction() else { resignIfCovered(); return }
-        // Let AppKit finish selection/tracking before the panel changes shape.
+        // Capture this draft's callback before tracking can yield to other work.
+        let completed = pointerInteracted
         super.mouseDown(with: event)
         guard permitsInteraction() else { return }
-        pointerInteracted?()
+        completed?()
     }
     override func paste(_ sender: Any?) {
         guard permitsInteraction() else { resignIfCovered(); return }
@@ -247,6 +262,7 @@ struct DraftEditor: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
+        scroll.contentView = ComposerClipView()
         let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false; editor.allowsUndo = true
         editor.font = .systemFont(ofSize: fontSize); editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
         editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
@@ -320,9 +336,10 @@ struct DraftEditor: NSViewRepresentable {
         }
     }
     private func configureInteraction(_ editor: ComposerTextView, coordinator: Coordinator) {
+        let pointerOwner = coordinator.parent.draftID
         editor.pointerInteracted = { [weak editor, weak coordinator] in
             guard let editor, let coordinator, coordinator.editor === editor,
-                  coordinator.draftID == coordinator.parent.draftID, coordinator.parent.ownsDraft(),
+                  coordinator.draftID == pointerOwner, coordinator.parent.draftID == pointerOwner, coordinator.parent.ownsDraft(),
                   editor.permitsInteraction() else { return }
             coordinator.parent.onPointerInteraction?()
         }
@@ -342,7 +359,7 @@ struct DraftEditor: NSViewRepresentable {
         }
     }
     static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
-        if let editor = nsView.documentView as? ComposerTextView { editor.focusChanged = nil; editor.commitToDraft = nil; editor.permitsInteraction = { false }; editor.submit = nil }
+        if let editor = nsView.documentView as? ComposerTextView { editor.focusChanged = nil; editor.pointerInteracted = nil; editor.commitToDraft = nil; editor.permitsInteraction = { false }; editor.submit = nil }
         coordinator.editor = nil
     }
     final class Coordinator: NSObject, NSTextViewDelegate {
