@@ -67,8 +67,23 @@ def create(args):
         (setup / 'verification.json').write_text(json.dumps(proof, indent=2, sort_keys=True) + '\n')
         signature = proof.get('signature', {}).get('kind', 'unverified')
         web = proof.get('knownFailureAcknowledged') == 'explicitWebSearchUsesRealTool'
-        readme = f'''Vale {version} (build {build}) — configured bootstrap setup
+        preview = proof.get('status') == 'preview-needs-chatgpt-consent'
+        if preview and (proof.get('releaseReady') is not False or proof.get('genuineChatGPTVerified') is not False):
+            raise SystemExit('A ChatGPT preview must retain explicit unaccepted integration labels.')
+        heading = 'ChatGPT sign-in preview' if preview else 'configured bootstrap setup'
+        readme = f'''Vale {version} (build {build}) — {heading}
 
+'''
+        if preview:
+            readme += '''This preview includes direct Continue with ChatGPT and the single native
+workspace. Local checks and generated account/stream fixtures do not establish
+genuine sign-in or replies. Connect your own eligible account in Vale; personal
+browser consent cannot be completed by the build process. Authenticated replies,
+Web, renewal and revocation still require real-account acceptance. This preview
+is not promoted to the stable automatic-update feed. See verification.json.
+
+'''
+        readme += f'''
 Open “Install Vale.command” on your laptop. It stages and verifies this app,
 requests normal quit of matching Vale/Lilt copies, installs ~/Applications/Vale.app,
 and verifies its launch before moving superseded app bundles to Trash. The previous

@@ -176,6 +176,38 @@ extension AppController {
         try await runAccountChangeAcceptance(output: output, results: &results)
         await runNativeUndoAcceptance(editor: editor, results: &results)
         try runClosedChatInputAcceptance(output: output, results: &results)
+        try await runChatGPTSettingsVisualAcceptance(output: output)
+    }
+}
+
+extension AppController {
+    /// Actual Settings component with explicit generated accounts; never OAuth or personal credentials.
+    func runChatGPTSettingsVisualAcceptance(output: URL) async throws {
+        let previousView = workspace.contentView
+        let previousFrame = workspace.frame
+        let previousAppearance = workspace.appearance
+        defer {
+            workspace.contentView = previousView
+            workspace.appearance = previousAppearance
+            workspace.setFrame(previousFrame, display: true)
+        }
+        workspace.setContentSize(NSSize(width: 740, height: 650))
+        for granted in [true, false] {
+            let account = try await ChatGPTAccountChecks.makeSettingsFixture(planGranted: granted)
+            let content = ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("Generated account layout fixture · no OAuth performed").font(.system(size: 12)).foregroundStyle(Theme.muted)
+                    ChatGPTAccountSettings(account: account)
+                }.padding(32).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
+            }.background(Theme.background).foregroundStyle(Theme.ink)
+            workspace.contentView = NSHostingView(rootView: content)
+            for dark in [false, true] {
+                workspace.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                await settle()
+                let state = granted ? "connected" : "grant-needed"
+                try snapshot(workspace, to: output.appendingPathComponent("workspace-account-\(state)-\(dark ? "dark" : "light")-fixture.png"))
+            }
+        }
     }
 }
 
