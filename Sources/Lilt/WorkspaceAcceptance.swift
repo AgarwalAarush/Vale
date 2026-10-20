@@ -713,8 +713,8 @@ extension AppController {
             row["frame"] = ["width": window.frame.width, "height": window.frame.height]
             row["sourceHidden"] = !workspace.isVisible
             row["identifiersAreDistinct"] = isolated
-            row["sourceToolbarIdentifier"] = workspace.toolbar?.identifier.rawValue ?? "none"
-            row["fixtureToolbarIdentifier"] = toolbar?.identifier.rawValue ?? "none"
+            row["sourceToolbarIdentifier"] = workspace.toolbar?.identifier ?? "none"
+            row["fixtureToolbarIdentifier"] = toolbar?.identifier ?? "none"
             row["sourceItems"] = sourceItems
             row["fixtureItems"] = toolbar?.items.map { $0.itemIdentifier.rawValue } ?? []
             row["fixtureVisibleItems"] = visible
