@@ -74,8 +74,12 @@ extension AppController {
         case "vale.companion.back": point = NSPoint(x: 60, y: window.frame.height - 24)
         case "vale.companion.collapse": point = NSPoint(x: window.frame.width - 26, y: window.frame.height - 21.5)
         case "vale.companion.expand": point = NSPoint(x: 23, y: 22.5)
-        case "vale.companion.ready-input-top": point = NSPoint(x: 110, y: 34)
-        case "vale.companion.ready-input-center": point = NSPoint(x: 110, y: 22.5)
+        case "vale.companion.ready-input-top", "vale.companion.ready-input-center":
+            guard let input = window.firstResponder as? ComposerTextView else { return false }
+            let visible = input.visibleRect
+            guard visible.width > 20, visible.height > 4 else { return false }
+            let top = input.isFlipped ? visible.minY + 2 : visible.maxY - 2
+            point = input.convert(NSPoint(x: visible.midX, y: identifier.hasSuffix("top") ? top : visible.midY), to: nil)
         case "vale.companion.stop-response": point = NSPoint(x: window.frame.width - 33, y: 29.5)
         default: return false
         }
