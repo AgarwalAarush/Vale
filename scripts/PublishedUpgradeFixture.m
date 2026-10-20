@@ -43,22 +43,25 @@
     NSString *rootPath = [NSBundle.mainBundle objectForInfoDictionaryKey:@"PublishedUpgradeRoot"];
     if (![rootPath isKindOfClass:NSString.class]) { [NSApp terminate:nil]; return; }
     self.root = [[NSURL fileURLWithPath:rootPath] URLByResolvingSymlinksInPath];
+    NSString *temporaryParent = [NSURL fileURLWithPath:@"/private/tmp" isDirectory:YES].URLByResolvingSymlinksInPath.path;
     struct stat attributes;
-    BOOL safeRoot = [self.root.URLByDeletingLastPathComponent.path isEqualToString:@"/private/tmp"] &&
+    BOOL safeRoot = [self.root.URLByDeletingLastPathComponent.path isEqualToString:temporaryParent] &&
         [self.root.lastPathComponent hasPrefix:@"vale-published-upgrade."] &&
-        lstat(self.root.path.fileSystemRepresentation, &attributes) == 0 &&
+        lstat(rootPath.fileSystemRepresentation, &attributes) == 0 &&
         S_ISDIR(attributes.st_mode) && attributes.st_uid == getuid() && (attributes.st_mode & 0077) == 0;
     if (!safeRoot) { [NSApp terminate:nil]; return; }
     self.request = [NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfURL:[self.root URLByAppendingPathComponent:@"prepared.json"]] options:0 error:NULL];
     NSString *fixtureID = self.request[@"fixtureBundleID"];
     NSString *defaultsID = self.request[@"defaultsDomain"];
     NSURL *hostURL = [self.root URLByAppendingPathComponent:@"installed/Vale.app"];
-    NSURL *driverURL = [self.root URLByAppendingPathComponent:@"Published Upgrade.app"];
+    NSURL *driverURL = [[self.root URLByAppendingPathComponent:@"Published Upgrade.app"] URLByResolvingSymlinksInPath];
+    NSString *requestedRoot = self.request[@"root"];
+    NSURL *requestedRootURL = [requestedRoot isKindOfClass:NSString.class] ? [[NSURL fileURLWithPath:requestedRoot] URLByResolvingSymlinksInPath] : nil;
     BOOL identitySafe = [fixtureID hasPrefix:@"local.vale.publishedupgrade."] &&
         [defaultsID isEqualToString:[fixtureID stringByAppendingString:@".host"]] &&
         [NSBundle.mainBundle.bundleIdentifier isEqualToString:fixtureID] &&
         [NSBundle.mainBundle.bundleURL.URLByResolvingSymlinksInPath.path isEqualToString:driverURL.path] &&
-        [self.request[@"root"] isEqualToString:self.root.path];
+        [requestedRootURL.path isEqualToString:self.root.path];
     if (!identitySafe) { [NSApp terminate:nil]; return; }
     // A normal running Vale could share the SDK's host-ID installer service.
     // Refuse the test rather than stopping or interfering with that application.

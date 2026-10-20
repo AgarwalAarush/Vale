@@ -17,6 +17,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 import xml.etree.ElementTree as ET
 import zipfile
@@ -32,8 +33,11 @@ def fail(message):
     raise SystemExit(message)
 
 
-def run(*args, env=None):
-    result = subprocess.run([str(a) for a in args], cwd=ROOT, env=env, capture_output=True, text=True)
+def run(*args, env=None, timeout=None):
+    try:
+        result = subprocess.run([str(a) for a in args], cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        fail(f'{Path(str(args[0])).name} timed out; output suppressed. No later release stage ran.')
     if result.returncode:
         # In particular, never print sign_update output: malformed key files can be echoed by that tool.
         fail(f'{Path(str(args[0])).name} failed ({result.returncode}); output suppressed. No later release stage ran.')
@@ -86,11 +90,11 @@ def build_number(value):
     return parts + (0,) * (8 - len(parts))
 
 
-def download(url, destination):
+def download(url, destination, *, timeout=60):
     if not url.startswith('https://github.com/' + REPO + '/'):
         fail('Release downloads must originate at the pinned repository over HTTPS.')
     run('/usr/bin/curl', '--disable', '--fail', '--silent', '--show-error', '--location',
-        '--proto', '=https', '--proto-redir', '=https', '--retry', '3', '--output', destination, url)
+        '--proto', '=https', '--proto-redir', '=https', '--retry', '3', '--output', destination, url, timeout=timeout)
 
 
 def verifier(mode, key, path, signature=None):
@@ -369,13 +373,43 @@ def build_assets(version, output):
     return manifest, info, head, assets
 
 
-def remote_release(tag):
+def remote_release(tag, *, timeout=20):
     # Listing distinguishes absent release from permission/network errors; no best-effort catch.
-    releases = json.loads(run('gh', 'api', '--paginate', '--slurp', f'repos/{REPO}/releases?per_page=100'))
+    releases = json.loads(run('gh', 'api', '--paginate', '--slurp', f'repos/{REPO}/releases?per_page=100', timeout=timeout))
     found = [release for page in releases for release in page if release['tag_name'] == tag]
     if len(found) > 1:
         fail('Ambiguous existing release tag.')
     return found[0] if found else None
+
+
+def await_visibility(probe, description):
+    """Retry only explicit propagation absence, within 120 seconds and 24 reads."""
+    deadline = time.monotonic() + 120
+    for attempt in range(24):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        value = probe(min(20, remaining))
+        if value is not None:
+            return value
+        remaining = deadline - time.monotonic()
+        if attempt == 23 or remaining <= 0:
+            break
+        print(f'Waiting for GitHub {description} ({attempt + 1}/24)…', file=sys.stderr, flush=True)
+        time.sleep(min(5, remaining))
+    fail(f'GitHub {description} did not become visible within the bounded verification window.')
+
+
+def visible_canonical_feed(expected_hash, previous_hash, destination):
+    def probe(timeout):
+        download(FEED, destination, timeout=timeout)
+        actual = sha(destination)
+        if actual == expected_hash:
+            return True
+        if actual != previous_hash:
+            fail('The canonical feed contains unexpected bytes; it was not rewritten.')
+        return None
+    await_visibility(probe, 'canonical latest-feed propagation')
 
 
 def remote_tag_commit(tag):
@@ -429,6 +463,7 @@ def publication_failure(tag, output, *, confirmed):
     state = f'ALREADY PUBLIC: {tag}.' if confirmed else f'PUBLICATION STATUS UNCERTAIN: {tag} may already be public.'
     fail(f'{state} Verification did not finish. Release: https://github.com/{REPO}/releases/tag/{tag}\n'
          f'Frozen binding: {output / "release-binding.json"}\n'
+         f'Read-only recovery: python3 scripts/release.py {tag.removeprefix("v")} --verify-published\n'
          'Inspect and verify this release before recovery; do not delete, replace or retag its public assets. '
          'Tool output remains suppressed.')
 
@@ -450,7 +485,7 @@ def publish(tag, source, assets, notes_file, old_feed_hash, output):
     require_source_tag(tag, source)
     if release is None:
         run('gh', 'release', 'create', tag, '--repo', REPO, '--target', source, '--draft', '--title', 'Vale ' + tag[1:], '--notes-file', notes_file)
-        release = remote_release(tag)
+        release = await_visibility(lambda timeout: remote_release(tag, timeout=timeout), 'new draft visibility')
     if release is None or release['target_commitish'] != source or not release['draft']:
         fail('Existing draft does not match the exact reviewed source target.')
     remote = {item['name']: item for item in release['assets']}
@@ -490,13 +525,79 @@ def publish(tag, source, assets, notes_file, old_feed_hash, output):
                 if sha(downloaded) != sha(path):
                     fail('Public download hash mismatch.')
         current = output / 'production-after-promotion.xml'
-        download(FEED, current)
-        if sha(current) != sha(expected['appcast.xml']):
-            fail('Latest feed hash mismatch.')
+        visible_canonical_feed(sha(expected['appcast.xml']), old_feed_hash, current)
         write_json(output / 'publication.json', {**binding, 'published': True, 'productionFeedVerified': True,
             'tagCommitVerified': source, 'releaseURL': f'https://github.com/{REPO}/releases/tag/{tag}'})
     except (Exception, SystemExit, KeyboardInterrupt):
         publication_failure(tag, output, confirmed=True)
+
+
+def verify_published(version):
+    """Read-only public recovery against an unchanged prior frozen binding; no signing custody."""
+    common = Path(run('git', 'rev-parse', '--git-common-dir'))
+    common = common if common.is_absolute() else ROOT / common
+    work = common / 'codex-factory/releases' / ('v' + version)
+    binding_path = regular(work / 'release-binding.json')
+    binding_hash = sha(binding_path)
+    binding = json.loads(binding_path.read_text())
+    head = run('git', 'rev-parse', 'HEAD')
+    source = binding.get('sourceCommit', '')
+    tooling = binding.get('toolingCommit', '')
+    if binding.get('version') != version or not all(re.fullmatch('[0-9a-f]{40}', value) for value in (source, tooling)):
+        fail('The frozen binding has an invalid version or source revision.')
+    run('git', 'merge-base', '--is-ancestor', tooling, head)
+    info = plistlib.loads(run('git', 'show', f'{source}:Resources/Info.plist').encode())
+    if info.get('SUFeedURL') != FEED or info.get('SURequireSignedFeed') is not True:
+        fail('The frozen source lacks the pinned signed feed.')
+    expected = binding.get('files', {})
+    required = {f'Vale-{version}-{suffix}' for suffix in ('macOS-universal.zip', 'source-and-evidence.zip',
+        'laptop-setup.zip', 'laptop-setup.dmg', 'release-manifest.json', 'SHA256SUMS.txt',
+        'automatic-update.json', 'update-SHA256SUMS.txt')} | {'appcast.xml'}
+    if set(expected) != required:
+        fail('Published verification requires the exact nine frozen assets.')
+    for name, bound in expected.items():
+        file = regular(work / 'assets' / name)
+        if sha(file) != bound.get('sha256') or file.stat().st_size != bound.get('bytes'):
+            fail('A frozen local asset changed; the binding was not rewritten.')
+    tag = 'v' + version
+    release = remote_release(tag)
+    if release is None or release.get('draft') is not False:
+        fail('Expected an already public Vale release for read-only verification.')
+    try:
+        require_source_tag(tag, source, required=True)
+        names = [item['name'] for item in release['assets']]
+        if len(names) != len(set(names)) or set(names) != required:
+            fail('Public asset names differ from the frozen nine assets.')
+        with tempfile.TemporaryDirectory(prefix='vale-published-verification-') as folder:
+            directory = Path(folder)
+            for name, bound in expected.items():
+                file = directory / name
+                download(f'https://github.com/{REPO}/releases/download/{tag}/{name}', file)
+                if sha(file) != bound['sha256'] or file.stat().st_size != bound['bytes']:
+                    fail('Public asset bytes differ from the frozen binding.')
+            feed = directory / 'appcast.xml'
+            verifier('feed', info['SUPublicEDKey'], feed)
+            item = ET.fromstring(feed.read_bytes()).find('./channel/item')
+            archive_name = f'Vale-{version}-macOS-universal.zip'
+            enclosure = item.find('enclosure')
+            if (item.findtext(f'{{{SPARKLE}}}version') != info['CFBundleVersion']
+                    or item.findtext(f'{{{SPARKLE}}}shortVersionString') != version
+                    or enclosure.get('url') != f'https://github.com/{REPO}/releases/download/{tag}/{archive_name}'
+                    or enclosure.get('length') != str(expected[archive_name]['bytes'])):
+                fail('The public signed appcast describes another candidate.')
+            verifier('archive', info['SUPublicEDKey'], directory / archive_name, enclosure.get(f'{{{SPARKLE}}}edSignature'))
+            visible_canonical_feed(expected['appcast.xml']['sha256'], binding['previousAppcastSHA256'], directory / 'canonical.xml')
+        if sha(binding_path) != binding_hash:
+            fail('Frozen binding changed during verification.')
+        receipt = work / 'published-verification.json'
+        write_json(receipt, {'version': version, 'sourceCommit': source, 'bindingSHA256': binding_hash,
+            'verifiedByToolingCommit': head, 'verifiedAtUTC': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'readOnlyPublicVerification': True, 'privateSigningKeyAccessed': False, 'remoteMutationsPerformed': False,
+            'allNineAssetsVerified': True, 'archiveAndFeedPublicKeyVerified': True, 'canonicalLatestFeedVerified': True,
+            'tagCommitVerified': source, 'files': expected, 'releaseURL': f'https://github.com/{REPO}/releases/tag/{tag}'})
+        return receipt
+    except (Exception, SystemExit, KeyboardInterrupt):
+        publication_failure(tag, work, confirmed=True)
 
 
 def main():
@@ -505,17 +606,24 @@ def main():
     parser.add_argument('--plan', action='store_true', help='Print the pipeline without mutation or network access')
     parser.add_argument('--publish', action='store_true', help='Upload a verified draft, then promote its signed automatic-update feed')
     parser.add_argument('--prepare-only', action='store_true', help='Build/package/sign locally without uploading')
+    parser.add_argument('--verify-published', action='store_true', help='Read-only public tag/assets/signatures/latest verification; never access the signing key')
     parser.add_argument('--prepared-assets', type=Path, help='Reuse six immutable, reviewed release files without rebuilding')
     parser.add_argument('--notes-file', type=Path, help='Public release notes; defaults to a concise version announcement')
     args = parser.parse_args()
-    if not re.fullmatch(r'\d+\.\d+\.\d+', args.version) or (args.publish and args.prepare_only):
-        parser.error('Use a three-component numeric version and choose --publish or --prepare-only.')
+    if (not re.fullmatch(r'\d+\.\d+\.\d+', args.version)
+            or sum((args.publish, args.prepare_only, args.verify_published)) > 1
+            or (args.verify_published and (args.prepared_assets or args.notes_file))):
+        parser.error('Use a three-component numeric version and one mode; verification does not accept preparation inputs.')
     if args.plan:
         print(json.dumps({'version': args.version, 'planOnly': True, 'networkAccess': False,
             'steps': ['clean committed source', 'reviewed assets or version commit + universal build + core/config/native checks',
                       'ZIP/DMG/source/checksums', 'verify current production feed', 'sign archive and feed with protected Ed25519 seed',
                       'public-key-only verification', 'draft upload and hash check', 'promote latest', 'anonymous download/hash/signature verification'],
             'AppleSigning': 'current build is ad-hoc; Sparkle Ed25519 signing does not establish Developer ID or notarization'}, indent=2))
+        return
+    if args.verify_published:
+        receipt = verify_published(args.version)
+        print(json.dumps({'verifiedPublished': True, 'readOnly': True, 'receipt': str(receipt)}, indent=2))
         return
     if not args.publish and not args.prepare_only:
         parser.error('Choose --publish or --prepare-only; use --plan for a read-only preview.')

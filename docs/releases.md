@@ -80,7 +80,14 @@ separate primary release.
 Local state and frozen file hashes are saved under the Git common directory's
 `codex-factory/releases/vVERSION/`. Retrying the same command resumes an unchanged
 draft, verifies existing uploads and avoids duplicate assets. A failed upload or
-changed production feed leaves the draft unpublished. A public version is immutable:
+changed production feed leaves the draft unpublished. New-draft visibility and the
+previously verified old canonical feed may lag behind GitHub's writes. The command
+polls those two propagation states for up to 120 seconds and 24 reads, with bounded
+request times and progress. Wrong draft metadata, tags,
+asset bytes or an unexpected third feed fail immediately; polling never rewrites
+remote assets or relaxes the expected hash.
+
+A public version is immutable:
 after publication, use a new version. If tag or anonymous verification fails after
 publication, the command explicitly reports **ALREADY PUBLIC**, the release URL and
 the frozen `release-binding.json` path. A promotion command with an unknown remote
@@ -89,6 +96,22 @@ release before recovery; do not delete, replace or retag public assets. Successf
 verification writes `publication.json` under the release's private state directory;
 the appcast is verified from the exact supplied assets path, normally `assets/`.
 Tool output remains suppressed so signer errors cannot expose private material.
+
+To finish verification after a delayed GitHub response or inspect an existing
+publication, use the exact recovery command printed by a failed publication:
+
+```sh
+python3 scripts/release.py 1.3.3 --verify-published
+```
+
+This reads the unchanged local frozen binding, requires its tooling commit to be an
+ancestor of the current checkout, downloads and hashes all nine public assets,
+checks the exact public tag, verifies the archive/feed with only the source's pinned
+public key, and checks the canonical latest feed. It does not read the signing key,
+build, push, upload, promote, install, or rewrite the binding/publication receipt.
+It writes a separate local `published-verification.json` marked as read-only public
+verification, with its binding hash and verification-tool revision. It requires the
+original local release state; no private signing material is needed for recovery.
 
 Run `python3 scripts/test-release.py` to exercise the release command's offline
 preflight, feed and draft-publication failure boundaries.
