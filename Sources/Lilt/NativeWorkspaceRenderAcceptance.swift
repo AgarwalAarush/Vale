@@ -161,9 +161,12 @@ extension AppController {
         let collapsed = pressCompanionControl(in: panel, identifier: "vale.companion.collapse", label: "Collapse Vale")
         await settle(); applyHarnessCompanionLayout(panel)
         let collapsedPreserved = collapsed && !model.companionExpanded && model.draft == draft && input.selectedRange() == selection && abs(panel.frame.height - 45) < 1
-        let expanded = pressCompanionControl(in: panel, identifier: "vale.companion.expand", label: "Expand Vale")
+        // The owner removed the decorative app-icon expansion button. The
+        // actual Ready editor remains the primary pointer expansion surface.
+        panel.makeFirstResponder(input)
+        let expanded = pressCompanionControl(in: panel, identifier: "vale.companion.ready-input-center")
         await settle(); applyHarnessCompanionLayout(panel)
-        results["companionNativeCollapseExpandPreservesDraftSelectionAndEditor"] = collapsedPreserved && expanded && model.companionExpanded && model.draft == draft && input.selectedRange() == selection && panel.contentView.flatMap({ editor(in: $0) }) === input
+        results["companionNativeCollapseExpandPreservesDraftAndEditor"] = collapsedPreserved && expanded && model.companionExpanded && model.draft == draft && panel.contentView.flatMap({ editor(in: $0) }) === input
         // A long user question must not bury progress or the arriving answer.
         let longQuestion = (1...45).map { "Generated question paragraph \($0): explain the relationship between speed, work and kinetic energy while I read this textbook." }.joined(separator: "\n\n")
         model.draft = ""; model.updateActive { $0.messages = [Message(role: "user", text: longQuestion)] }
@@ -246,6 +249,7 @@ extension AppController {
         }
         results["companionUsesOneProductionPanel"] = panel is NSPanel && panel.styleMask.subtracting(.resizable).isEmpty && panel.toolbar == nil && NSApp.windows.filter { $0.isVisible && $0.identifier?.rawValue == "vale.workspace" }.count == 1
         try JSONSerialization.data(withJSONObject: ["method": "generated native production-panel state and software-injected native controls", "physicalInputVerified": false, "frames": frames, "controlEvents": CompanionControlProbeTrace.events], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("companion-state-transitions.json"), options: .atomic)
+        try await runOwnerReportedUIAcceptance(output: output, results: &results)
         model.draft = ""; model.updateActive { $0.messages = [] }; model.collapseCompanion()
         await settle(); applyHarnessCompanionLayout(panel)
     }

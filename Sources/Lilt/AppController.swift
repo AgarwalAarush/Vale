@@ -141,6 +141,7 @@ import LiltCore
         let fileItem = NSMenuItem(); main.addItem(fileItem); let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
         let newItem = NSMenuItem(title: "New chat", action: #selector(menuNew), keyEquivalent: "n"); newItem.target = self; fileMenu.addItem(newItem)
         let attachItem = NSMenuItem(title: "Attach files…", action: #selector(menuAttach), keyEquivalent: "a"); attachItem.keyEquivalentModifierMask = [.command, .shift]; attachItem.target = self; fileMenu.addItem(attachItem)
+        let shareItem = NSMenuItem(title: "Share a window…", action: #selector(menuShareWindow), keyEquivalent: "s"); shareItem.keyEquivalentModifierMask = [.command, .shift]; shareItem.target = self; fileMenu.addItem(shareItem)
         fileMenu.addItem(.separator())
         let closeItem = NSMenuItem(title: "Close window", action: #selector(menuClose), keyEquivalent: "w"); closeItem.target = self; fileMenu.addItem(closeItem)
         let editItem = NSMenuItem(); main.addItem(editItem); let editMenu = NSMenu(title: "Edit"); editItem.submenu = editMenu
@@ -233,11 +234,12 @@ import LiltCore
     @objc private func menuNew() { guard !nativeDialogOpen else { return }; model.newSession() }
     @objc private func menuUpdates() { guard !nativeDialogOpen, model.updates.canCheck else { return }; model.updates.check() }
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        let guardedActions = [#selector(menuNew), #selector(menuSettings), #selector(menuLibrary), #selector(menuPause), #selector(menuUpdates), #selector(menuWorkspace), #selector(menuClose), #selector(menuAttach), #selector(menuSidebar), #selector(menuDetails), #selector(menuBack)]
+        let guardedActions = [#selector(menuNew), #selector(menuSettings), #selector(menuLibrary), #selector(menuPause), #selector(menuUpdates), #selector(menuWorkspace), #selector(menuClose), #selector(menuAttach), #selector(menuShareWindow), #selector(menuSidebar), #selector(menuDetails), #selector(menuBack)]
         if nativeDialogOpen, let action = item.action, guardedActions.contains(action) { return false }
         if item.action == #selector(menuUpdates) { return model.updates.canCheck }
         if item.action == #selector(menuPause) { item.title = model.paused && model.active != nil ? "Resume" : "Pause chat"; return model.active != nil }
         if item.action == #selector(menuAttach) { return model.active != nil && !model.importing }
+        if item.action == #selector(menuShareWindow) { return model.active != nil && !model.paused }
         if item.action == #selector(menuDetails) { return model.active != nil }
         if item.action == #selector(menuBack) { return model.workspaceRoute != .chat || model.inspector != nil || model.compactHistoryVisible }
         return true
@@ -252,6 +254,11 @@ import LiltCore
     @objc private func menuWorkspace() { openWorkspace() }
     @objc private func menuLibrary() { guard !nativeDialogOpen else { return }; model.showHistory() }
     @objc private func menuAttach() { guard !nativeDialogOpen, model.active != nil, !model.importing else { return }; model.attachFiles() }
+    @objc private func menuShareWindow() {
+        guard !nativeDialogOpen, model.active != nil, !model.paused else { return }
+        model.commitComposer?()
+        model.context.choose()
+    }
     @objc private func menuSidebar() { guard !nativeDialogOpen else { return }; workspaceToolbar?.toggleSidebar() }
     @objc private func menuDetails() { guard !nativeDialogOpen, model.active != nil else { return }; workspaceToolbar?.toggleDetails() }
     @objc private func menuBack() { guard !nativeDialogOpen else { return }; model.backToChat() }

@@ -16,7 +16,7 @@ and the coordinator's earlier Lens recommendation.
 The three columns show successive Ready, Ask and Answer states of one panel.
 The textbook, desktop chrome, monitor bezel, example prose and equation are
 contextual illustrations, not shipped UI rasters or answer-correctness claims.
-Use native text, symbols and controls. Retain the canonical folded-ribbon V.
+Use native text, symbols and controls. The October20 14:32 owner report overrides the earlier in-panel icon direction: remove the raster V from Ready and expanded chrome. Retain the canonical app icon only for Dock/Finder/system identity.
 
 ## Product and composition
 
@@ -28,12 +28,12 @@ limited existing roles.
 
 | State | Native implementation |
 | --- | --- |
-| Ready | 300×45pt; V, editable Ask Vale…, microphone, overflow |
-| Ask | 320pt wide, at least188pt high; header, optional context/status/files, editor, plus/mic/send |
+| Ready | 300×45pt; editable Ask Vale…, microphone, overflow; no raster logo |
+| Ask | 320pt wide, content-led height; concise header, optional context/status/files, top-aligned native editor, plus/mic/send |
 | Answer | 350pt wide; latest exchange, measured reply viewport up to320pt, one-row connected follow-up composer |
 | History | 400×500pt in the same panel |
 | Files/notes/context | 460×540pt in the same panel |
-| Settings | 520×610pt in the same panel |
+| Settings | 380×520pt in the same panel, compact preference rows and on-demand details |
 | Bounds | Ordinary height capped650pt; visible-frame inset18pt; fixed composer above scrollable overflow |
 
 All sizes are logical AppKit points and implementation choices. Long content
@@ -50,7 +50,7 @@ auxiliary behavior; physical display/Space acceptance is separate.
 NativeCompanionMaterial wraps real NSGlassEffectView regular material on macOS26,
 using contentView for stable hosted content. On14/15 it uses active
 NSVisualEffectView popover material with behind-window blending. The window is
-transparent, rounded and uses a native shadow. Reduce Transparency supplies an
+transparent, rounded and uses a native shadow. One neutral legibility surface covers the full panel, including settings, with matched native/SwiftUI appearance and readable text over contrasting work. Do not add an outer border to imitate the OS glass edge. Reduce Transparency supplies an
 opaque semantic surface. Corners are22.5pt at rest and24pt expanded.
 
 Swift6.2.4 matches the installed Xcode26.2SDK. Explicitly override inherited
@@ -108,3 +108,7 @@ light/dark and keyboard recovery. Keep raster/injected-event evidence distinct
 from compositor, physical accessibility, real voice/screen consent, genuine
 ChatGPT, package/feed and target-laptop installation. Preview is not production
 readiness.
+
+## Owner defect reopening, October20 14:32
+
+The owner screenshots of1.3.3 reject washed-out Ready contrast, raster icon/vertical alignment, caret cutting through placeholder, excess empty Ask space, a translucent-header/solid-dark Settings split and verbose preferences. Placeholder must use actual native text geometry; preserved editor identity and typing behavior remain required. Attachment commands must be discoverable while typing: CmdShiftA files/images, native CmdV image paste, CmdShiftS explicit window chooser. Keep dialog guards and no automatic capture. Earlier preview visual acceptance does not close these defects.

@@ -11,7 +11,8 @@ enum Theme {
     }
     static let inkColor = adaptive(0x252629, 0xf0f0ed)
     static let ink = Color(nsColor: inkColor)
-    static let muted = Color(nsColor: adaptive(0x67686b, 0xb0b1b8))
+    static let mutedColor = adaptive(0x595b60, 0xc2c3c7)
+    static let muted = Color(nsColor: mutedColor)
     static let accentColor = adaptive(0x5759c6, 0xb9bcff)
     static let accent = Color(nsColor: accentColor)
     static let line = Color(nsColor: adaptive(0xddddd6, 0x363840))
@@ -24,6 +25,28 @@ enum Theme {
     static let action = Color(nsColor: adaptive(0x28292d, 0xecece8))
     static let onAction = Color(nsColor: adaptive(0xffffff, 0x252629))
     static let warning = Color(nsColor: adaptive(0x825010, 0xecc48a))
+    /// The continuous frosted reading plane is shared by every panel route.
+    /// Its high opacity bounds backdrop influence instead of asking pale text
+    /// to remain legible over arbitrary desktop content.
+    static let companionSurfaceColor = adaptive(0xf8f8f6, 0x202124)
+
+    static func resolved(_ color: NSColor, in appearance: NSAppearance) -> NSColor {
+        var result = color
+        appearance.performAsCurrentDrawingAppearance { result = color.usingColorSpace(.sRGB) ?? color }
+        return result
+    }
+}
+
+enum CompanionEditorMetrics {
+    static let readyFontSize: CGFloat = 13
+    static let expandedFontSize: CGFloat = 14
+    static let verticalInset: CGFloat = 5
+    static func lineHeight(fontSize: CGFloat) -> CGFloat {
+        ceil(NSLayoutManager().defaultLineHeight(for: .systemFont(ofSize: fontSize)))
+    }
+    static func minimumHeight(fontSize: CGFloat) -> CGFloat { lineHeight(fontSize: fontSize) + verticalInset * 2 }
+    static var readyHeight: CGFloat { minimumHeight(fontSize: readyFontSize) }
+    static var expandedHeight: CGFloat { minimumHeight(fontSize: expandedFontSize) }
 }
 struct QuietField: ViewModifier {
     func body(content: Content) -> some View {
@@ -107,6 +130,47 @@ final class ComposerClipView: NSClipView {
 }
 
 final class ComposerTextView: NSTextView {
+    var placeholder = "" { didSet { if placeholder != oldValue { needsDisplay = true } } }
+    private let placeholderStorage = NSTextStorage()
+    private let placeholderLayout = NSLayoutManager()
+    private let placeholderContainer = NSTextContainer()
+
+    override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+        super.init(frame: frameRect, textContainer: container)
+        placeholderStorage.addLayoutManager(placeholderLayout)
+        placeholderLayout.addTextContainer(placeholderContainer)
+    }
+    convenience init() { self.init(frame: .zero, textContainer: nil) }
+    required init?(coder: NSCoder) { nil }
+
+    /// TextKit draws both the placeholder and editable text from this origin.
+    /// No SwiftUI overlay attempts to approximate AppKit's baseline or insets.
+    var placeholderLayoutOrigin: NSPoint { textContainerOrigin }
+    var placeholderFirstGlyphRect: NSRect? {
+        guard preparePlaceholderLayout(), placeholderLayout.numberOfGlyphs > 0 else { return nil }
+        return placeholderLayout.boundingRect(forGlyphRange: NSRange(location: 0, length: 1), in: placeholderContainer)
+            .offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+    }
+    private func preparePlaceholderLayout() -> Bool {
+        guard string.isEmpty, !hasMarkedText(), !placeholder.isEmpty, let font, let textContainer else { return false }
+        placeholderContainer.containerSize = textContainer.containerSize
+        placeholderContainer.lineFragmentPadding = textContainer.lineFragmentPadding
+        placeholderContainer.maximumNumberOfLines = 1
+        placeholderContainer.lineBreakMode = .byTruncatingTail
+        placeholderStorage.setAttributedString(NSAttributedString(string: placeholder, attributes: [
+            .font: font, .foregroundColor: Theme.resolved(Theme.mutedColor, in: effectiveAppearance),
+            .paragraphStyle: defaultParagraphStyle ?? NSParagraphStyle.default
+        ]))
+        placeholderLayout.ensureLayout(for: placeholderContainer)
+        return true
+    }
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard preparePlaceholderLayout() else { return }
+        placeholderLayout.drawGlyphs(forGlyphRange: placeholderLayout.glyphRange(for: placeholderContainer), at: placeholderLayoutOrigin)
+    }
+    override func didChangeText() { super.didChangeText(); needsDisplay = true }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
     var submit: (() -> Void)?
     var escape: (() -> Void)?
     var pasteFiles: (([URL]) -> Void)?
@@ -243,6 +307,7 @@ struct DraftEditor: NSViewRepresentable {
     var draftID: UUID? = nil
     var focusToken: Int = 0
     var fontSize: CGFloat = 15
+    var placeholder = ""
     var ownsDraft: () -> Bool = { true }
     var permitsFocus: (NSWindow) -> Bool = { _ in true }
     var submit: () -> Void
@@ -264,8 +329,11 @@ struct DraftEditor: NSViewRepresentable {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         scroll.contentView = ComposerClipView()
         let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false; editor.allowsUndo = true
-        editor.font = .systemFont(ofSize: fontSize); editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
-        editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
+        editor.font = .systemFont(ofSize: fontSize); editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.inkColor
+        editor.placeholder = placeholder
+        editor.textContainerInset = NSSize(width: 0, height: CompanionEditorMetrics.verticalInset)
+        editor.textContainer?.lineFragmentPadding = 0
+        editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
         editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false; editor.isAutomaticTextReplacementEnabled = false
         editor.isAutomaticSpellingCorrectionEnabled = TypedText.correctsSpelling
@@ -294,7 +362,12 @@ struct DraftEditor: NSViewRepresentable {
         editor.resignIfCovered()
         editor.observeFocus()
         editor.font = .systemFont(ofSize: fontSize)
-        editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
+        editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.inkColor
+        editor.placeholder = placeholder
+        var attributes = editor.typingAttributes
+        attributes[.font] = editor.font
+        attributes[.foregroundColor] = Theme.inkColor
+        editor.typingAttributes = attributes
         editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         installCommit { [weak editor, weak coordinator = context.coordinator] in
             guard let editor, let coordinator, coordinator.draftID == coordinator.parent.draftID, coordinator.parent.ownsDraft() else { return }

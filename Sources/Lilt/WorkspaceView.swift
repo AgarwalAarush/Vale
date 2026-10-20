@@ -95,21 +95,25 @@ struct WorkspaceView: View {
     private var secondaryHeader: some View {
         VStack(spacing: 0) {
             HStack(spacing: 9) {
-                Button { model.backToChat() } label: { Label("Back to chat", systemImage: "chevron.left") }
+                Button { model.backToChat() } label: { Label("Back", systemImage: "chevron.left") }
                     .buttonStyle(ActionButton()).font(.system(size: 12, weight: .medium))
-                    .help("Return to your question").accessibilityIdentifier("vale.companion.back")
+                    .help("Return to your question").accessibilityLabel("Back to chat")
+                    .accessibilityIdentifier("vale.companion.back")
+                if model.workspaceRoute == .settings {
+                    Text("Settings").font(.system(size: 13, weight: .semibold))
+                }
                 Spacer(minLength: 0)
                 if model.busy || model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation || model.context.hasSelection {
                     Button("Stop", systemImage: "stop.fill") { model.stopInteraction() }
                         .buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.accent)
                 }
                 CompactOverflowMenu(model: model)
-            }.padding(.horizontal, 17).frame(height: 48)
+            }.padding(.horizontal, 18).frame(height: 44)
             if let status = model.importStatus {
                 AttachmentImportStatus(text: status).frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 17).padding(.bottom, 10)
             }
-        }.background(Theme.fillRaised.opacity(0.22))
+        }
     }
 
     private var navigation: some View {

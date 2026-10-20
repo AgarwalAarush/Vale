@@ -15,6 +15,11 @@ struct CompactCompanionView: View {
     private var expanded: Bool { model.companionExpanded }
     private var hasReply: Bool { model.active?.messages.isEmpty == false || model.busy || model.active?.guide != nil }
     private var voiceActive: Bool { model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
+    private var hasSupportingContent: Bool {
+        hasReply || model.context.hasSelection || model.error != nil || model.canRetry || model.paused || voiceActive ||
+        model.importStatus != nil || !model.pendingFiles.isEmpty || model.active?.mode == .learn ||
+        !account.permitsPlanUsage || ShortcutNotice.text(model.shortcutWarning) != nil
+    }
     private var sendReady: Bool { chatVisible && account.permitsPlanUsage && model.hasInput && !model.paused && model.active != nil && !model.importing }
     private var voiceStatus: String {
         if model.voice.starting { return "Starting microphone…" }
@@ -35,7 +40,7 @@ struct CompactCompanionView: View {
     }
     private func panel(availableHeight: CGFloat) -> some View {
         VStack(spacing: 0) {
-            header.frame(height: expanded ? 43 : 0).clipped().allowsHitTesting(expanded).accessibilityHidden(!expanded)
+            header.frame(height: expanded ? CompanionPresentation.headerHeight : 0).clipped().allowsHitTesting(expanded).accessibilityHidden(!expanded)
             ScrollView {
                 VStack(spacing: 0) {
                     if expanded {
@@ -64,12 +69,11 @@ struct CompactCompanionView: View {
                     }
                 }.frame(maxWidth: .infinity)
             }.scrollIndicators(.automatic)
-                .frame(maxHeight: expanded ? .infinity : 0)
-                .allowsHitTesting(expanded).accessibilityHidden(!expanded)
+                .frame(maxHeight: expanded && hasSupportingContent ? .infinity : 0)
+                .allowsHitTesting(expanded && hasSupportingContent).accessibilityHidden(!expanded || !hasSupportingContent)
             composer.fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Theme.fillRaised.opacity(0.16))
         .onChange(of: model.draft) { _, text in if !text.isEmpty && chatVisible { model.companionExpanded = true } }
         .onChange(of: model.busy) { _, busy in if busy { model.companionExpanded = true } }
         .onChange(of: model.pendingFiles.count) { _, count in if count > 0 && chatVisible { model.companionExpanded = true } }
@@ -86,7 +90,6 @@ struct CompactCompanionView: View {
     }
     private var header: some View {
         HStack(spacing: 9) {
-            LogoMark(size: 20)
             Text("Vale").font(.system(size: 12, weight: .medium))
             if model.active?.mode == .learn { Text("Learn").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.muted) }
             Spacer(minLength: 0)
@@ -154,23 +157,16 @@ struct CompactCompanionView: View {
     private var composer: some View {
         let draftID = model.activeID
         let inlineReply = expanded && hasReply && account.permitsPlanUsage
-        let editorHeight = expanded ? max(hasReply ? 36 : 70, min(110, model.companionInputHeight)) : 26
+        let editorHeight = expanded ? max(inlineReply ? 36 : CompanionEditorMetrics.expandedHeight, min(110, model.companionInputHeight)) : CompanionEditorMetrics.readyHeight
         return VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: inlineReply ? 5 : expanded ? 0 : 7) {
-                Button { model.expandCompanion() } label: { LogoMark(size: 19).frame(width: 24, height: 26) }
-                    .buttonStyle(ActionButton()).help("Expand Vale").accessibilityLabel("Expand Vale")
-                    .frame(width: expanded ? 0 : 24).opacity(expanded ? 0 : 1).clipped().allowsHitTesting(!expanded).accessibilityHidden(expanded)
-                attachmentMenu.frame(width: inlineReply ? 32 : 0).opacity(inlineReply ? 1 : 0).clipped()
-                    .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
-                micButton.frame(width: inlineReply ? 32 : 0).opacity(inlineReply ? 1 : 0).clipped()
-                    .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
+            HStack(alignment: .center, spacing: expanded && !inlineReply ? 0 : 6) {
+                if inlineReply { attachmentMenu; micButton }
                 ZStack(alignment: .topLeading) {
-                    if model.active != nil && model.draft.isEmpty { Text(expanded ? (hasReply ? "Ask a follow-up…" : "Ask Vale anything…") : "Ask Vale…").font(.system(size: expanded ? 14 : 12)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.leading, 2).padding(.top, 5).allowsHitTesting(false).accessibilityHidden(true) }
-                    DraftEditor(text: Binding(get: { model.draft }, set: { if model.activeID == draftID { model.editDraft($0) } }), draftID: draftID, focusToken: model.composerFocus, fontSize: expanded ? 14 : 12, ownsDraft: { model.activeID == draftID }, permitsFocus: { _ in model.active != nil && model.chatSurfaceVisible && chatVisible }, submit: {
+                    DraftEditor(text: Binding(get: { model.draft }, set: { if model.activeID == draftID { model.editDraft($0) } }), draftID: draftID, focusToken: model.composerFocus, fontSize: expanded ? CompanionEditorMetrics.expandedFontSize : CompanionEditorMetrics.readyFontSize, placeholder: model.active == nil ? "" : expanded ? (hasReply ? "Ask a follow-up…" : "Ask Vale anything…") : "Ask Vale…", ownsDraft: { model.activeID == draftID }, permitsFocus: { _ in model.active != nil && model.chatSurfaceVisible && chatVisible }, submit: {
                         if chatVisible && model.chatSurfaceVisible && account.permitsPlanUsage && ComposerReturn.sends(whileWaiting: model.busy) { model.companionExpanded = true; model.send() }
                     }, cancel: { if let escape = model.requestCompanionEscape { escape() } else { model.stopInteraction() } }, pasteFiles: { model.expandCompanion(); model.importDroppedFiles($0) }, pasteImage: { model.expandCompanion(); model.pasteImage($0) }, pastePDF: { model.expandCompanion(); model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { height in
                         guard chatVisible, model.chatSurfaceVisible else { return }
-                        let value = min(110, max(26, height)); if abs(model.companionInputHeight - value) > 1 { model.companionInputHeight = value }
+                        let value = min(110, max(CompanionEditorMetrics.readyHeight, height)); if abs(model.companionInputHeight - value) > 1 { model.companionInputHeight = value }
                     }, onPointerInteraction: {
                         guard chatVisible, model.chatSurfaceVisible, model.activeID == draftID else { return }
                         model.companionExpanded = true
@@ -179,18 +175,19 @@ struct CompactCompanionView: View {
                     .allowsHitTesting(model.active != nil).accessibilityHidden(model.active == nil)
                     if model.active == nil {
                         Button { model.newSession(); model.expandCompanion() } label: {
-                            Text("Ask Vale…").font(.system(size: expanded ? 14 : 12)).foregroundStyle(Theme.muted)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(.top, 5).padding(.leading, 2)
+                            Text("Ask Vale…").font(.system(size: expanded ? CompanionEditorMetrics.expandedFontSize : CompanionEditorMetrics.readyFontSize)).foregroundStyle(Theme.muted)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         }.buttonStyle(.plain).accessibilityLabel("Start a new chat")
                     }
                 }.frame(height: editorHeight)
                     .padding(.horizontal, inlineReply ? 7 : 0)
                     .background(inlineReply ? Theme.fillRaised.opacity(0.3) : .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                micButton.frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().allowsHitTesting(!expanded).accessibilityHidden(expanded)
-                CompactOverflowMenu(model: model).frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().allowsHitTesting(!expanded).accessibilityHidden(expanded)
-                submitButton.frame(width: inlineReply ? 34 : 0).opacity(inlineReply ? 1 : 0).clipped()
-                    .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
+                if !expanded {
+                    micButton.frame(width: 28, height: CompanionEditorMetrics.readyHeight)
+                    CompactOverflowMenu(model: model).frame(width: 28, height: CompanionEditorMetrics.readyHeight)
+                }
+                if inlineReply { submitButton }
             }
             HStack(spacing: 8) {
                 attachmentMenu
@@ -198,14 +195,15 @@ struct CompactCompanionView: View {
                 if model.active?.webEnabled == true { Image(systemName: "globe").font(.system(size: 11)).foregroundStyle(Theme.accent).help("Web search on").accessibilityLabel("Web search on") }
                 Spacer(minLength: 3)
                 submitButton
-            }.frame(height: expanded && !inlineReply ? 43 : 0).opacity(expanded && !inlineReply ? 1 : 0).clipped()
+            }.frame(height: expanded && !inlineReply ? CompanionPresentation.toolsHeight : 0).opacity(expanded && !inlineReply ? 1 : 0).clipped()
                 .allowsHitTesting(expanded && !inlineReply).accessibilityHidden(!expanded || inlineReply)
-        }.padding(.horizontal, expanded ? 16 : 11).padding(.top, expanded ? 0 : 9.5).padding(.bottom, expanded ? 8 : 9.5)
+        }.padding(.horizontal, expanded ? 16 : 15).padding(.bottom, expanded ? CompanionPresentation.composerBottomInset : 0)
+            .frame(height: expanded ? nil : CompanionPresentation.idleSize.height, alignment: .center)
     }
     private var attachmentMenu: some View {
         Menu {
-            Button("Attach files…", systemImage: "paperclip") { model.attachFiles() }.disabled(model.importing)
-            Button("Share a window…", systemImage: "macwindow") { model.context.choose() }.disabled(model.paused)
+            Button("Attach files or images…  ⇧⌘A", systemImage: "paperclip") { model.attachFiles() }.disabled(model.importing)
+            Button("Share a window…  ⇧⌘S", systemImage: "macwindow") { model.context.choose() }.disabled(model.paused)
             if model.context.hasSelection {
                 Button("Preview shared window") { model.previewContext() }.disabled(model.context.preview == nil)
                 Toggle("Live locally", isOn: Binding(get: { model.context.live }, set: { if $0 { model.context.startLive() } else { model.context.stopLive() } })).disabled(model.paused)
@@ -216,16 +214,17 @@ struct CompactCompanionView: View {
         } label: {
             Label("Add context", systemImage: "plus").labelStyle(.iconOnly).font(.system(size: 15, weight: .regular)).frame(width: 32, height: 32)
                 .background(Theme.fill.opacity(0.65)).clipShape(Circle())
-        }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Attach files, share a window, or enable Web")
+        }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .help("Attach files or images (⇧⌘A), share a window (⇧⌘S), or paste an image (⌘V)")
     }
     private var micButton: some View {
         Button {
             model.expandCompanion(); model.toggleVoice()
         } label: {
             Label(model.voice.listening ? "Finish speaking" : model.voice.speaking || model.voice.starting ? "Stop voice" : "Dictate a question", systemImage: model.voice.listening ? "stop.fill" : "mic")
-                .labelStyle(.iconOnly).font(.system(size: expanded ? 14 : 12, weight: .regular))
+                .labelStyle(.iconOnly).font(.system(size: expanded ? 14 : 13, weight: .regular))
                 .foregroundStyle(voiceActive ? Theme.accent : Theme.ink)
-                .frame(width: expanded ? 32 : 25, height: expanded ? 32 : 26)
+                .frame(width: expanded ? 32 : 28, height: expanded ? 32 : CompanionEditorMetrics.readyHeight)
                 .background(expanded ? Theme.fill.opacity(0.65) : .clear).clipShape(Circle())
         }.buttonStyle(ActionButton()).disabled(model.active == nil || model.paused || !account.permitsPlanUsage)
             .help(model.voice.listening ? "Finish speaking and send" : "Dictate one question")

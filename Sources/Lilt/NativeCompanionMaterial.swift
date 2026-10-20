@@ -62,8 +62,16 @@ import AppKit
     }
     func refreshAccessibility() {
         let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-        solidSurface.isHidden = !reduce
-        solidSurface.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        let contrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        // One neutral reading plane behind *all* routes bounds the amount of
+        // desktop color that can enter the glass. Keep the native edge/effect;
+        // never add a second panel stroke to imitate it.
+        let color = Theme.resolved(Theme.companionSurfaceColor, in: effectiveAppearance)
+        solidSurface.isHidden = false
+        solidSurface.layer?.backgroundColor = color.withAlphaComponent(reduce || contrast ? 1 : 0.90).cgColor
+        if #available(macOS 26, *), let glass = effect as? NSGlassEffectView {
+            glass.tintColor = color.withAlphaComponent(0.08)
+        }
         if let material = effect as? NSVisualEffectView { material.state = reduce ? .inactive : .active }
         needsDisplay = true
     }

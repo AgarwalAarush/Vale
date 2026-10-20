@@ -24,7 +24,7 @@ Preserve legacy bundleID local.lilt.companion, store, chats, drafts, attachments
 
 ## Brand commitments
 
-Vale name and canonical folded-ribbon V artwork remain. The owner requests exceptional native craft and a Liquid Glass look, informed by the supplied Refero/Uiarc references and Freya/Stratum density. Both the old two-window appearance and the large workspace are anti-references. The latest request explicitly chooses generated visual mockups before further implementation; this supersedes the earlier code-first choice. See [compact companion exploration](docs/design/compact-companion-2026-10-20/README.md).
+Vale name and canonical folded-ribbon V artwork remain for app/system identity. The latest owner defect report removes the raster icon from the compact panel itself. The owner requests exceptional native craft and a Liquid Glass look, informed by the supplied Refero/Uiarc references and Freya/Stratum density. Both the old two-window appearance and the large workspace are anti-references. The latest request explicitly chooses generated visual mockups before further implementation; this supersedes the earlier code-first choice. See [compact companion exploration](docs/design/compact-companion-2026-10-20/README.md).
 
 ## Evidence on hand
 
@@ -44,4 +44,4 @@ Preserve native keyboard/IME/undo behavior, readable semantic colors, labeled co
 
 ## Open decisions
 
-The owner selected the Pearl Glass Ready→Ask→Answer mockup on 2026-10-20. Implement its compact topology and hierarchy with native text/material and a coherent dark appearance. Generated images do not prove native material rendering or measured dimensions. Publication remains authorized in the broader task. Fresh native, package and delivery evidence is recorded in the current Factory round; prior preview evidence does not approve the compact rebuild. Preserve protected signing-key custody. Direct ChatGPT consent/inference, compact native visual/interaction acceptance and target-laptop installation remain separate milestones.
+The owner selected the Pearl Glass Ready→Ask→Answer mockup on 2026-10-20. Implement its compact topology and hierarchy with native text/material and one coherent appearance that honors System, Light and Dark preferences. The October20 owner screenshots reopen contrast, caret, layout and Settings acceptance. Generated images do not prove native material rendering or measured dimensions. Publication remains authorized in the broader task. Fresh native, package and delivery evidence is recorded in the current Factory round; prior preview evidence does not approve the compact rebuild. Preserve protected signing-key custody. Direct ChatGPT consent/inference, compact native visual/interaction acceptance and target-laptop installation remain separate milestones.
