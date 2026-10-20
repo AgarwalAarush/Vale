@@ -175,7 +175,7 @@ extension AppController {
     private func ownerUIEditor(in root: NSView?) -> ComposerTextView? {
         guard let root else { return nil }
         if let editor = root as? ComposerTextView { return editor }
-        return root.subviews.lazy.compactMap { ownerUIEditor(in: $0) }.first
+        return root.subviews.lazy.compactMap { self.ownerUIEditor(in: $0) }.first
     }
     private func ownerUICaretRect(_ editor: ComposerTextView, in window: NSWindow) -> NSRect? {
         var actual = NSRange(location: NSNotFound, length: 0)

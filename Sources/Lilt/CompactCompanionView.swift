@@ -182,7 +182,7 @@ struct CompactCompanionView: View {
                 }.frame(height: editorHeight)
                     .padding(.horizontal, inlineReply ? 7 : 0)
                     .background(inlineReply ? Theme.fillRaised.opacity(0.3) : .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: inlineReply ? 18 : 0, style: .continuous))
                 if !expanded {
                     micButton.frame(width: 28, height: CompanionEditorMetrics.readyHeight)
                     CompactOverflowMenu(model: model).frame(width: 28, height: CompanionEditorMetrics.readyHeight)
