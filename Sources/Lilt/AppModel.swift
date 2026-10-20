@@ -217,6 +217,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         cancel();voice.stopListening();error=nil;busy=true;sentAt=Date()
         let id=UUID();requestID=id;let chatID=chat.id
         let previousTitle = chat.title
+        let previousRetryQuestion = retry ? chat.messages.last : nil
         if !retry {
             let naming = stored.isEmpty ? (chat.pendingAttachments.first?.name ?? "") : stored
             chat.messages.append(Message(role:"user",text:stored,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
@@ -227,7 +228,12 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
         guard persist() else {
             busy = false
-            if !retry {
+            if retry, let previousRetryQuestion, previousRetryQuestion.role == "user" {
+                // A failed save must not erase the persisted recovery signal before any request exists.
+                updateActive { chat in
+                    if let index = chat.messages.firstIndex(where: { $0.id == previousRetryQuestion.id }) { chat.messages[index] = previousRetryQuestion }
+                }
+            } else if !retry {
                 let restored = SendSave.restore(previousTitle: previousTitle, messages: active?.messages ?? [], pending: active?.pendingAttachments ?? [], question: stored, draft: composerBeforeSend)
                 updateActive { $0.title = restored.title; $0.messages = restored.messages; $0.pendingAttachments = restored.pending; $0.draft = restored.draft }
                 loading = true; draft = restored.draft; loading = false

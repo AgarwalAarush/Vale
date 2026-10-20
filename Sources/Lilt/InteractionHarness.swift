@@ -134,8 +134,8 @@ extension AppController {
         denied.delete(id);results["fixture_forgetFailureKeepsRetryableChat"]=denied.sessions.contains{$0.id==id} && denied.error != nil
         denied.selectedID=id
         let originalContent = workspace.contentView
-        let host = NSHostingView(rootView: WorkspaceView(model: denied)); host.sizingOptions = []; host.autoresizingMask = [.width, .height]
-        workspace.contentView = host; workspace.setContentSize(NSSize(width: 1040, height: 740))
+        workspace.contentView = NativeWorkspaceWindow.contentContainer(for: WorkspaceView(model: denied), size: NSSize(width: 1040, height: 740))
+        workspace.setContentSize(NSSize(width: 1040, height: 740))
         await settle();try snapshot(workspace,to:output.appendingPathComponent("22-deletion-error.png"))
         fault.recover();denied.delete(id);results["fixture_retryForgetRemovesBytesAndChat"]=denied.sessions.isEmpty && denied.fileStore?.image(for:record)==nil && denied.error==nil
         await settle();try snapshot(workspace,to:output.appendingPathComponent("23-forget-recovered.png"));workspace.contentView = originalContent

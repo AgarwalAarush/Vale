@@ -134,7 +134,7 @@ All dimensions below are logical AppKit points and source choices, not Apple req
 | Element | Implemented rule |
 | --- | --- |
 | Initial content | 1040 × 740 pt; native frame autosave when enabled |
-| Minimum window | NSWindow.minSize 740 × 560 pt; a frame constraint, not guaranteed content size |
+| Minimum window | At least 740 × 560 pt frame; AppKit-owned content container and an instance-converted contentMinSize preserve the floor. Effective minimum includes native toolbar metrics and is recorded from the actual window. |
 | History | 200 pt when visible and content width is at least 860 pt; otherwise history replaces chat on request |
 | Details | 320 pt inline only if at least 560 pt of chat remains after visible history and 1 pt dividers; otherwise details replace chat |
 | Combined inline thresholds | At least 1082 pt content with history; at least 881 pt without history, derived from the remaining-space rule |
@@ -142,7 +142,7 @@ All dimensions below are logical AppKit points and source choices, not Apple req
 | Transcript spacing | 24 pt between messages, 24 pt top and 20 pt bottom insets |
 | Composer editor | Measured NSTextView content height clamped to 28–140 pt, then native vertical scrolling; excludes shell padding/tool rows |
 
-One real NSWindow owns standard traffic lights, title, drag, resize and full-screen behavior. A compact unified NSToolbar supplies history, new chat, mode, details and actions; AppKit owns overflow/menu tracking. Content adds no second toolbar or blank titlebar spacer. The title identifies the task or covered route, with an accessible Vale-qualified title.
+One real NSWindow owns standard traffic lights, title, drag, resize and full-screen behavior. An AppKit NSView contains the stable autoresizing NSHostingView with sizingOptions=[] so the hosting view does not own the window's minimum constraint. The minimum content size is derived after chrome/content setup using the window instance's contentRect(forFrameRect:); minimum capture uses setContentSize(contentMinSize) and compares the result with instance frameRect(forContentRect:). Apple documents [top-level hosting size propagation](https://developer.apple.com/documentation/swiftui/nshostingview/sizingoptions), [contentMinSize precedence and enforcement](https://developer.apple.com/documentation/appkit/nswindow/contentminsize), and [toolbar-aware frame conversion](https://developer.apple.com/documentation/appkit/nswindow/framerect(forcontentrect:)). A compact unified NSToolbar supplies history, new chat, mode, details and actions; AppKit owns overflow/menu tracking. Content adds no second toolbar or blank titlebar spacer. The title identifies the task or covered route, with an accessible Vale-qualified title.
 
 The composer remains mounted across empty/populated, history, settings and details routes. When covered it is hidden from hit testing/accessibility and relinquishes its own first responder after committing marked text. Focus restoration checks live layout, draft identity, visible window and modal/sheet state. Its border reflects actual editor focus only while chat is visible. Back returns to the originating task. Test combined panels, not isolated thresholds.
 

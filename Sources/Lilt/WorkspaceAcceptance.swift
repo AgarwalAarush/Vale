@@ -10,6 +10,7 @@ extension AppController {
         let initialWindow = workspace.windowNumber
         let savedFrame = workspace.frame
         let savedAppearance = workspace.appearance
+        var settledMinimumChecks: [Bool] = []
         defer { workspace.appearance = savedAppearance; workspace.setFrame(savedFrame, display: true) }
         func composer(in view: NSView) -> ComposerTextView? {
             if let value = view as? ComposerTextView { return value }
@@ -32,16 +33,18 @@ extension AppController {
         model.sidebarVisible = true; model.compactHistoryVisible = false
         openWorkspace()
         try await capture("workspace-01-empty-light")
+        settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
         results["workspaceOneWindowAtLaunch"] = oneWorkspace()
         results["workspaceUsesNativeCompactToolbar"] = workspace.toolbar != nil && workspace.toolbarStyle == .unifiedCompact
         let emptyEditor = workspace.contentView.flatMap { composer(in: $0) }
         workspace.appearance = NSAppearance(named: .darkAqua)
         try await capture("workspace-01b-empty-dark")
-        workspace.setFrame(NSRect(origin: workspace.frame.origin, size: workspace.minSize), display: true)
-        results["workspaceMinimumDarkUsesProductionFrameConstraint"] = workspace.frame.size == workspace.minSize
+        workspace.setContentSize(workspace.contentMinSize)
         try await capture("workspace-01c-empty-minimum-dark")
+        results["workspaceMinimumDarkUsesProductionFrameConstraint"] = workspaceMinimumIsValid(workspace, atMinimum: true)
         workspace.appearance = NSAppearance(named: .aqua)
         try await capture("workspace-01d-empty-minimum-light")
+        results["workspaceMinimumLightUsesProductionFrameConstraint"] = workspaceMinimumIsValid(workspace, atMinimum: true)
         workspace.appearance = NSAppearance(named: .aqua)
         workspace.setContentSize(NSSize(width: 1040, height: 740))
 
@@ -96,6 +99,7 @@ extension AppController {
         model.stopInteraction(); await settle()
         results["workspaceStopFromCoveredChatClearsActivityAndKeepsDraft"] = model.workspaceRoute == .settings && !model.conversation && !model.voice.listening && !model.context.hasSelection && model.draft == savedDraft
         model.backToChat(); await settle()
+        settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
         results["workspaceComposerObservationTracksFocusAndCoveredRoute"] = observesFocusedEditor && observesCoveredEditor && editor.observedFocus && workspace.firstResponder === editor
         results["workspaceBackRestoresComposerSelection"] = model.activeID == originalID && model.draft == savedDraft && editor.selectedRange() == selection && workspace.firstResponder === editor
 
@@ -158,9 +162,9 @@ extension AppController {
         model.openSettings(); try await capture("workspace-09-settings-dark")
         model.backToChat()
         workspace.appearance = NSAppearance(named: .aqua)
-        workspace.setFrame(NSRect(origin: workspace.frame.origin, size: workspace.minSize), display: true); model.compactHistoryVisible = false
-        results["workspaceMinimumConversationUsesProductionFrameConstraint"] = workspace.frame.size == workspace.minSize
+        workspace.setContentSize(workspace.contentMinSize); model.compactHistoryVisible = false
         try await capture("workspace-10-compact-chat")
+        results["workspaceMinimumConversationUsesProductionFrameConstraint"] = workspaceMinimumIsValid(workspace, atMinimum: true)
         model.showInspector(.notes); try await capture("workspace-11-compact-notes")
         results["workspaceCompactInspectorKeepsWindowIdentity"] = oneWorkspace() && model.draft == composedDraft && model.inspector == .notes
         model.showInspector(.files); model.showHistory(); await settle()
@@ -193,6 +197,7 @@ extension AppController {
         workspace.performClose(nil); await settle()
         results["workspaceCloseStopsTransientActivityAndPreservesDraft"] = !workspace.isVisible && !model.voice.listening && !model.voice.speaking && !model.context.hasSelection && model.draft == composedDraft
         openWorkspace(); await settle()
+        settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
         results["workspaceReopenKeepsTypingAndOneWindow"] = oneWorkspace() && model.activeID == originalID && model.draft == composedDraft && (!readyBeforeClose || !model.paused) && !model.voice.listening && !model.context.hasSelection
         let loaded = try SessionStore(directory: output.appendingPathComponent("test-library")).load().first(where: { $0.id == originalID })
         results["workspaceNavigationPersistsDraftNotesAndFiles"] = loaded?.draft == composedDraft && loaded?.pendingAttachments.map(\.id) == pendingIDs && loaded?.takeaway.contains("HARBOR-73") == true
@@ -202,6 +207,9 @@ extension AppController {
         await runNativeUndoAcceptance(editor: editor, results: &results)
         try runClosedChatInputAcceptance(output: output, results: &results)
         try await runChatGPTSettingsVisualAcceptance(output: output)
+        await settle()
+        settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
+        results["workspaceMinimumConstraintsSurviveSettledRoutesAndFixtureRestoration"] = settledMinimumChecks.allSatisfy { $0 }
         try await runChatGPTWorkspaceVisualAcceptance(output: output, results: &results)
         try await runImportFeedbackAcceptance(output: output, results: &results)
     }
@@ -213,6 +221,7 @@ extension AppController {
     func runChatGPTWorkspaceVisualAcceptance(output: URL, results: inout [String: Bool]) async throws {
         workspace.orderOut(nil)
         defer { workspace.makeKeyAndOrderFront(nil) }
+        var settledMinimumChecks: [Bool] = []
         for (granted, identityPending) in [(true, false), (false, false), (true, true)] {
             let account = try await ChatGPTAccountChecks.makeSettingsFixture(planGranted: granted, identityPending: identityPending)
             let fixture = try AppModel(testingAccount: account, dataDirectory: output.appendingPathComponent("workspace-account-layout-\(granted)-\(identityPending)-fixture"))
@@ -234,13 +243,13 @@ extension AppController {
                 try snapshot(window, to: output.appendingPathComponent("workspace-full-\(state)-\(dark ? "dark" : "light")-generated-account.png"), provenance: .generatedHarness(account: account))
             }
             if identityPending {
-                window.setFrame(NSRect(origin: window.frame.origin, size: window.minSize), display: true)
+                window.setContentSize(window.contentMinSize)
                 for dark in [false, true] {
                     window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                     await settle()
                     try snapshot(window, to: output.appendingPathComponent("workspace-full-retry-connection-minimum-\(dark ? "dark" : "light")-generated-account.png"), provenance: .generatedHarness(account: account))
                 }
-                results["workspaceRetryConnectionUsesTrueMinimumFrame"] = window.frame.size == window.minSize && account.needsIdentityValidation && !account.permitsPlanUsage
+                results["workspaceRetryConnectionUsesTrueMinimumFrame"] = workspaceMinimumIsValid(window, atMinimum: true) && account.needsIdentityValidation && !account.permitsPlanUsage
             }
             if granted && !identityPending {
                 try runCaptureProvenanceAcceptance(window: window, account: account, output: output, results: &results)
@@ -305,7 +314,10 @@ extension AppController {
                     results["workspaceSidebarCoverCommitsMarkedTextAndRejectsHiddenKeys"] = false
                 }
             }
+            await settle()
+            settledMinimumChecks.append(workspaceMinimumIsValid(window))
         }
+        results["workspaceGeneratedAccountWindowsKeepPositiveSettledMinimum"] = settledMinimumChecks.allSatisfy { $0 }
     }
 }
 
@@ -329,7 +341,7 @@ extension AppController {
                     ChatGPTAccountSettings(account: account)
                 }.padding(32).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }.background(Theme.background).foregroundStyle(Theme.ink)
-            workspace.contentView = NSHostingView(rootView: content)
+            workspace.contentView = NativeWorkspaceWindow.contentContainer(for: content, size: workspace.contentView?.bounds.size ?? NSSize(width: 740, height: 650))
             for dark in [false, true] {
                 workspace.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                 await settle()
@@ -515,13 +527,32 @@ extension AppController {
         await settle()
         results["workspaceFailedQuestionRetryVisibleEnabledAfterRelaunch"] = !restored.hasFailedQuestion && restored.canRetry && restored.retryEnabled && restored.activeID == failedChatID && restored.active?.messages.last?.id == questionID
         try snapshot(restoredWindow, to: output.appendingPathComponent("workspace-restored-failed-retry-relaunch-dark-generated-account.png"), provenance: .generatedHarness(account: account))
-        var retriedImages = 0
-        restored.provider.fixtureReply = { _, images, _, complete in retriedImages = images.count; complete(.success(TutorReply(text: "Generated attachment retry answer."))) }
+        var retriedImages = 0, retryCalls = 0
+        restored.provider.fixtureReply = { _, images, _, complete in retryCalls += 1; retriedImages = images.count; complete(.success(TutorReply(text: "Generated attachment retry answer."))) }
+        let storeFile = directory.appendingPathComponent("sessions.json")
+        let savedStore = try Data(contentsOf: storeFile)
+        let originalQuestion = restored.active?.messages.last
+        var storeFaultActive = true
+        defer {
+            if storeFaultActive { try? FileManager.default.removeItem(at: storeFile); try? savedStore.write(to: storeFile, options: .atomic) }
+        }
+        try FileManager.default.removeItem(at: storeFile)
+        try FileManager.default.createDirectory(at: storeFile, withIntermediateDirectories: false)
+        if restored.retryEnabled { restored.retry() }
+        await settle()
+        let keptDuringFault = originalQuestion?.answerFailed == true && originalQuestion?.id == questionID && !restored.busy && retryCalls == 0 && !restored.hasFailedQuestion && restored.canRetry && restored.retryEnabled && restored.error != nil && restored.active?.messages.last?.id == originalQuestion?.id && restored.active?.messages.last?.answerFailed == originalQuestion?.answerFailed && restored.active?.messages.last?.replyStopped == originalQuestion?.replyStopped && restored.active?.messages.filter { $0.role == "user" }.count == 1 && restored.draft == "Keep this newer unsent draft." && restored.pendingFiles.map(\.id) == pendingIDs
+        try FileManager.default.removeItem(at: storeFile)
+        try savedStore.write(to: storeFile, options: .atomic); storeFaultActive = false
+        let recoveredSave = restored.persist()
+        let recoveredQuestion = try SessionStore(directory: directory).load().first { $0.id == failedChatID }?.messages.last
+        let keptPendingBytes = try restored.pendingFiles.map { try Data(contentsOf: restored.fileStore!.url(for: $0)) }
+        results["workspaceRestoredRetrySaveFailureKeepsVisibleRecoveryAndOwnership"] = keptDuringFault && recoveredSave && recoveredQuestion?.id == questionID && recoveredQuestion?.answerFailed == true && restored.canRetry && restored.retryEnabled && retryCalls == 0 && keptPendingBytes == pendingBytes
+        try snapshot(restoredWindow, to: output.appendingPathComponent("workspace-restored-failed-retry-save-recovered-dark-generated-account.png"), provenance: .generatedHarness(account: account))
         // The rendered Retry message uses this exact enabled gate and action.
         if restored.retryEnabled { restored.retry() }
         await until { !restored.busy }
         let retainedPendingBytes = try restored.pendingFiles.map { try Data(contentsOf: restored.fileStore!.url(for: $0)) }
-        results["cursorSavedAttachmentOnlyRetryUsesOriginalFiles"] = restored.active?.messages.last?.text == "Generated attachment retry answer." && restored.active?.messages.filter { $0.role == "user" }.count == 1 && restored.active?.messages.first?.id == questionID && restored.active?.messages.first?.answerFailed == false && restored.active?.messages.first?.attachments.count == 1 && retriedImages == 1 && restored.draft == "Keep this newer unsent draft." && restored.pendingFiles.map(\.id) == pendingIDs && retainedPendingBytes == pendingBytes && !restored.canRetry
+        results["cursorSavedAttachmentOnlyRetryUsesOriginalFiles"] = restored.active?.messages.last?.text == "Generated attachment retry answer." && restored.active?.messages.filter { $0.role == "user" }.count == 1 && restored.active?.messages.first?.id == questionID && restored.active?.messages.first?.answerFailed == false && restored.active?.messages.first?.attachments.count == 1 && retryCalls == 1 && retriedImages == 1 && restored.draft == "Keep this newer unsent draft." && restored.pendingFiles.map(\.id) == pendingIDs && retainedPendingBytes == pendingBytes && !restored.canRetry
         restoredWindow.orderOut(nil)
 
         restored.newSession(title: "Generated stale-answer refresh")
@@ -638,9 +669,9 @@ extension AppController {
         let ownerDraft = "Owner draft stays editable. More while adding files."
         results["workspaceImportProgressKeepsNativeDraftingAvailable"] = fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files…" && fixture.pendingFiles.isEmpty && fixture.draft == ownerDraft && window.firstResponder === window.contentView.flatMap({ editor(in: $0) })
         window.appearance = NSAppearance(named: .darkAqua)
-        window.setFrame(NSRect(origin: window.frame.origin, size: window.minSize), display: true)
+        window.setContentSize(window.contentMinSize)
         try await capture("workspace-import-minimum-dark-generated-account")
-        results["workspaceImportStatusUsesTrueMinimumFrame"] = window.frame.size == window.minSize
+        results["workspaceImportStatusUsesTrueMinimumFrame"] = workspaceMinimumIsValid(window, atMinimum: true)
         window.setContentSize(NSSize(width: 1040, height: 740))
         fixture.showInspector(.files)
         try await capture("workspace-import-files-dark-generated-account")
@@ -676,5 +707,22 @@ extension AppController {
         results["workspaceAsyncImportFailureReplacesProgressWithoutMovingFilesOrDraft"] = !fixture.importing && fixture.importOwnerID == nil && fixture.importStatus == nil && fixture.error?.contains("generated-missing-file.txt") == true && fixture.activeID == otherID && fixture.pendingFiles.isEmpty && fixture.draft == "Other chat draft stays here." && fixture.sessions.first(where: { $0.id == ownerID })?.pendingAttachments.map(\.id) == ownerRecords.map(\.id)
         fixture.backToChat(); window.appearance = NSAppearance(named: .darkAqua)
         try await capture("workspace-import-failure-dark-generated-account")
+    }
+}
+
+extension AppController {
+    /// Compare against the independent product floor and toolbar-aware geometry, not minSize alone.
+    func workspaceMinimumIsValid(_ window: NSWindow, atMinimum: Bool = false) -> Bool {
+        let floor = NativeWorkspaceWindow.minimumFrameSize
+        let minimumContent = window.contentMinSize
+        let expectedFrame = window.frameRect(forContentRect: NSRect(origin: .zero, size: minimumContent)).size
+        let values = [minimumContent.width, minimumContent.height, expectedFrame.width, expectedFrame.height, window.minSize.width, window.minSize.height]
+        guard values.allSatisfy({ $0.isFinite && $0 > 0 }),
+              floor.width >= 740, floor.height >= 560,
+              window.minSize.width >= floor.width, window.minSize.height >= floor.height,
+              expectedFrame.width >= floor.width, expectedFrame.height >= floor.height else { return false }
+        guard atMinimum else { return true }
+        guard let actualContent = window.contentView?.bounds.size else { return false }
+        return abs(actualContent.width - minimumContent.width) < 1 && abs(actualContent.height - minimumContent.height) < 1 && abs(window.frame.width - expectedFrame.width) < 1 && abs(window.frame.height - expectedFrame.height) < 1 && window.frame.width >= 740 && window.frame.height >= 560
     }
 }
