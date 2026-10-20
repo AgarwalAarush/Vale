@@ -73,7 +73,12 @@ struct CoachView: View {
                     HStack {
                         Text(model.status).font(.system(size: 12)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                         Spacer()
-                        Button { model.setConversation(!model.conversation) } label: { Label(ConversationControl.title(on: model.conversation), systemImage: model.conversation ? "waveform.circle.fill" : "waveform.circle") }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted).disabled(model.paused).help("Opt in to spoken turn-taking. Escape stops voice and sharing.")
+                        Button { model.setConversation(!model.conversation) } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: model.conversation ? "waveform.circle.fill" : "waveform.circle").symbolRenderingMode(.monochrome).foregroundStyle(model.conversation ? Theme.accent : Theme.muted)
+                                Text(ConversationControl.title(on: model.conversation))
+                            }
+                        }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted).disabled(model.paused).help("Opt in to spoken turn-taking. Escape stops voice and sharing.")
                     }.padding(.horizontal, 2)
                 }
             }.fixedSize(horizontal: false, vertical: true).layoutPriority(1).padding(.horizontal, 32).padding(.bottom, 22).frame(maxWidth: 740).frame(maxWidth: .infinity)
@@ -151,9 +156,7 @@ private struct CoachMessage: View {
                 if message.role == "assistant" { ReplyTools(model: model, message: message) }
             }.frame(maxWidth: .infinity, alignment: .leading).layoutPriority(1)
                 .padding(message.role == "user" ? 12 : 0)
-                .padding(.leading, ReplyTurn.ruled(message.role) ? ReplyTurn.inset : 0)
                 .background(message.role == "user" ? Theme.fill : .clear)
-                .overlay(alignment: .leading) { if ReplyTurn.ruled(message.role) { RoundedRectangle(cornerRadius: 1.5).fill(Theme.accent.opacity(0.8)).frame(width: ReplyTurn.ruleWidth) } }
                 .clipExchange(ReplyControls.clips(message.role))
         }
     }
@@ -164,7 +167,7 @@ struct MessageHeading: View {
     var body: some View {
         HStack(spacing: 6) {
             if ReplySpeaker.showsMark(for: message.role) { Image(systemName: "sparkle").font(.system(size: 8)).foregroundStyle(Theme.accent) }
-            Text(message.role == "user" ? "You" : ReplySpeaker.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.muted)
+            Text(message.role == "user" ? "You" : ReplySpeaker.name.localizedCapitalized).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.muted)
             if ReplyClock.shows(on: message.role) { Text(ReplyClock.label(for: message.date, now: Date())).font(.system(size: 9)).foregroundStyle(Theme.muted) }
         }
     }
@@ -207,7 +210,12 @@ private struct ReplyTools: View {
         HStack(spacing: 16) {
             Button {
                 if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
-            } label: { Label(ReplyPlayback.label(reading: reading), systemImage: ReplyPlayback.symbol(reading: reading)) }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: ReplyPlayback.symbol(reading: reading)).symbolRenderingMode(.monochrome).foregroundStyle(reading ? Theme.accent : Theme.muted)
+                    Text(ReplyPlayback.label(reading: reading))
+                }
+            }
                 .buttonStyle(ActionButton()).font(.system(size: 12, weight: .medium)).foregroundStyle(reading ? Theme.accent : Theme.muted).help(reading ? "Stop reading" : "Read this reply").accessibilityLabel(reading ? "Stop reading" : "Read this reply")
             Button {
                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(ReplyCopy.text(from: message.text), forType: .string)

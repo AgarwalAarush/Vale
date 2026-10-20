@@ -44,7 +44,7 @@ struct ChatGPTAuthorizedSession {
     var accountDisplayName: String { activeRegistration?.displayName ?? "ChatGPT" }
     var selectedModel: ChatGPTModel? { models.first { $0.id == selectedModelID } }
 
-    init(memoryOnly: Bool = CommandLine.arguments.contains("--self-test")) {
+    init(memoryOnly: Bool = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--verify-release-feed")) {
         fixtureMode = memoryOnly; store = ChatGPTCredentialStore(memoryOnly: memoryOnly)
         do {
             vault = try store.load(); publish()
