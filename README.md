@@ -16,7 +16,7 @@ The screenshot shows the actual native app with generated public fixtures. Light
 
 The selected window is the capture boundary, including whichever page is visible inside it. There is no automatic frontmost-window selection, full-display fallback, or continuous cloud video transmission. If the window changes while an answer is being prepared, the answer is marked and its point/guide is withheld; use Refresh for the current view. Missing geometry prevents pointing with a visible explanation. Hidden windows stop capture; a covered highlight is suppressed with visible feedback.
 
-This release uses Apple dictation/speech and the official Codex CLI's existing ChatGPT sign-in. Voice is interruption-safe turn-taking with final provider replies. It is not network streaming or full-duplex audio. No paid API fallback or new service is configured.
+The 1.3.1 candidate uses **Continue with ChatGPT** in your browser and your eligible ChatGPT plan. It does not require the Codex CLI. Vale keeps its connection in a separate protected Keychain namespace. Apple provides dictation and speech. Voice is interruption-safe turn-taking with final provider replies. It is not network streaming or full-duplex audio. No paid API fallback or new service is configured.
 
 ## Everyday use
 
@@ -26,11 +26,11 @@ Add images, PDFs, UTF-8 text, or code through **+**, drop, or paste. Up to eight
 
 History opens chats directly and supports search, rename, Markdown export and confirmed Forget. The details button opens Notes or files; Back returns to the same draft. Forget purges that chat from both the active library and the legacy migration backup while keeping unrelated chats. Deletion failures retain a retryable chat/attachment and show an error; Retry Forget finishes the operation when the failure is resolved. Open previews close when their files are forgotten; sharing previews close on stop.
 
-Long conversations show a context notice: recent messages/excerpts are sent, while the full saved history remains available. The globe exposes optional per-chat Web search and its availability notice. Web search is unavailable with the currently tested Codex runtime under the required execution restrictions; a URL alone is not treated as proof that search ran. Voice settings provide language, system voice, speed, and silence timing.
+Long conversations show a context notice: recent messages/excerpts are sent, while the full saved history remains available. The globe exposes optional per-chat Web search and its availability notice. Availability depends on your ChatGPT account, workspace and selected model; a URL alone is not proof that search ran. Genuine direct-provider Web verification remains pending. Voice settings provide language, system voice, speed, and silence timing.
 
 ## Build and verify
 
-macOS 14+, Command Line Tools with a macOS 15.2+ SDK (verified with Swift 6.2.4), and an existing signed-in Codex CLI are required. Pointing geometry requires macOS 15.2+. SwiftPM resolves the pinned official Sparkle 2.10.0 framework.
+macOS 14+ and Command Line Tools with a macOS 15.2+ SDK (verified with Swift 6.2.4) are required to build. To receive replies, connect an eligible ChatGPT account in Vale. No API key or Codex installation is required. Pointing geometry requires macOS 15.2+. SwiftPM resolves the pinned official Sparkle 2.10.0 framework.
 
 ```sh
 scripts/build.sh
@@ -38,9 +38,9 @@ VALE_ARCH=universal scripts/verify.sh --integration --repeat
 python3 scripts/package-release.py
 ```
 
-Tests use isolated generated files and labeled synthetic capture/voice adapters. The provider integration also asks the real signed-in service using public image/PDF/text fixtures and a synthetic selected-window image. It does not request hardware consent or alter real chats. See [verification](docs/verification.md) for exactly what is exercised and still pending.
+Tests use isolated generated files and labeled synthetic capture/voice adapters. The optional provider integration asks the service through Vale’s own ChatGPT connection using public image/PDF/text fixtures and a synthetic selected-window image. This requires personal browser consent first; JWT/SSE fixtures do not establish genuine sign-in or inference. It does not request hardware consent or alter real chats. See [verification](docs/verification.md) for exactly what is exercised and still pending.
 
-The local app is ad-hoc signed, not notarized. The 1.3.0 candidate embeds a trusted public key and signed HTTPS update source, with automatic checks and downloads enabled by default and editable in Settings. The previous unconfigured build needs one manual replacement. See [update configuration and delivery evidence](docs/updates.md); packaging is separate from publication and installation. Laptop installation, Apple Silicon runtime, and real hardware QA remain pending. No notch integration, persistent agents, routines, connectors, or autonomous computer actions are included.
+The local app is ad-hoc signed, not notarized. The [published 1.3.0 bootstrap](https://github.com/AgarwalAarush/Vale/releases/tag/v1.3.0) embeds a trusted public key and signed HTTPS update source, with automatic checks and downloads enabled by default and editable in Settings. Its anonymous signed downloads and an actual configured Sparkle check against the live feed have been verified. The 1.3.1 candidate retains this update channel and replaces the bootstrap’s CLI connection with direct ChatGPT sign-in; genuine OAuth/inference acceptance remains pending. The previous unconfigured build needs one manual replacement. See [update configuration and delivery evidence](docs/updates.md); packaging is separate from publication and installation. Laptop installation, Apple Silicon runtime, and real hardware QA remain pending. No notch integration, persistent agents, routines, connectors, or autonomous computer actions are included.
 
 ## Working on Vale
 

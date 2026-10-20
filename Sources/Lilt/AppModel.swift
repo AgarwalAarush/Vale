@@ -89,6 +89,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         updates.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         context.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         voice.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
+        provider.account.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
+        NotificationCenter.default.publisher(for: ChatGPTAccount.connectionWillChange, object: provider.account)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.accountConnectionWillChange() }
+            }.store(in: &observerTokens)
         context.failed = { [weak self] message in self?.stopResponse();self?.error=message }
         context.changed = { [weak self] in guard let self else{return};self.contextReset?(); self.hideOverlay?(); if self.busy { self.cancel(); self.error="Sharing changed. Your message is saved; retry when you’re ready." } }
         voice.failed = { [weak self] message in self?.conversation=false;self?.conversationTask?.cancel();self?.error=message }
@@ -96,9 +101,6 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         voice.playbackInterrupted = { [weak self] in self?.conversation=false }
         voice.partial = { [weak self] text in guard let self else{return}; self.draft=self.spokenDraftPrefix+text }
         voice.finished = { [weak self] _ in self?.send(spoken:true) }
-        provider.located = { [weak self] in self?.objectWillChange.send() }
-        provider.lookupEnded = { [weak self] in self?.objectWillChange.send() }
-        provider.locateWithLoginShell()
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
     func openSettings() {
@@ -166,6 +168,16 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         loading=true;draft="";loading=false;persist();showWorkspace?()
     }
     func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
+    private func accountConnectionWillChange() {
+        let interrupted = busy
+        conversation = false; conversationTask?.cancel(); conversationTask = nil
+        voice.stop(); cancel(); context.stop(); contextPreview = nil; contextReset?()
+        if interrupted {
+            setAnswerFailed(true)
+            showError("Your ChatGPT connection changed. Your question is saved; retry when you’re ready.", settings: true)
+        }
+        persist()
+    }
     func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false,preserveDraft:Bool=false) {
         if override == nil && !spoken { commitComposer?() }
         guard var chat=active else{return}

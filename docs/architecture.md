@@ -6,7 +6,9 @@ AppModel owns chats, drafts, mode, upload metadata, explicit search choice, and 
 
 AttachmentStore retains UUID-named files under the legacy application-support directory with private permissions. ImageIO bounds image inputs to 1600 pixels. PDFKit extracts bounded text, or renders the first four scanned pages with a visible context limitation. Request context has a total text/visual budget. PDF preview renders pages with navigation and copyable page text; text previews are bounded. Imported files are reference data and never executed.
 
-TutorProvider runs the official CLI with forced ChatGPT authentication, ephemeral request storage, ignored user config/rules, read-only sandbox, and disabled local/integration tools. Only the per-chat globe setting exposes live web search. Multiple images use repeated image arguments. Prompts enter via stdin; responses use the bundled strict JSON schema. The provider drains output without logging it; it keeps only a boolean that a web-search event occurred for integration verification. Temporary request files are deleted after completion/cancellation. Credentials are never read by the app.
+ChatGPTAccount owns direct system-browser OAuth, a loopback PKCE/state/nonce callback, issued-client registrations, JWKS/issuer/audience/expiry verification, and eligible ChatGPT plan grants. Credentials use Vale’s separate Keychain namespace, independent of legacy Codex sign-in. Refresh rotation and vault mutations are serialized; sign-out removes local access before remote revocation. TutorProvider discovers eligible models and sends streaming Responses requests with `store:false`. Only a complete response can become a reply. Explicit per-chat Web may declare the hosted web-search tool; no command, file, app, browser or coding execution tools are exposed, and there is no API-key fallback.
+
+Account connection changes synchronously invalidate both provider and AppModel request identity, cancel preprocessing, stop voice/sharing and preserve an interrupted question for retry. A late answer cannot cross an account switch. Generated protocol/lifecycle checks are separate from genuine OAuth and inference acceptance.
 
 WindowContext uses ScreenCaptureKit's single-window system picker and fresh SCScreenshotManager captures. There is no display fallback. Pointing requires bounded coordinates, matching generation, identical fresh pixels, and unchanged geometry; local checks clear highlights when content changes. On-screen metadata is required before capture. Front-to-back window bounds conservatively reject a highlight covered by another visible window; unknown bounds fail closed, transparent windows are ignored, and the annotation itself is excluded from subsequent checks. This reads window metadata, not other-window pixels. Screen images and microphone audio are not in the chat store.
 
@@ -20,9 +22,9 @@ The native harness runs the same NSWindows and views as the product with isolate
 
 ## Primary references
 
-- [Codex non-interactive mode and JSON events](https://learn.chatgpt.com/docs/non-interactive-mode)
-- [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
-- [Codex web search](https://learn.chatgpt.com/docs/web-search)
+- [Direct ChatGPT sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+- [Profiles and sessions](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
+- [Eligible models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)
 - [ScreenCaptureKit screenshots](https://developer.apple.com/documentation/screencapturekit/scscreenshotmanager)
 - [Apple on-device speech recognition](https://developer.apple.com/documentation/speech/sfspeechrecognitionrequest/requiresondevicerecognition)
 - [Sparkle setup and signed updates](https://sparkle-project.org/documentation/)

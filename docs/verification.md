@@ -1,6 +1,6 @@
 # Vale 1.3 verification
 
-The versioned `verification-1.3.0.json` records current assertions and evidence boundaries. The release manifest identifies the frozen source, architectures, exact packaged hashes, updater configuration and delivery status. Historical 1.2.x totals below do not establish current acceptance.
+The versioned `verification-1.3.0.json` records the published bootstrap’s assertions and evidence boundaries. The 1.3.1 direct-ChatGPT/UI candidate requires fresh source-bound results; genuine consent/inference has not yet been performed. The release manifest identifies the frozen source, architectures, exact packaged hashes, updater configuration and delivery status. Historical 1.2.x totals below do not establish current acceptance.
 
 Native verification uses the actual AppKit workspace, native NSTextView and SwiftUI routes with generated data. It checks one persistent window, draft/selection/marked-text continuity, direct history, Notes/files/PDF, close/reopen, existing recovery, and synthetic capture/voice/privacy transitions. Light/dark and minimum/default/wide view PNGs are inspected separately from assertion counts. Some controls are exercised through their bound model methods; this is not physical mouse/drop/picker, VoiceOver or hardware consent proof. Repeated runs validate fixture isolation; integration totals overlap native checks.
 

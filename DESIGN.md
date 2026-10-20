@@ -21,6 +21,8 @@ The owner's subsequent native-UI direction sharpens that baseline:
 
 Retain DESIGN_VARIANCE5, MOTION_INTENSITY2 and VISUAL_DENSITY5 as native Operate values: a distinct composition, quiet immediate feedback, and readable working density. These references guide hierarchy and spacing within the existing SF typography, semantic palette and native controls; marketing display fonts, giant headings, promotional cards and decorative metadata do not enter the workspace.
 
+The uploaded desktop-product screenshots add compact aligned navigation rows, primary text with adjacent muted context, quiet gray-to-white surface steps, and selective action color. Apply those relationships to Vale’s history, composer and detail routes. UiArc reinforces stable local async feedback, anchored grouped native menus and brief interruptible transitions. Keep the reference’s useful density within the current reading measure and native control scale.
+
 ## First viewport and layout
 
 Default1040×740, minimum740×560, verified at compact/default/wide sizes. One standard NSWindow, normal traffic lights, native resize/minimize/fullscreen and remembered frame. Collapsible history rail (~224points), compact toolbar, readable conversation (~680point max measure), bottom composer. Below~860points the rail yields to the current task. File/notes/context details live in an in-window inspector; at narrow widths a detail route replaces the reading region with a clear Back action. Settings is an in-window route, never a detached preferences app.

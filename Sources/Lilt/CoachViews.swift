@@ -102,7 +102,7 @@ struct CoachView: View {
                 if !model.context.hasSelection { Button { model.context.choose() } label: { Label("Share window", systemImage: "macwindow") }.disabled(model.paused) }
                 Menu {
                     Toggle("Web search", isOn: Binding(get: { model.active?.webEnabled == true }, set: { model.setWeb($0) })).disabled(!WebToggle.changes(waiting: model.busy))
-                    Text("Web search is unavailable with the current Codex runtime.")
+                    Text("Availability depends on your ChatGPT account and selected model.")
                 } label: { Image(systemName: "globe").frame(width: 24, height: 24) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Web search availability").accessibilityLabel("Web search options")
                 Spacer(minLength: 8)
                 if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
@@ -264,25 +264,30 @@ struct EmptyGreeting: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(session.mode == .learn ? "What are we working through?" : "How can I help?").font(.system(size: 30, weight: .regular)).tracking(-0.6)
             Text(session.mode == .learn ? "Take it one step at a time, with a little guidance." : "Think something through, make sense of a file, or start with a question.").font(.system(size: 15)).foregroundStyle(Theme.muted).lineSpacing(4)
-            if CodexNotice.shows(executableKnown: model.provider.executable != nil, lookupFinished: model.provider.lookupFinished) { CodexSignInCard(model: model).padding(.top, 8) }
+            if !model.provider.account.permitsPlanUsage { ChatGPTSignInPrompt(account: model.provider.account).padding(.top, 8) }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 16)
     }
 }
 
-struct CodexSignInCard: View {
-    @ObservedObject var model: AppModel
+struct ChatGPTSignInPrompt: View {
+    @ObservedObject var account: ChatGPTAccount
     var body: some View {
-        let notice = CodexSignInNotice.beforeFirstSend(executableFound: model.provider.executable != nil)
-        VStack(alignment: .leading, spacing: 8) {
-            Text(notice.title).font(.system(size: 13, weight: .semibold))
-            Text(notice.detail).font(.system(size: 12)).foregroundStyle(Theme.ink).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-            Button("Settings") { model.openSettings() }.buttonStyle(QuietButton())
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.accent.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accent.opacity(0.35), lineWidth: 0.8))
-        .accessibilityElement(children: .contain)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(account.isSigningIn ? "Finish connecting in your browser." : "Connect ChatGPT to start a conversation.")
+                .font(.system(size: 13)).foregroundStyle(Theme.muted)
+            HStack(spacing: 10) {
+                if account.isSigningIn {
+                    ProgressView().controlSize(.small)
+                    Button("Cancel sign-in") { account.cancelSignIn() }.buttonStyle(QuietButton())
+                } else if account.isSignedIn {
+                    Button("Enable ChatGPT plan usage") { account.enablePlanUsage() }.buttonStyle(QuietButton(filled: true))
+                } else {
+                    Button("Continue with ChatGPT") { account.signIn() }.buttonStyle(QuietButton(filled: true))
+                }
+            }.disabled(account.isSigningOut)
+            if let error = account.error {
+                Text(error).font(.system(size: 12)).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true)
+            }
+        }.accessibilityElement(children: .contain)
     }
 }

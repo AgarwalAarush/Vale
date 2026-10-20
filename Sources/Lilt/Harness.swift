@@ -129,6 +129,7 @@ extension AppController {
                 }
                 try await runWorkspaceAcceptance(output:output,results:&results)
             }
+            for (name, passed) in await ChatGPTAccountChecks.run() { results[name] = passed }
             let data=try JSONSerialization.data(withJSONObject:results,options:[.prettyPrinted,.sortedKeys]);try data.write(to:output.appendingPathComponent("results.json"));print(String(data:data,encoding:.utf8)!);model.suspend();exit(results.values.allSatisfy{$0} ? 0 : 1)
         }catch{print("Harness failed: \(error)");exit(1)}
     }

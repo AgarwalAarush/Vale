@@ -152,8 +152,39 @@ extension AppController {
         results["workspaceNavigationPersistsDraftNotesAndFiles"] = loaded?.draft == composedDraft && loaded?.pendingAttachments.map(\.id) == pendingIDs && loaded?.takeaway.contains("HARBOR-73") == true
         try runMultipageAttachmentAcceptance(output: output, results: &results)
         try await runCursorReplyAcceptance(output: output, results: &results)
+        try await runAccountChangeAcceptance(output: output, results: &results)
         await runNativeUndoAcceptance(editor: editor, results: &results)
         try runClosedChatInputAcceptance(output: output, results: &results)
+    }
+}
+
+extension AppController {
+    /// Real AppModel cancellation with a generated connection notification and reply adapter.
+    /// This exercises account isolation; it does not perform OAuth or access a real account.
+    func runAccountChangeAcceptance(output: URL, results: inout [String: Bool]) async throws {
+        let directory = output.appendingPathComponent("account-change-fixture-" + UUID().uuidString)
+        let fixture = AppModel(dataDirectory: directory)
+        fixture.voice.enableFixtures()
+        defer { fixture.suspend() }
+        fixture.newSession(title: "Generated account isolation")
+        var providerCalls = 0
+        fixture.provider.fixtureReply = { _, _, _, _ in providerCalls += 1 }
+        fixture.draft = "Keep this question with its original account."
+        fixture.send()
+        NotificationCenter.default.post(name: ChatGPTAccount.connectionWillChange, object: fixture.provider.account)
+        await settle()
+        results["chatGPTConnectionChangeCancelsPreprocessing"] = providerCalls == 0 && !fixture.busy && fixture.canRetry && fixture.active?.messages.last?.text == "Keep this question with its original account." && fixture.active?.messages.last?.answerFailed == true
+
+        var pending: ((Result<TutorReply, Error>) -> Void)?
+        fixture.provider.fixtureReply = { _, _, _, complete in pending = complete }
+        fixture.retry(); await until { pending != nil }
+        let reachedProvider = pending != nil && fixture.busy
+        fixture.draft = "Preserve this next draft."
+        pending?(.success(TutorReply(text: "Generated stale account reply.")))
+        NotificationCenter.default.post(name: ChatGPTAccount.connectionWillChange, object: fixture.provider.account)
+        await settle()
+        let stored = try SessionStore(directory: directory).load().first { $0.id == fixture.activeID }
+        results["chatGPTConnectionChangeRejectsQueuedReplyAndKeepsRetry"] = reachedProvider && !fixture.busy && !fixture.conversation && !fixture.voice.listening && !fixture.voice.speaking && !fixture.context.hasSelection && fixture.canRetry && fixture.active?.messages.count == 1 && fixture.draft == "Preserve this next draft." && stored?.draft == fixture.draft && stored?.messages.last?.answerFailed == true
     }
 }
 
