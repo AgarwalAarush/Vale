@@ -689,6 +689,70 @@ extension AppController {
         fixture.openSettings()
         try await capture("workspace-import-other-owner-settings-light-generated-account")
         results["workspaceImportCoveredAndOtherChatIdentifyOwnerWithoutFalseStop"] = noImportStop && coveredStatus && fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files to Generated import owner…" && window.toolbar?.items.first(where: { $0.itemIdentifier.rawValue == "vale.activity" })?.toolTip == fixture.importStatus && window.toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.stop" }) == false
+        // Reconcile the hidden original window after every covered-route transition. Matching
+        // NSToolbar identifiers previously let that other model remove this window's Back/status.
+        var toolbarTrace: [[String: Any]] = []
+        var coveredRouteChecks: [Bool] = [], backActionChecks: [Bool] = []
+        func recordCoveredToolbar(_ state: String, expectedStatus: String) -> Bool {
+            let toolbar = window.toolbar
+            let back = toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.back" }
+            let activity = toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.activity" }
+            let label = activity?.view as? NSTextField
+            let visible = toolbar?.visibleItems?.map { $0.itemIdentifier.rawValue } ?? []
+            let sourceItems = workspace.toolbar?.items.map { $0.itemIdentifier.rawValue } ?? []
+            let isolated = toolbar != nil && workspace.toolbar != nil && toolbar?.identifier != workspace.toolbar?.identifier
+            let passed = isolated && !workspace.isVisible && !sourceItems.contains("vale.back") && back?.isEnabled == true && back?.action != nil && visible.contains("vale.back") && visible.contains("vale.activity") && activity?.toolTip == expectedStatus && label?.stringValue == expectedStatus && label?.accessibilityLabel() == expectedStatus && activity?.menuFormRepresentation?.title == expectedStatus && toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.stop" }) == false
+            toolbarTrace.append([
+                "state": state, "passed": passed, "expectedStatus": expectedStatus,
+                "windowTitle": window.title, "route": fixture.workspaceRoute.rawValue,
+                "appearance": window.effectiveAppearance.name.rawValue,
+                "frame": ["width": window.frame.width, "height": window.frame.height],
+                "sourceHidden": !workspace.isVisible, "identifiersAreDistinct": isolated,
+                "sourceToolbarIdentifier": workspace.toolbar.map { String(describing: $0.identifier) } ?? "none",
+                "fixtureToolbarIdentifier": toolbar.map { String(describing: $0.identifier) } ?? "none",
+                "sourceItems": sourceItems, "fixtureItems": toolbar?.items.map { $0.itemIdentifier.rawValue } ?? [],
+                "fixtureVisibleItems": visible, "activityTooltip": activity?.toolTip ?? "missing",
+                "activityText": label?.stringValue ?? "missing", "activityAccessibilityLabel": label?.accessibilityLabel() ?? "missing"
+            ])
+            return passed
+        }
+        if let ownerID, let otherID {
+            let hiddenSourceIsNormalChat = model.workspaceRoute == .chat && model.inspector == nil && !model.compactHistoryVisible
+            for dark in [false, true] {
+                for minimum in [false, true] {
+                    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                    window.setContentSize(minimum ? window.contentMinSize : NSSize(width: 1040, height: 740))
+                    for chatID in [ownerID, otherID] {
+                        fixture.navigateToChat(chatID)
+                        let otherOwner = chatID == otherID
+                        let expectedStatus = otherOwner ? "Adding files to Generated import owner…" : "Adding files…"
+                        let ownerName = otherOwner ? "other-owner" : "owner"
+                        let state = "\(ownerName)-\(minimum ? "minimum" : "default")-\(dark ? "dark" : "light")"
+                        fixture.showInspector(.files); await settle()
+                        model.composerFocus += 1; await settle()
+                        coveredRouteChecks.append(hiddenSourceIsNormalChat && recordCoveredToolbar(state + "-files", expectedStatus: expectedStatus))
+                        fixture.openSettings(); await settle()
+                        model.composerFocus += 1; await settle()
+                        coveredRouteChecks.append(recordCoveredToolbar(state + "-settings", expectedStatus: expectedStatus) && (!minimum || workspaceMinimumIsValid(window, atMinimum: true)))
+                        if minimum { try await capture("workspace-import-repeat-\(ownerName)-settings-minimum-\(dark ? "dark" : "light")-generated-account") }
+                        let back = window.toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.back" }
+                        let accepted: Bool
+                        if let back, let action = back.action { accepted = NSApp.sendAction(action, to: back.target, from: back) }
+                        else { accepted = false }
+                        await settle()
+                        let expectedDraft = otherOwner ? "Other chat draft stays here." : ownerDraft
+                        let returned = accepted && fixture.workspaceRoute == .chat && fixture.inspector == nil && !fixture.compactHistoryVisible && fixture.activeID == chatID && fixture.draft == expectedDraft && window.firstResponder === window.contentView.flatMap({ editor(in: $0) })
+                        backActionChecks.append(returned)
+                        toolbarTrace.append(["state": state + "-back-action", "passed": returned, "actionAccepted": accepted])
+                    }
+                }
+            }
+            // Keep the original success/failure ownership precondition: the other chat is active.
+            fixture.navigateToChat(otherID); fixture.openSettings(); await settle()
+        }
+        results["workspaceImportToolbarIsolatedAcrossOwnersRoutesSizesAndAppearances"] = coveredRouteChecks.count == 16 && coveredRouteChecks.allSatisfy { $0 }
+        results["workspaceImportNativeBackReturnsToEachDraftAcrossRepeatedRoutes"] = backActionChecks.count == 8 && backActionChecks.allSatisfy { $0 }
+        try JSONSerialization.data(withJSONObject: ["method": "generated native toolbar cross-window transition checks", "states": toolbarTrace], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("import-toolbar-transitions.json"), options: .atomic)
         gate.release(); await importing.value; await settle()
         let owner = fixture.sessions.first { $0.id == ownerID }
         let ownerRecords = owner?.pendingAttachments ?? []

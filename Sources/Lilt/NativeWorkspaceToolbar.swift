@@ -18,7 +18,9 @@ import LiltCore
     }
     private weak var window: NSWindow?
     private let model: AppModel
-    private let toolbar = NSToolbar(identifier: "vale.workspace.toolbar")
+    // AppKit synchronizes item membership across matching toolbar identifiers, even without
+    // customization/autosave. Route and activity items belong only to this window's model.
+    private let toolbar = NSToolbar(identifier: "vale.workspace.toolbar." + UUID().uuidString)
     private var observations: [AnyCancellable] = []
     private var refreshQueued = false
     private var lastAppliedAppearance: String?

@@ -164,7 +164,7 @@ Search uses the search radius; quiet fields/buttons use the control radius; comp
 
 ### Native toolbar and history
 
-Real NSToolbarItem/NSMenuToolbarItem controls carry labels, help, native symbols and validated menu routes. Settings remains a quiet persistent destination. Search covers messages, notes and files. Compact history rows use meaningful text/excerpts and an unsent-draft mark. Omit only the pristine active empty chat as a redundant retrieval row; preserve genuine drafts/files.
+Real NSToolbarItem/NSMenuToolbarItem controls carry labels, help, native symbols and validated menu routes. Each window owns a distinct NSToolbar identifier so AppKit cannot synchronize its route/activity membership with another window; per-item identifiers remain stable. Settings remains a quiet persistent destination. Search covers messages, notes and files. Compact history rows use meaningful text/excerpts and an unsent-draft mark. Omit only the pristine active empty chat as a redundant retrieval row; preserve genuine drafts/files.
 
 Active response, voice or selected-window context exposes a high-priority Stop toolbar item. A compact activity label remains when secondary routes cover chat, identifying starting/listening/speaking/conversation, thinking and shared/live/refreshing-window states. Full text remains in help and native overflow representation.
 
