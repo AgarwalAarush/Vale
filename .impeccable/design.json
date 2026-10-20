@@ -1,0 +1,348 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T07:27:40.374430Z",
+  "title": "Design System: Vale",
+  "extensions": {
+    "colorMeta": {
+      "ink-light": {
+        "role": "neutral",
+        "displayName": "Content ink (light)",
+        "nativeSource": "Theme.inkColor / ink",
+        "appearance": "light",
+        "pairedToken": "ink-dark"
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Content ink (dark)",
+        "nativeSource": "Theme.inkColor / ink",
+        "appearance": "dark",
+        "pairedToken": "ink-light"
+      },
+      "muted-light": {
+        "role": "neutral",
+        "displayName": "Muted metadata (light)",
+        "nativeSource": "Theme.muted",
+        "appearance": "light",
+        "pairedToken": "muted-dark"
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "Muted metadata (dark)",
+        "nativeSource": "Theme.muted",
+        "appearance": "dark",
+        "pairedToken": "muted-light"
+      },
+      "accent-light": {
+        "role": "primary",
+        "displayName": "Theme accent (light)",
+        "nativeSource": "Theme.accentColor / accent",
+        "appearance": "light",
+        "pairedToken": "accent-dark"
+      },
+      "accent-dark": {
+        "role": "primary",
+        "displayName": "Theme accent (dark)",
+        "nativeSource": "Theme.accentColor / accent",
+        "appearance": "dark",
+        "pairedToken": "accent-light"
+      },
+      "line-light": {
+        "role": "neutral",
+        "displayName": "Boundary line (light)",
+        "nativeSource": "Theme.line",
+        "appearance": "light",
+        "pairedToken": "line-dark"
+      },
+      "line-dark": {
+        "role": "neutral",
+        "displayName": "Boundary line (dark)",
+        "nativeSource": "Theme.line",
+        "appearance": "dark",
+        "pairedToken": "line-light"
+      },
+      "background-light": {
+        "role": "neutral",
+        "displayName": "Reading canvas (light)",
+        "nativeSource": "Theme.windowBackground / background",
+        "appearance": "light",
+        "pairedToken": "background-dark"
+      },
+      "background-dark": {
+        "role": "neutral",
+        "displayName": "Reading canvas (dark)",
+        "nativeSource": "Theme.windowBackground / background",
+        "appearance": "dark",
+        "pairedToken": "background-light"
+      },
+      "rail-light": {
+        "role": "neutral",
+        "displayName": "History rail (light)",
+        "nativeSource": "Theme.rail",
+        "appearance": "light",
+        "pairedToken": "rail-dark"
+      },
+      "rail-dark": {
+        "role": "neutral",
+        "displayName": "History rail (dark)",
+        "nativeSource": "Theme.rail",
+        "appearance": "dark",
+        "pairedToken": "rail-light"
+      },
+      "fill-light": {
+        "role": "neutral",
+        "displayName": "Quiet fill (light)",
+        "nativeSource": "Theme.fill",
+        "appearance": "light",
+        "pairedToken": "fill-dark"
+      },
+      "fill-dark": {
+        "role": "neutral",
+        "displayName": "Quiet fill (dark)",
+        "nativeSource": "Theme.fill",
+        "appearance": "dark",
+        "pairedToken": "fill-light"
+      },
+      "fill-raised-light": {
+        "role": "neutral",
+        "displayName": "Raised fill (light)",
+        "nativeSource": "Theme.fillRaised",
+        "appearance": "light",
+        "pairedToken": "fill-raised-dark"
+      },
+      "fill-raised-dark": {
+        "role": "neutral",
+        "displayName": "Raised fill (dark)",
+        "nativeSource": "Theme.fillRaised",
+        "appearance": "dark",
+        "pairedToken": "fill-raised-light"
+      },
+      "fill-pressed-light": {
+        "role": "neutral",
+        "displayName": "Selected fill (light)",
+        "nativeSource": "Theme.fillPressed",
+        "appearance": "light",
+        "pairedToken": "fill-pressed-dark"
+      },
+      "fill-pressed-dark": {
+        "role": "neutral",
+        "displayName": "Selected fill (dark)",
+        "nativeSource": "Theme.fillPressed",
+        "appearance": "dark",
+        "pairedToken": "fill-pressed-light"
+      },
+      "action-light": {
+        "role": "primary",
+        "displayName": "Primary action (light)",
+        "nativeSource": "Theme.action",
+        "appearance": "light",
+        "pairedToken": "action-dark"
+      },
+      "action-dark": {
+        "role": "primary",
+        "displayName": "Primary action (dark)",
+        "nativeSource": "Theme.action",
+        "appearance": "dark",
+        "pairedToken": "action-light"
+      },
+      "on-action-light": {
+        "role": "neutral",
+        "displayName": "Action content (light)",
+        "nativeSource": "Theme.onAction",
+        "appearance": "light",
+        "pairedToken": "on-action-dark"
+      },
+      "on-action-dark": {
+        "role": "neutral",
+        "displayName": "Action content (dark)",
+        "nativeSource": "Theme.onAction",
+        "appearance": "dark",
+        "pairedToken": "on-action-light"
+      },
+      "warning-light": {
+        "role": "semantic",
+        "displayName": "Warning (light)",
+        "nativeSource": "Theme.warning",
+        "appearance": "light",
+        "pairedToken": "warning-dark"
+      },
+      "warning-dark": {
+        "role": "semantic",
+        "displayName": "Warning (dark)",
+        "nativeSource": "Theme.warning",
+        "appearance": "dark",
+        "pairedToken": "warning-light"
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Conversation and composer",
+        "purpose": "Native system type; no substituted font or CSS fallback."
+      },
+      "code": {
+        "displayName": "System monospaced",
+        "purpose": "Readable code segments using native system monospaced type."
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [],
+    "native": {
+      "platform": "macos",
+      "frameworks": [
+        "AppKit",
+        "SwiftUI"
+      ],
+      "minimumOS": "14",
+      "compiler": "Swift 6.2.4",
+      "sourceRevision": "b069a49c5b25c15678b2a31405153f9be7d54c99",
+      "unit": "logical AppKit point",
+      "runtimeSourceOfTruth": [
+        "Sources/Lilt/Design.swift",
+        "Sources/Lilt/NativeWorkspaceWindow.swift",
+        "Sources/Lilt/NativeWorkspaceToolbar.swift",
+        "Sources/Lilt/WorkspaceView.swift",
+        "Sources/Lilt/CoachViews.swift",
+        "Sources/LiltCore/Models.swift"
+      ],
+      "tokenInterpretation": "Frontmatter records native source values. Light/dark color alternatives are appearance pairs, not tonal scales. Native controls retain platform appearance and selection. Native pt units and framework font descriptions deliberately do not pretend to be CSS.",
+      "componentPresentation": "No HTML/CSS facsimiles. The web panel component array is empty; native component metadata below points to the real implementation. No synthesized tonal ramps, shadows or motion tokens.",
+      "geometry": {
+        "initialContent": {
+          "width": 1040,
+          "height": 740
+        },
+        "minimumWindowFrame": {
+          "width": 740,
+          "height": 560
+        },
+        "historyWidth": 200,
+        "historyCollapseBelowContentWidth": 860,
+        "inlineDetailsWidth": 320,
+        "inlineDetailsMinimumRemainingChatWidth": 560,
+        "panelDividerWidth": 1,
+        "derivedInlineDetailsMinimumContentWidth": {
+          "historyVisible": 1082,
+          "historyHidden": 881
+        },
+        "maximumTranscriptAndComposerMeasureBeforeGutters": 680,
+        "horizontalGutter": 24,
+        "editorMeasuredHeight": {
+          "minimum": 28,
+          "maximum": 140,
+          "excludes": "Composer shell padding, attachment and tool rows"
+        }
+      },
+      "components": [
+        {
+          "name": "Native toolbar",
+          "implementation": "NativeWorkspaceToolbar",
+          "source": "Sources/Lilt/NativeWorkspaceToolbar.swift",
+          "behavior": "AppKit unifiedCompact toolbar, native menus and overflow; active Stop and covered-route activity label."
+        },
+        {
+          "name": "History and search",
+          "implementation": "WorkspaceHistory",
+          "source": "Sources/Lilt/WorkspaceView.swift",
+          "refersTo": "history-search",
+          "behavior": "Search messages/notes/files, meaningful rows and unsent draft marks; preserve real drafts/files."
+        },
+        {
+          "name": "Mounted native composer",
+          "implementation": "DraftEditor / ComposerTextView / CoachView.composer",
+          "source": "Sources/Lilt/Design.swift; Sources/Lilt/CoachViews.swift",
+          "refersTo": "composer",
+          "behavior": "One mounted NSTextView, identity-bound draft/undo/IME; live visibility and modal-aware focus policy; connection action replaces unavailable Send."
+        },
+        {
+          "name": "Native details routes",
+          "implementation": "WorkspaceView.inspector",
+          "source": "Sources/Lilt/WorkspaceView.swift",
+          "behavior": "Notes/files/file/context preview inline only with sufficient remaining chat space, otherwise a replacement route with Back."
+        },
+        {
+          "name": "Quiet native controls",
+          "implementation": "QuietField / QuietButton / ActionButton / IconButton",
+          "source": "Sources/Lilt/Design.swift",
+          "behavior": "Surface-only hover/pressed feedback, disabled opacity and visible focus without geometry movement."
+        }
+      ],
+      "accessibilityRequirements": [
+        "Native keyboard, IME, selection and undo",
+        "Readable light/dark/increased contrast",
+        "Visible actual focus; covered editor cannot receive input or accessibility focus",
+        "Reduce Motion and Reduce Transparency",
+        "Labeled controls and state beyond color; immediate Stop for active voice and sharing"
+      ],
+      "consentAndDataRequirements": [
+        "Explicit selected-window and microphone consent; no automatic selection or startup capture",
+        "Bounded local RAM preview; send fresh context only on question/guide action",
+        "Conversation rearms only after opt-in and completed playback; stop on Pause/Escape/sleep/lock/session change/error",
+        "Atomic sessions and preserved drafts/files/settings/legacy identifiers; identity-validated async completion",
+        "Forget purges legacy backup and reports retryable deletion failures",
+        "No retained capture/audio or credential logging; uploaded files remain with chats",
+        "Only explicitly enabled supported web search; no model command/file/app/browser/code execution, paid fallback or login registration"
+      ],
+      "evidence": {
+        "status": "Final native confirmation and formal reviews pending at documentation pass",
+        "firstPassDirectory": "artifacts/native-ui-1.3.2-first",
+        "firstPassMethod": "Generated in-process native rasters; complete-window applicability must be checked per image and metadata. Not compositor or physical-input evidence.",
+        "knownFirstPassMetadataIssue": "sourceRevision 54b0fd1a is a known sidecar typo and cannot establish revision provenance",
+        "separateGates": [
+          "Native visual inspection",
+          "Physical input and accessibility",
+          "Real microphone/screen consent",
+          "Genuine provider use and hosted search",
+          "Official authorization for exact third-party ChatGPT route",
+          "Signed package and configured update feed",
+          "Public assets",
+          "Target laptop installation/update/relaunch"
+        ],
+        "productionReadyClaim": false
+      },
+      "tooling": "Impeccable launcher already ran once; no macOS enum/reference. Do not rerun or relabel this app as web/iOS."
+    }
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "A quiet Mac conversation workspace",
+    "overview": "Reading and writing lead; history and contextual tools sit beside the task when space permits. This is a recurring native desktop tool in Impeccable Operate mode, built with AppKit and SwiftUI for macOS 14 or later. Native window behavior, familiar controls and precise task hierarchy govern the composition. The folded-ribbon V remains the identity asset.\n\nThe owner rejected the published 1.3.1 single-window preview: duplicate chrome, empty hero, oversized editor and competing first-run actions are confirmed anti-references. Earlier visual approval is reopened. This contract records the replacement implemented at source `b069a49`; it claims neither visual acceptance nor production readiness. The [native product pipeline](docs/design/native-product-pipeline.md) and existing Factory tracker own research, independent critique, implementation, confirmation and delivery.\n\nThe owner's Refero Apple, Linear, Cursor, Vercel, Intercom, Superhuman and Dala references guide quiet surfaces, alignment and restrained action hierarchy. Refero measurements and reconstructed HTML are interpretations, not source components or native specifications. Uploaded desktop-product references inform compact navigation and adjacent muted context. Uiarc is inspiration, not a dependency or a claim every demo was viewed. No marketing heroes, imported fonts, CSS layouts or theatrical motion.",
+    "keyCharacteristics": [
+      "One native workspace with one AppKit-owned toolbar.",
+      "A stable bottom composer with local draft ownership.",
+      "Warm light and charcoal dark surfaces with functional accent.",
+      "Secondary routes adapt to remaining conversation space.",
+      "Explicit connection, voice and sharing states with immediate stop controls."
+    ],
+    "rules": [
+      {
+        "name": "The Source Pair Rule",
+        "body": "Preserve the actual adaptive Theme pairs and native semantic control colors. Do not invent intermediate ramps or treat a light-only swatch as the runtime color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Density Rule",
+        "body": "Remove unnecessary space before shrinking type. Titles truncate or wrap deliberately and retain full accessible values or help text; tiny text is not density.",
+        "section": "typography"
+      },
+      {
+        "name": "The Remaining Space Rule",
+        "body": "A prose maximum is not a chat minimum. Decide whether details sit alongside chat from usable remaining width, including visible panels and dividers.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "**Do** keep one native toolbar and make the answer and composer primary.",
+      "**Do** preserve the mounted editor, draft identity and visible focus across secondary routes.",
+      "**Do** evaluate combined history/details width from remaining chat space.",
+      "**Do** retain every capability and explicit consent boundary while simplifying hierarchy.",
+      "**Do** report implementation, native visual inspection, physical input, provider, package/feed and installed outcomes separately."
+    ],
+    "donts": [
+      "**Don't** restore duplicate chrome, empty hero, oversized editor or competing connection/send actions.",
+      "**Don't** substitute web components, imported fonts, iOS dimensions or fabricated tonal ramps for native source truth.",
+      "**Don't** hide active voice/sharing without visible state and an immediate Stop route.",
+      "**Don't** infer hosted-tool success, real consent or third-party support from fixtures or familiar login branding.",
+      "**Don't** call the redesign accepted or production-ready from compilation, assertion counts, worker completion or first-pass rasters."
+    ]
+  }
+}
