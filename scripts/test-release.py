@@ -1,0 +1,263 @@
+#!/usr/bin/env python3
+"""Offline release-boundary tests. No production seed, network, app build or GUI."""
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import plistlib
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parent.parent
+spec = importlib.util.spec_from_file_location('vale_release', ROOT / 'scripts/release.py')
+release = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(release)
+
+FAKE_GH = '''#!/usr/bin/env python3
+import json, os, pathlib, shutil, sys
+root = pathlib.Path(os.environ['VALE_RELEASE_FIXTURE'])
+args = sys.argv[1:]
+with (root/'calls.jsonl').open('a') as stream: stream.write(json.dumps(args)+'\\n')
+state_path = root/'state.json'
+state = json.loads(state_path.read_text())
+def save(): state_path.write_text(json.dumps(state))
+if args[0] == 'api':
+    if '/releases?' in args[-1]: print(json.dumps([[state['release']] if state['release'] else []]))
+    else: print(json.dumps({'private': False, 'owner': {'login': 'AgarwalAarush'}}))
+elif args[:2] == ['release','create']:
+    state['release'] = {'tag_name':args[2], 'draft':True, 'target_commitish':args[args.index('--target')+1], 'assets':[]}; save()
+elif args[:2] == ['release','upload']:
+    if os.environ.get('VALE_RELEASE_FAIL_UPLOAD'): sys.exit(31)
+    source = pathlib.Path(args[3]); shutil.copyfile(source,root/'remote'/source.name)
+    state['release']['assets'].append({'name': source.name}); save()
+elif args[:2] == ['release','download']:
+    name=args[args.index('--pattern')+1]; shutil.copyfile(root/'remote'/name,pathlib.Path(args[args.index('--dir')+1])/name)
+elif args[:2] == ['release','edit']:
+    state['release']['draft']=False; save()
+else: sys.exit(32)
+'''
+
+
+class ReleaseTests(unittest.TestCase):
+    def test_plan_is_offline_and_mutation_free(self):
+        before = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT)
+        result = subprocess.run([sys.executable, ROOT / 'scripts/release.py', '1.3.4', '--plan'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertTrue(value['planOnly'])
+        self.assertFalse(value['networkAccess'])
+        self.assertEqual(before, subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT))
+
+    def test_invalid_version_fails_before_any_work(self):
+        result = subprocess.run([sys.executable, ROOT / 'scripts/release.py', '1.3.4;touch /tmp/nope', '--plan'], capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_seed_metadata_only_requires_private_owned_file_and_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve()
+            directory.chmod(0o700)
+            seed = directory / 'fixture.key'
+            seed.touch(mode=0o600)
+            with patch.dict(os.environ, {'VALE_UPDATE_SIGNING_KEY_FILE': str(seed)}), patch.object(release, 'run', return_value=str(directory)):
+                self.assertEqual(release.key_path(), seed)
+                seed.chmod(0o644)
+                with self.assertRaises(SystemExit):
+                    release.key_path()
+                seed.chmod(0o600)
+                directory.chmod(0o755)
+                with self.assertRaises(SystemExit):
+                    release.key_path()
+                directory.chmod(0o700)
+                alias = directory / 'alias.key'
+                alias.symlink_to(seed)
+                with patch.dict(os.environ, {'VALE_UPDATE_SIGNING_KEY_FILE': str(alias)}):
+                    with self.assertRaises(SystemExit):
+                        release.key_path()
+
+    def test_monotonic_feed_preserves_prior_items(self):
+        tree = ET.fromstring(f'<rss><channel><title>Vale</title><item><title>Old</title><enclosure sparkle:version="9" xmlns:sparkle="{release.SPARKLE}"/></item></channel></rss>')
+        for bad in ('8', '9', '9.0'):
+            with self.assertRaises(SystemExit):
+                release.check_monotonic(tree, bad)
+        original = ET.tostring(tree.find('./channel/item'))
+        with tempfile.TemporaryDirectory() as folder:
+            archive = Path(folder) / 'Vale-1.3.3-macOS-universal.zip'
+            archive.write_bytes(b'generated archive')
+            output = Path(folder) / 'appcast.xml'
+            release.create_feed(tree, {'CFBundleVersion': '10', 'CFBundleShortVersionString': '1.3.3', 'LSMinimumSystemVersion': '14.0'}, archive, 'PUBLIC_SIGNATURE', '<b>plain text</b>', output)
+            result = ET.fromstring(output.read_bytes())
+            items = result.findall('./channel/item')
+            self.assertEqual(len(items), 2)
+            self.assertEqual(ET.tostring(items[1]), original)
+            self.assertEqual(items[0].findtext('description'), '<b>plain text</b>')
+            self.assertEqual(items[0].find('enclosure').get('url'), f'https://github.com/{release.REPO}/releases/download/v1.3.3/{archive.name}')
+
+    def native_clone_case(self, *, instruction_tamper=False):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            app = folder / 'production/Vale.app'
+            (app / 'Contents/MacOS').mkdir(parents=True)
+            original_info = {'CFBundleIdentifier': 'local.lilt.companion', 'CFBundleExecutable': 'Lilt', 'CFBundleVersion': '10'}
+            (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(original_info))
+            (app / 'Contents/MacOS/Lilt').write_bytes(b'generated executable fixture')
+            original_tree = release.tree_digest(app)
+            calls = []
+
+            def fixture_run(*arguments, env=None):
+                args = [str(a) for a in arguments]
+                calls.append(args)
+                if args[0] == '/usr/bin/ditto':
+                    shutil.copytree(args[1], args[2])
+                if args[0] == '/usr/bin/otool':
+                    changed = instruction_tamper and Path(args[-1]) != app / 'Contents/MacOS/Lilt'
+                    return '0000000100001000 ' + ('deadbeef' if changed else 'aabbccdd')
+                if '--self-test' in args:
+                    executable = Path(args[args.index('--self-test') - 1])
+                    self.assertNotEqual(executable, app / 'Contents/MacOS/Lilt')
+                    clone_info = plistlib.loads((executable.parent.parent / 'Info.plist').read_bytes())
+                    self.assertTrue(clone_info['CFBundleIdentifier'].startswith('local.vale.releasetest.'))
+                    self.assertEqual({k: v for k, v in clone_info.items() if k != 'CFBundleIdentifier'},
+                                     {k: v for k, v in original_info.items() if k != 'CFBundleIdentifier'})
+                return ''
+
+            with patch.object(release, 'run', side_effect=fixture_run):
+                if instruction_tamper:
+                    with self.assertRaises(SystemExit):
+                        release.isolated_native_check(app, folder / 'evidence', {})
+                else:
+                    receipt = release.isolated_native_check(app, folder / 'evidence', {})
+                    self.assertTrue(receipt['productionAppUnchanged'])
+            spawned = [args for args in calls if '--self-test' in args]
+            self.assertEqual(len(spawned), 0 if instruction_tamper else 1)
+            if spawned:
+                self.assertEqual(Path(spawned[0][1]), ROOT / 'scripts/run-bounded.py')
+                signature_checks = [i for i, args in enumerate(calls) if args[:4] == ['/usr/bin/codesign', '--verify', '--deep', '--strict']]
+                self.assertEqual(len(signature_checks), 1)
+                self.assertLess(signature_checks[0], calls.index(spawned[0]))
+            self.assertEqual(release.tree_digest(app), original_tree)
+
+    def test_native_checks_execute_only_nonce_clone_after_strict_verification(self):
+        self.native_clone_case()
+
+    def test_changed_clone_instruction_sections_prevent_any_native_execution(self):
+        self.native_clone_case(instruction_tamper=True)
+
+    def publication_case(self, *, fail_upload=False, changed_feed=False, existing_public=False, mismatch=False):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / 'remote').mkdir()
+            (folder / 'bin').mkdir()
+            command = folder / 'bin/gh'
+            command.write_text(FAKE_GH)
+            command.chmod(0o755)
+            source = 'a' * 40
+            state = {'release': {'tag_name': 'v1.3.3', 'draft': not existing_public, 'target_commitish': source, 'assets': []} if existing_public or mismatch else None}
+            assets = []
+            for name, contents in [('app.zip', b'app-generated'), ('appcast.xml', b'candidate-feed-generated')]:
+                path = folder / name
+                path.write_bytes(contents)
+                assets.append(path)
+            if mismatch:
+                state['release']['assets'] = [{'name': 'app.zip'}]
+                (folder / 'remote/app.zip').write_bytes(b'changed-upload')
+            (folder / 'state.json').write_text(json.dumps(state))
+            notes = folder / 'notes.md'
+            notes.write_text('Generated fixture release')
+            old_hash = hashlib.sha256(b'old-feed-generated').hexdigest()
+
+            def generated_download(url, destination):
+                if url == release.FEED:
+                    published = json.loads((folder / 'state.json').read_text())['release']
+                    if published is not None and not published['draft']:
+                        destination.write_bytes(b'candidate-feed-generated')
+                    else:
+                        destination.write_bytes(b'changed-feed' if changed_feed else b'old-feed-generated')
+                else:
+                    shutil.copyfile(folder / 'remote' / url.rsplit('/', 1)[-1], destination)
+
+            environment = {'PATH': str(folder / 'bin') + os.pathsep + os.environ['PATH'], 'VALE_RELEASE_FIXTURE': str(folder)}
+            if fail_upload:
+                environment['VALE_RELEASE_FAIL_UPLOAD'] = 'yes'
+            with patch.dict(os.environ, environment), patch.object(release, 'download', side_effect=generated_download):
+                if fail_upload or changed_feed or existing_public or mismatch:
+                    with self.assertRaises(SystemExit):
+                        release.publish('v1.3.3', source, assets, notes, old_hash, folder)
+                else:
+                    release.publish('v1.3.3', source, assets, notes, old_hash, folder)
+            calls = [json.loads(line) for line in (folder / 'calls.jsonl').read_text().splitlines()]
+            promoted = any(call[:2] == ['release', 'edit'] for call in calls)
+            self.assertEqual(promoted, not (fail_upload or changed_feed or existing_public or mismatch))
+            if promoted:
+                edit_index = next(index for index, call in enumerate(calls) if call[:2] == ['release', 'edit'])
+                self.assertEqual(sum(call[:2] == ['release', 'download'] for call in calls[:edit_index]), len(assets))
+
+    def test_draft_upload_failure_never_promotes(self):
+        self.publication_case(fail_upload=True)
+
+    def test_changed_production_feed_never_promotes(self):
+        self.publication_case(changed_feed=True)
+
+    def test_public_version_is_immutable(self):
+        self.publication_case(existing_public=True)
+
+    def test_changed_draft_asset_never_promotes(self):
+        self.publication_case(mismatch=True)
+
+    def test_complete_draft_verified_before_promotion(self):
+        self.publication_case()
+
+    def test_public_only_crypto_verifier_rejects_tampering(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            fixture = folder / 'fixture.swift'
+            fixture.write_text('''import CryptoKit
+import Foundation
+let root = URL(fileURLWithPath: CommandLine.arguments[1])
+let key = Curve25519.Signing.PrivateKey()
+let archive = Data("generated archive".utf8)
+try archive.write(to: root.appendingPathComponent("archive.zip"))
+let content = Data("<rss><channel/></rss>\\n".utf8)
+let sig = try key.signature(for: content).base64EncodedString()
+let footer = "<!-- sparkle-signatures:\\nedSignature: \\(sig)\\nlength: \\(content.count)\\n-->\\n"
+try (content + Data(footer.utf8)).write(to: root.appendingPathComponent("feed.xml"))
+print(key.publicKey.rawRepresentation.base64EncodedString())
+print(try key.signature(for: archive).base64EncodedString())
+''')
+            environment = os.environ.copy()
+            sdk = Path('/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
+            if sdk.exists():
+                environment['SDKROOT'] = str(sdk)
+            environment['CLANG_MODULE_CACHE_PATH'] = str(folder / 'module-cache')
+            generated = subprocess.run(['swift', str(fixture), str(folder)], env=environment, capture_output=True, text=True)
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            key, signature = generated.stdout.splitlines()
+
+            def verify(mode, path, sig=None):
+                command = ['swift', str(ROOT / 'scripts/verify-release-signatures.swift'), mode, key, str(path)]
+                return subprocess.run(command + ([sig] if sig else []), env=environment, capture_output=True)
+
+            archive = folder / 'archive.zip'
+            feed = folder / 'feed.xml'
+            self.assertEqual(verify('archive', archive, signature).returncode, 0)
+            self.assertEqual(verify('feed', feed).returncode, 0)
+            with patch.dict(os.environ, {'SDKROOT': '/nonexistent/stale-sdk'}):
+                release.verifier('feed', key, feed)
+            archive.write_bytes(b'tampered')
+            self.assertNotEqual(verify('archive', archive, signature).returncode, 0)
+            original = feed.read_bytes()
+            feed.write_bytes(original.replace(b'<channel/>', b'<changed/>'))
+            self.assertNotEqual(verify('feed', feed).returncode, 0)
+            feed.write_bytes(original.replace(b'length: ', b'length: 9'))
+            self.assertNotEqual(verify('feed', feed).returncode, 0)
+            feed.write_bytes(original + b'unsigned trailing bytes')
+            self.assertNotEqual(verify('feed', feed).returncode, 0)
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

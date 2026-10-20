@@ -68,6 +68,7 @@ def create(args):
         signature = proof.get('signature', {}).get('kind', 'unverified')
         web = proof.get('knownFailureAcknowledged') == 'explicitWebSearchUsesRealTool'
         preview = proof.get('status') == 'preview-needs-chatgpt-consent'
+        automatic_delivery = proof.get('deliveryChannel') == 'automatic-update'
         if preview and (proof.get('releaseReady') is not False or proof.get('genuineChatGPTVerified') is not False):
             raise SystemExit('A ChatGPT preview must retain explicit unaccepted integration labels.')
         pearl = proof.get('interface') == 'pearl-companion'
@@ -116,6 +117,11 @@ feed/key does not mean the production HTTPS feed has been published or verified;
 until that delivery step completes a check can report an unavailable feed.
 
 '''
+        if automatic_delivery:
+            readme += '''\nThis package is intended for the automatic-update channel. Its included receipt
+records software verification at preparation time. Read the current GitHub release
+and automatic-update receipt for publication/feed verification; preparation does
+not establish genuine account, hardware, target-laptop or notarization acceptance.\n'''
         if web:
             readme += '''Known limitation: the genuine Web integration assertion failed in the
 tested CLI/runtime with execution tools disabled. Its false result remains in

@@ -17,8 +17,14 @@ Vale is a general-purpose native macOS companion with an optional learning mode.
 3. Run the packaged app on Apple Silicon. Universal compilation is already supported; Intel is the only runtime verified so far.
 4. Review VoiceOver, keyboard navigation, contrast, large text, and physical file picker/drop/paste flows.
 5. Test account expiry/quota/offline recovery, cold restarts, large histories, and difficult PDFs/documents.
-6. Rebuild the owner-rejected1.3.1 native composition under [the native pipeline](design/native-product-pipeline.md), then complete genuine direct ChatGPT consent/inference, frozen-source review and signed candidate delivery. The1.3.2 candidate is not visually accepted or production ready yet. The 1.3.0 bootstrap is published: anonymous signed downloads and an actual configured Sparkle production check passed. One-time laptop bootstrap installation remains pending; source, package, live feed and target installation require separate evidence. Preserve the private signing seed across repository maintenance. Developer ID/notarization and an encrypted external key backup remain distribution/maintenance follow-up work.
+6. The approved Pearl compact companion is implemented at1.3.3/build10 and published as a manual preview. Deliver the identical reviewed app through the signed automatic-update feed using [the release workflow](releases.md). Genuine direct ChatGPT, physical-device and target-laptop acceptance remain separate. The 1.3.0 bootstrap is published: anonymous signed downloads and an actual configured Sparkle production check passed. One-time laptop bootstrap installation remains pending; source, package, live feed and target installation require separate evidence. Preserve the private signing seed across repository maintenance. Developer ID/notarization and an encrypted external key backup remain distribution/maintenance follow-up work.
 
 ## Scope
 
 Live context is explicit selected-window sampling kept locally; images are sent on questions or guide actions. Voice currently takes turns through complete provider replies. Network audio/video streaming and full-duplex voice are not implemented. No notch integration, persistent agents, routines/connectors, or autonomous computer control is planned in the current scope.
+
+## Release delivery
+
+| Item | Status | Owner | Outcome | Evidence and remaining work |
+| --- | --- | --- | --- | --- |
+| V10 | P0 / signed release automation under review | Main chat coordinates delivery and independent review | One command builds, checks, packages, signs Sparkle updates, stages verified GitHub assets, promotes latest and verifies public downloads. Reuse exact reviewed Pearl1.3.3/build10 for automatic delivery. | [Release workflow](releases.md). Publishing and actual isolated SDK upgrade acceptance pending; original preview assets remain immutable. Developer ID/notarization and target-laptop installation are separate unverified boundaries. |
