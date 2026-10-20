@@ -11,7 +11,7 @@ import CryptoKit
         var generatedOnly: Bool { self != .unknown }
 
         /// Generated view data alone is insufficient if a saved account can appear in Settings.
-        static func generatedHarness(account: ChatGPTAccount) -> Self {
+        @MainActor static func generatedHarness(account: ChatGPTAccount) -> Self {
             let harness = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") || CommandLine.arguments.contains("--verify-release-feed")
             return classify(harness: harness, disposable: account.isDisposableFixture, accountless: account.accounts.isEmpty && account.activeAccountID == nil && !account.isSignedIn && !account.isSigningIn && account.error == nil)
         }
