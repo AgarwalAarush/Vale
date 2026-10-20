@@ -3,7 +3,7 @@ import LiltCore
 
 /// Exercises real account tasks against a shared disposable store and a transport with no sockets.
 @MainActor enum ChatGPTLifecycleChecks {
-    static func makeSettingsFixture(planGranted: Bool) async throws -> ChatGPTAccount {
+    static func makeSettingsFixture(planGranted: Bool, identityPending: Bool = false) async throws -> ChatGPTAccount {
         guard CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else { throw ChatGPTError("Generated account views are restricted to the native harness.") }
         let (store, http) = try fixture(expiring: false)
         if !planGranted {
@@ -11,8 +11,13 @@ import LiltCore
                 for index in vault.registrations.indices { vault.registrations[index].tokens?.scopes = ["openid", "profile", "email"] }
             }
         }
+        if identityPending {
+            _ = try await store.update { vault in
+                for index in vault.registrations.indices { vault.registrations[index].tokens?.identityValidationPending = true }
+            }
+        }
         let account = try ChatGPTAccount(testingStore: store, testingTransport: http)
-        if planGranted { account.refreshModels(); try await wait { account.models.count == 2 } }
+        if planGranted && !identityPending { account.refreshModels(); try await wait { account.models.count == 2 } }
         return account
     }
     static func run() async -> [String: Bool] {

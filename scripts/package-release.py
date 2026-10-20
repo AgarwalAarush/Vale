@@ -176,7 +176,31 @@ def sparkle_receipts(args, series):
     return receipts
 
 
+def validate_evidence_png(path, expected_head):
+    """Admit only exact-source, explicitly generated full-window native evidence."""
+    path = Path(path)
+    if path.is_symlink() or not path.is_file():
+        raise SystemExit(f'Missing regular screenshot: {path.name}')
+    metadata = read_json(path.with_suffix(path.suffix + '.json'))
+    allowed = {'generated-accountless-harness', 'generated-disposable-fixture'}
+    if (not re.fullmatch(r'[0-9a-f]{40}', expected_head)
+            or metadata.get('sourceRevision') != expected_head
+            or metadata.get('captureProvenance') not in allowed
+            or metadata.get('generatedTestDataOnly') is not True
+            or metadata.get('publicArchiveEligible') is not True
+            or metadata.get('method') != 'in-process-full-window-raster'
+            or metadata.get('includesWindowControlsInHierarchy') is not True):
+        raise SystemExit(f'Private, unknown, or stale screenshot refused for public archive: {path.name}')
+    data = path.read_bytes()
+    if not data.startswith(b'\x89PNG\r\n\x1a\n') or metadata.get('pngSHA256') != hashlib.sha256(data).hexdigest():
+        raise SystemExit(f'Invalid or unbound evidence PNG: {path.name}')
+    scan_bytes(path.name, data)
+    scan_bytes(path.name + '.json', json_bytes(metadata))
+    return data, metadata
+
+
 def add_evidence(archive, prefix, summaries, series):
+    expected_head = command('git', 'rev-parse', 'HEAD')
     for name, value in summaries.items():
         data = json_bytes(value)
         scan_bytes(name, data)
@@ -187,13 +211,11 @@ def add_evidence(archive, prefix, summaries, series):
             path = ROOT / 'artifacts' / folder / name
             if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to((ROOT / 'artifacts').resolve()):
                 raise SystemExit(f'Missing regular allowlisted screenshot: {folder}/{name}')
-            data = path.read_bytes()
-            if not data.startswith(b'\x89PNG\r\n\x1a\n'):
-                raise SystemExit(f'Invalid allowlisted PNG: {folder}/{name}')
-            scan_bytes(name, data)
+            data, metadata = validate_evidence_png(path, expected_head)
             # A failed Web attempt remains evidence, without presenting its filename as a successful search.
             output_name = '11-web-search-attempt.png' if name == '11-live-web-search.png' else name
             archive.writestr(prefix + 'evidence/' + folder + '/' + output_name, data)
+            archive.writestr(prefix + 'evidence/' + folder + '/' + output_name + '.json', json_bytes(metadata))
 
 
 def audit_source_zip(path, prefix):

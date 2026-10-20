@@ -3,8 +3,8 @@ import LiltCore
 
 /// Disposable protocol checks. These never open a browser or touch the production credential store.
 @MainActor enum ChatGPTAccountChecks {
-    static func makeSettingsFixture(planGranted: Bool = true) async throws -> ChatGPTAccount {
-        try await ChatGPTLifecycleChecks.makeSettingsFixture(planGranted: planGranted)
+    static func makeSettingsFixture(planGranted: Bool = true, identityPending: Bool = false) async throws -> ChatGPTAccount {
+        try await ChatGPTLifecycleChecks.makeSettingsFixture(planGranted: planGranted, identityPending: identityPending)
     }
     static func run() async -> [String: Bool] {
         guard CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else { return [:] }

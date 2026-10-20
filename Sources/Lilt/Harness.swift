@@ -3,8 +3,10 @@ import PDFKit
 import LiltCore
 
 extension AppController {
-    func snapshot(_ window:NSWindow,to file:URL)throws{
-        try NativeWindowEvidence.capture(window, to: file)
+    func snapshot(_ window:NSWindow,to file:URL,provenance:NativeWindowEvidence.Provenance? = nil)throws{
+        // Only this harness supplies the primary window's generated-data assertion.
+        let source = provenance ?? (window === workspace ? .generatedHarness(account: model.provider.account) : .unknown)
+        try NativeWindowEvidence.capture(window, to: file, provenance: source)
     }
     func settle()async{try? await Task.sleep(nanoseconds:650_000_000)}
     func waitForReply()async{let start=Date();while model.busy && Date().timeIntervalSince(start)<155{try? await Task.sleep(nanoseconds:200_000_000)}}
@@ -68,13 +70,31 @@ extension AppController {
             if CommandLine.arguments.contains("--integration-test"){
                 model.draft="Compare the two images, then give the verification token in the PDF and the reminder in the text file. Be brief."
                 await settle()
-                if editor != nil,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){NSApp.sendEvent(enter)}
-                results["returnSendsMessage"]=model.active?.messages.last?.role == "user" && model.draft.isEmpty
-                await waitForReply()
-                let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text.lowercased() : ""
-                results["realMultiImagePDFTextReply"]=answer.contains("red") && answer.contains("blue") && answer.contains("harbor-73") && answer.contains("notebook")
-                results["messageRetainsAttachments"]=model.active?.messages.first?.attachments.count==4 && model.pendingFiles.isEmpty
-                await settle();try snapshot(workspace,to:output.appendingPathComponent("07-real-general-reply.png"))
+                let eligible = model.provider.account.permitsPlanUsage
+                let unsentDraft = model.draft, unsentFiles = model.pendingFiles
+                let messageCount = model.active?.messages.count
+                let unsentBytes = try unsentFiles.map { try Data(contentsOf: model.fileStore!.url(for: $0)) }
+                if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){workspace.makeFirstResponder(editor);NSApp.sendEvent(enter)}
+                if eligible {
+                    results["returnSendsMessage"]=model.active?.messages.last?.role == "user" && model.draft.isEmpty
+                    await waitForReply()
+                    let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text.lowercased() : ""
+                    results["realMultiImagePDFTextReply"]=answer.contains("red") && answer.contains("blue") && answer.contains("harbor-73") && answer.contains("notebook")
+                    results["messageRetainsAttachments"]=model.active?.messages.first?.attachments.count==4 && model.pendingFiles.isEmpty
+                    await settle();try snapshot(workspace,to:output.appendingPathComponent("07-real-general-reply.png"))
+                } else {
+                    let retainedBytes = try model.pendingFiles.map { try Data(contentsOf: model.fileStore!.url(for: $0)) }
+                    results["disconnectedReturnPreservesExactDraftFilesAndMessageCount"] = model.draft == unsentDraft && model.pendingFiles.map(\.id) == unsentFiles.map(\.id) && retainedBytes == unsentBytes && model.active?.messages.count == messageCount && !model.busy
+                    results["realMultiImagePDFTextReply"] = false
+                    // Separate offline model/storage journey. This is not native Return or inference evidence.
+                    let previousAdapter = model.provider.fixtureReply
+                    var localCalls = 0
+                    model.provider.fixtureReply = { _, _, _, complete in localCalls += 1; complete(.failure(AppError("Generated offline storage journey; no account request"))) }
+                    model.send(); await until { !model.busy }
+                    model.provider.fixtureReply = previousAdapter
+                    results["offlineModelSendEstablishesSentFilePersistence"] = localCalls == 1 && model.active?.messages.last?.role == "user" && model.draft.isEmpty && model.active?.messages.first?.attachments.map(\.id) == unsentFiles.map(\.id) && model.pendingFiles.isEmpty
+                    await settle();try snapshot(workspace,to:output.appendingPathComponent("07-offline-storage-journey.png"))
+                }
             }else{
                 let records=model.pendingFiles
                 model.updateActive{$0.messages=[Message(role:"user",text:"Compare these and summarize the documents.",attachments:records),Message(role:"assistant",text:"A shows a red circle; B shows a blue square. The PDF’s verification token is HARBOR-73. Your note says to bring a notebook.")];$0.pendingAttachments=[];$0.title="Compare images and documents"}

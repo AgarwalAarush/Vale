@@ -109,7 +109,7 @@ The frontmatter records the actual sRGB pairs from `Theme` in [Design.swift](Sou
 
 ### Primary
 
-**Theme accent** marks links, optional tool selection, focus strokes and the editor caret. This is the custom adaptive accent pair, not a promise to follow the user's macOS accent preference. Send and Stop use **action/on-action**. Native AppKit/SwiftUI controls retain platform appearance and system selection behavior.
+**Theme accent** marks links, optional tool selection, focus strokes and the editor caret. This is the custom adaptive accent pair, not a promise to follow the user's macOS accent preference. Send, Stop and the primary Continue/Retry connection controls use **action/on-action**. Native AppKit/SwiftUI controls retain platform appearance and system selection behavior.
 
 ### Neutral
 
@@ -182,6 +182,8 @@ The plain NSTextView preserves native typing, IME, selection, undo and clipboard
 | Busy | Stop replaces Send, thinking is visible and continued drafting remains available |
 | Failed/retry | Preserve message/files/request ownership and offer Retry message when valid |
 | Paused | Explain mic/sharing are off and offer Resume; preserve draft |
+
+File imports show compact accessible Adding files… feedback beside the composer and in Files; covered routes keep passive toolbar status. When another chat owns the import, that status names the owner. Typing remains available; Stop response does not cancel file imports. Failed-question Retry remains visible after navigation or relaunch and preserves newer drafts/files.
 
 Files, selected-window context, Web and Voice remain subordinate tools. Web on/off is saved per chat, visible and accessibility-labeled. Opt-in does not establish hosted-tool success; account/workspace/model availability applies. No permanent Ready-to-type or idle voice footer.
 

@@ -12,6 +12,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var busy = false
     @Published var conversation=false
     @Published var importing = false
+    @Published private(set) var importOwnerID: UUID?
+    private var fixtureImportGate: (@MainActor () async -> Void)?
     @Published private(set) var errorOffersSettings = false
     private var settingsForNextError = false
     @Published var error: String? {
@@ -73,7 +75,14 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var contextName: String? { context.title }
     var pendingFiles: [AttachmentRecord] { active?.pendingAttachments ?? [] }
     var hasInput: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty }
-    var canRetry: Bool { ReplyRetry.isAvailable(busy: busy, hasFailedQuestion: failedQuestion != nil, lastRole: active?.messages.last?.role) }
+    var canRetry: Bool { ReplyRetry.isAvailable(busy: busy, hasFailedQuestion: failedQuestion != nil || active?.messages.last?.answerFailed == true, lastRole: active?.messages.last?.role) }
+    var retryEnabled: Bool { canRetry && provider.account.permitsPlanUsage && !paused && !importing }
+    var importStatus: String? {
+        guard importing else { return nil }
+        guard importOwnerID != activeID else { return "Adding files…" }
+        let title = sessions.first { $0.id == importOwnerID }?.title ?? "another chat"
+        return "Adding files to \(title)…"
+    }
     var status: String {
         let line = FooterStatus.line(paused: paused, importing: importing, microphoneStarting: voice.starting, listening: voice.listening, waiting: busy, speaking: voice.speaking, conversation: conversation)
         if line == "Voice off" { return CompanionStatus(canSend: hasInput && active != nil).line }
@@ -197,7 +206,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let raw = override ?? draft
         let kept = OutgoingMessage.text(raw)
         let retryFiles = retry ? chat.messages.last(where:{$0.role=="user"})?.attachments ?? [] : []
-        let hasFiles = !chat.pendingAttachments.isEmpty || !retryFiles.isEmpty
+        let hasFiles = retry ? !retryFiles.isEmpty : !chat.pendingAttachments.isEmpty
         let stored = kept ?? (hasFiles ? "" : nil)
         guard let stored else { return }
         let question = kept ?? AttachmentQuestion.modelPrompt
@@ -229,8 +238,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if ComposerFocus.returns(afterSending: override == nil && !spoken && !pointing && !reveal && !guideRequested) { composerFocus += 1 }
         var history=chat
         if history.messages.last?.role=="user", history.messages.last?.text==stored { history.messages.removeLast() }
-        let newest = (chat.messages.last { $0.role == "user" }?.attachments ?? []).map(\.id) + chat.pendingAttachments.map(\.id)
-        let records=FileBudget.ordered(chat.files, newest: newest);let files=fileStore;let wantsSearch=chat.webEnabled
+        let newest = (chat.messages.last { $0.role == "user" }?.attachments ?? []).map(\.id) + (retry ? [] : chat.pendingAttachments.map(\.id))
+        let records=FileBudget.ordered(retry ? chat.messages.flatMap(\.attachments) : chat.files, newest: newest);let files=fileStore;let wantsSearch=chat.webEnabled
         let wantsGuide = guideRequested || GuideRequest.explicit(question)
         let startedGuide = guideEpoch
         let requestedSpeechGeneration = spokenReplyGeneration
@@ -309,7 +318,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             }
         }
     }
-    func retry(){if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
+    func retry(){guard canRetry else{return};if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
     func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send(HintRequest.prompt,preserveDraft:true)}
     func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send(PointRequest.prompt,pointing:true,preserveDraft:true)}
     func toggleVoice(){
@@ -404,13 +413,23 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard active != nil else { return }
         editDraft(DroppedLink.inserted(into:draft,links:links))
     }
+    /// A one-shot hold for generated native evidence; production imports have no artificial delay.
+    func installImportFixtureGate(_ gate: @escaping @MainActor () async -> Void) throws {
+        guard provider.account.isDisposableFixture,
+              CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else {
+            throw AppError("Import holds are restricted to disposable native fixtures")
+        }
+        fixtureImportGate = gate
+    }
     func importFiles(_ urls:[URL]) async {
         if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: activeID != nil, importing: importing) { error = refusal; return }
         guard let chatID=activeID,let files=fileStore else{return}
         let valid=urls.filter(\.isFileURL)
         let existing = active?.files.count ?? 0
         guard existing+valid.count<=8 else{error="Attach up to 8 files in a chat. Remove a file or start a new chat.";return}
-        importing=true;defer{importing=false}
+        importOwnerID=chatID;importing=true;defer{importing=false;importOwnerID=nil}
+        let fixtureGate = fixtureImportGate; fixtureImportGate = nil
+        if let fixtureGate { await fixtureGate() }
         let extraRoom = 8-existing-valid.count
         let outcomes=await Task.detached(priority:.userInitiated){ () -> [ImportOutcome] in
             var room = extraRoom; var outcomes: [ImportOutcome] = []

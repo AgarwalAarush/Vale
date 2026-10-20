@@ -37,8 +37,11 @@ extension AppController {
         let emptyEditor = workspace.contentView.flatMap { composer(in: $0) }
         workspace.appearance = NSAppearance(named: .darkAqua)
         try await capture("workspace-01b-empty-dark")
-        workspace.setContentSize(NSSize(width: 740, height: 560))
+        workspace.setFrame(NSRect(origin: workspace.frame.origin, size: workspace.minSize), display: true)
+        results["workspaceMinimumDarkUsesProductionFrameConstraint"] = workspace.frame.size == workspace.minSize
         try await capture("workspace-01c-empty-minimum-dark")
+        workspace.appearance = NSAppearance(named: .aqua)
+        try await capture("workspace-01d-empty-minimum-light")
         workspace.appearance = NSAppearance(named: .aqua)
         workspace.setContentSize(NSSize(width: 1040, height: 740))
 
@@ -155,7 +158,8 @@ extension AppController {
         model.openSettings(); try await capture("workspace-09-settings-dark")
         model.backToChat()
         workspace.appearance = NSAppearance(named: .aqua)
-        workspace.setContentSize(NSSize(width: 740, height: 560)); model.compactHistoryVisible = false
+        workspace.setFrame(NSRect(origin: workspace.frame.origin, size: workspace.minSize), display: true); model.compactHistoryVisible = false
+        results["workspaceMinimumConversationUsesProductionFrameConstraint"] = workspace.frame.size == workspace.minSize
         try await capture("workspace-10-compact-chat")
         model.showInspector(.notes); try await capture("workspace-11-compact-notes")
         results["workspaceCompactInspectorKeepsWindowIdentity"] = oneWorkspace() && model.draft == composedDraft && model.inspector == .notes
@@ -199,6 +203,7 @@ extension AppController {
         try runClosedChatInputAcceptance(output: output, results: &results)
         try await runChatGPTSettingsVisualAcceptance(output: output)
         try await runChatGPTWorkspaceVisualAcceptance(output: output, results: &results)
+        try await runImportFeedbackAcceptance(output: output, results: &results)
     }
 }
 
@@ -208,9 +213,9 @@ extension AppController {
     func runChatGPTWorkspaceVisualAcceptance(output: URL, results: inout [String: Bool]) async throws {
         workspace.orderOut(nil)
         defer { workspace.makeKeyAndOrderFront(nil) }
-        for granted in [true, false] {
-            let account = try await ChatGPTAccountChecks.makeSettingsFixture(planGranted: granted)
-            let fixture = try AppModel(testingAccount: account, dataDirectory: output.appendingPathComponent("workspace-account-layout-\(granted)-fixture"))
+        for (granted, identityPending) in [(true, false), (false, false), (true, true)] {
+            let account = try await ChatGPTAccountChecks.makeSettingsFixture(planGranted: granted, identityPending: identityPending)
+            let fixture = try AppModel(testingAccount: account, dataDirectory: output.appendingPathComponent("workspace-account-layout-\(granted)-\(identityPending)-fixture"))
             fixture.voice.enableFixtures(); fixture.newSession()
             let window = NativeWorkspaceWindow(model: fixture, rememberFrame: false)
             defer { fixture.suspend(); window.close() }
@@ -222,26 +227,53 @@ extension AppController {
             }
             await settle()
             if let input = window.contentView.flatMap({ editor(in: $0) }) { window.makeFirstResponder(input) }
-            let state = granted ? "connected" : "grant-needed"
+            let state = identityPending ? "retry-connection" : granted ? "connected" : "grant-needed"
             for dark in [false, true] {
                 window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                 await settle()
-                try snapshot(window, to: output.appendingPathComponent("workspace-full-\(state)-\(dark ? "dark" : "light")-generated-account.png"))
+                try snapshot(window, to: output.appendingPathComponent("workspace-full-\(state)-\(dark ? "dark" : "light")-generated-account.png"), provenance: .generatedHarness(account: account))
             }
-            if granted {
+            if identityPending {
+                window.setFrame(NSRect(origin: window.frame.origin, size: window.minSize), display: true)
+                for dark in [false, true] {
+                    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                    await settle()
+                    try snapshot(window, to: output.appendingPathComponent("workspace-full-retry-connection-minimum-\(dark ? "dark" : "light")-generated-account.png"), provenance: .generatedHarness(account: account))
+                }
+                results["workspaceRetryConnectionUsesTrueMinimumFrame"] = window.frame.size == window.minSize && account.needsIdentityValidation && !account.permitsPlanUsage
+            }
+            if granted && !identityPending {
+                try runCaptureProvenanceAcceptance(window: window, account: account, output: output, results: &results)
                 fixture.draft = "Please turn the research into a practical plan."
                 fixture.updateActive { chat in
                     chat.title = "Research notes and a practical plan"
                     chat.messages = [Message(role: "user", text: "How should I organize the work?"), Message(role: "assistant", text: "Start with the task you need to finish.\n\nKeep the supporting files in this conversation, write down the decisions, and work through one concrete step at a time. You can keep drafting while you review the answer.")]
                 }
                 await settle()
-                try snapshot(window, to: output.appendingPathComponent("workspace-full-connected-conversation-dark-generated-account.png"))
+                try snapshot(window, to: output.appendingPathComponent("workspace-full-connected-conversation-dark-generated-account.png"), provenance: .generatedHarness(account: account))
                 var refusedProduction = false
                 fixture.provider.ask(prompt: "Generated account must remain offline") { result in
                     if case .failure = result { refusedProduction = true }
                 }
                 results["workspaceGeneratedAccountUsesRealViewsAndCannotReachProduction"] = fixture.provider.account === account && refusedProduction
                 if let input = window.contentView.flatMap({ editor(in: $0) }) {
+                    // Actual native Return with a permitted disposable account and generated attachments.
+                    fixture.newSession(title: "Generated native Return with attachments")
+                    await fixture.importFiles([output.appendingPathComponent("fixtures/A.png"), output.appendingPathComponent("fixtures/Brief.pdf")])
+                    let attachmentIDs = fixture.pendingFiles.map(\.id)
+                    let attachmentBytes = try fixture.pendingFiles.map { try Data(contentsOf: fixture.fileStore!.url(for: $0)) }
+                    var returnCalls = 0, returnImages = 0
+                    fixture.provider.fixtureReply = { _, images, _, complete in
+                        returnCalls += 1; returnImages = images.count
+                        complete(.success(TutorReply(text: "Generated native Return answer; no production request.")))
+                    }
+                    fixture.draft = "Generated native Return question."
+                    await settle(); window.makeFirstResponder(input)
+                    if let enter = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36) { NSApp.sendEvent(enter) }
+                    await until { !fixture.busy }
+                    let question = fixture.active?.messages.first
+                    let retainedBytes = try (question?.attachments ?? []).map { try Data(contentsOf: fixture.fileStore!.url(for: $0)) }
+                    results["workspaceGeneratedConnectedNativeReturnSendsOriginalAttachments"] = account.permitsPlanUsage && returnCalls == 1 && returnImages == 1 && question?.role == "user" && question?.text == "Generated native Return question." && question?.attachments.map(\.id) == attachmentIDs && retainedBytes == attachmentBytes && fixture.pendingFiles.isEmpty && fixture.draft.isEmpty && fixture.active?.messages.last?.text == "Generated native Return answer; no production request."
                     var sent = 0
                     fixture.provider.fixtureReply = { _, _, _, _ in sent += 1 }
                     func sendKey(_ text: String, code: UInt16) {
@@ -268,6 +300,7 @@ extension AppController {
                     sendKey("x", code: 7); sendKey("\r", code: 36); await settle()
                     results["workspaceSidebarCoverCommitsMarkedTextAndRejectsHiddenKeys"] = resignedOnSidebar && fixture.draft == markedDraft && fixture.active?.draft == markedDraft && !input.hasMarkedText() && sent == 0
                 } else {
+                    results["workspaceGeneratedConnectedNativeReturnSendsOriginalAttachments"] = false
                     results["workspaceResizeCoverResignsComposerAndRejectsHiddenKeys"] = false
                     results["workspaceSidebarCoverCommitsMarkedTextAndRejectsHiddenKeys"] = false
                 }
@@ -301,7 +334,7 @@ extension AppController {
                 workspace.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                 await settle()
                 let state = granted ? "connected" : "grant-needed"
-                try snapshot(workspace, to: output.appendingPathComponent("workspace-account-\(state)-\(dark ? "dark" : "light")-fixture.png"))
+                try snapshot(workspace, to: output.appendingPathComponent("workspace-account-\(state)-\(dark ? "dark" : "light")-fixture.png"), provenance: .generatedHarness(account: account))
             }
         }
     }
@@ -446,23 +479,50 @@ extension AppController {
     /// Real model/store transitions with a labeled generated provider adapter.
     func runCursorReplyAcceptance(output: URL, results: inout [String: Bool]) async throws {
         let directory = output.appendingPathComponent("cursor-reply-fixture-" + UUID().uuidString)
-        let initial = AppModel(dataDirectory: directory)
+        let account = try await ChatGPTAccountChecks.makeSettingsFixture()
+        let initial = try AppModel(testingAccount: account, dataDirectory: directory)
         initial.voice.enableFixtures()
         defer { initial.suspend() }
         initial.newSession(title: "Generated saved attachment-only retry")
         initial.pasteImage(try Data(contentsOf: output.appendingPathComponent("fixtures/A.png")))
         initial.provider.fixtureReply = { _, _, _, complete in complete(.failure(AppError("Generated provider refusal"))) }
         initial.send(); await until { !initial.busy }
-        initial.persist(); initial.suspend()
-        let restored = AppModel(dataDirectory: directory)
+        let failedChatID = initial.activeID, questionID = initial.active?.messages.last?.id
+        initial.draft = "Keep this newer unsent draft."
+        initial.pasteImage(try Data(contentsOf: output.appendingPathComponent("fixtures/B.png")))
+        let pendingIDs = initial.pendingFiles.map(\.id)
+        let pendingBytes = try initial.pendingFiles.map { try Data(contentsOf: initial.fileStore!.url(for: $0)) }
+        initial.newSession(title: "Generated recovery navigation destination")
+        let otherChatCannotRetry = !initial.canRetry
+        if let failedChatID { initial.navigateToChat(failedChatID) }
+        results["workspaceFailedQuestionRetryVisibleEnabledAfterNavigation"] = otherChatCannotRetry && initial.canRetry && initial.retryEnabled && initial.active?.messages.last?.id == questionID && initial.draft == "Keep this newer unsent draft." && initial.pendingFiles.map(\.id) == pendingIDs
+        workspace.orderOut(nil)
+        defer { workspace.makeKeyAndOrderFront(nil) }
+        let navigationWindow = NativeWorkspaceWindow(model: initial)
+        navigationWindow.appearance = NSAppearance(named: .darkAqua); navigationWindow.makeKeyAndOrderFront(nil)
+        await settle()
+        try snapshot(navigationWindow, to: output.appendingPathComponent("workspace-restored-failed-retry-navigation-dark-generated-account.png"), provenance: .generatedHarness(account: account))
+        navigationWindow.close(); initial.persist(); initial.suspend()
+        let restored = try AppModel(testingAccount: account, dataDirectory: directory)
         restored.voice.enableFixtures()
         defer { restored.suspend() }
         restored.prepareChat()
-        let questionID = restored.active?.messages.last?.id
+        // Reopen the persisted failed chat after the fresh model's normal launch selection.
+        if let failedChatID { restored.navigateToChat(failedChatID) }
+        let restoredWindow = NativeWorkspaceWindow(model: restored)
+        defer { restoredWindow.close() }
+        restoredWindow.appearance = NSAppearance(named: .darkAqua); restoredWindow.makeKeyAndOrderFront(nil)
+        await settle()
+        results["workspaceFailedQuestionRetryVisibleEnabledAfterRelaunch"] = !restored.hasFailedQuestion && restored.canRetry && restored.retryEnabled && restored.activeID == failedChatID && restored.active?.messages.last?.id == questionID
+        try snapshot(restoredWindow, to: output.appendingPathComponent("workspace-restored-failed-retry-relaunch-dark-generated-account.png"), provenance: .generatedHarness(account: account))
         var retriedImages = 0
         restored.provider.fixtureReply = { _, images, _, complete in retriedImages = images.count; complete(.success(TutorReply(text: "Generated attachment retry answer."))) }
-        restored.retry(); await until { !restored.busy }
-        results["cursorSavedAttachmentOnlyRetryUsesOriginalFiles"] = restored.active?.messages.last?.text == "Generated attachment retry answer." && restored.active?.messages.filter { $0.role == "user" }.count == 1 && restored.active?.messages.first?.id == questionID && restored.active?.messages.first?.answerFailed == false && restored.active?.messages.first?.attachments.count == 1 && retriedImages == 1
+        // The rendered Retry message uses this exact enabled gate and action.
+        if restored.retryEnabled { restored.retry() }
+        await until { !restored.busy }
+        let retainedPendingBytes = try restored.pendingFiles.map { try Data(contentsOf: restored.fileStore!.url(for: $0)) }
+        results["cursorSavedAttachmentOnlyRetryUsesOriginalFiles"] = restored.active?.messages.last?.text == "Generated attachment retry answer." && restored.active?.messages.filter { $0.role == "user" }.count == 1 && restored.active?.messages.first?.id == questionID && restored.active?.messages.first?.answerFailed == false && restored.active?.messages.first?.attachments.count == 1 && retriedImages == 1 && restored.draft == "Keep this newer unsent draft." && restored.pendingFiles.map(\.id) == pendingIDs && retainedPendingBytes == pendingBytes && !restored.canRetry
+        restoredWindow.orderOut(nil)
 
         restored.newSession(title: "Generated stale-answer refresh")
         restored.updateActive { $0.messages = [Message(role: "user", text: "Which button?"), Message(role: "assistant", text: "Generated stale answer.", screenChanged: true)] }
@@ -500,5 +560,121 @@ extension AppController {
         await settle()
         results["workspaceSentQuestionCannotReturnThroughNativeUndo"] = sendHadUndo && sentUndoWasCleared && model.draft.isEmpty && editor.string.isEmpty && model.active?.messages.last?.role == "user"
         model.stopInteraction()
+    }
+}
+
+extension AppController {
+    /// Negative provenance uses only the generated window and never a personal account.
+    func runCaptureProvenanceAcceptance(window: NSWindow, account: ChatGPTAccount, output: URL, results: inout [String: Bool]) throws {
+        let directory = output.appendingPathComponent("private-provenance-checks", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let unknown = directory.appendingPathComponent("unknown-default.png")
+        try NativeWindowEvidence.capture(window, to: unknown)
+        let nonfixture = NativeWindowEvidence.Provenance.classify(harness: true, disposable: false, accountless: false)
+        let nongenerated = directory.appendingPathComponent("nonfixture-classification.png")
+        try NativeWindowEvidence.capture(window, to: nongenerated, provenance: nonfixture)
+        let generated = directory.appendingPathComponent("generated-fixture.png")
+        try NativeWindowEvidence.capture(window, to: generated, provenance: .generatedHarness(account: account))
+        func metadata(_ file: URL) throws -> [String: Any] {
+            try JSONSerialization.jsonObject(with: Data(contentsOf: file.appendingPathExtension("json"))) as? [String: Any] ?? [:]
+        }
+        let unknownMetadata = try metadata(unknown), nonfixtureMetadata = try metadata(nongenerated), generatedMetadata = try metadata(generated)
+        results["nativeCaptureDefaultsUnknownAndNonfixtureStaysPrivate"] = unknownMetadata["generatedTestDataOnly"] as? Bool == false && unknownMetadata["publicArchiveEligible"] as? Bool == false && nonfixture == .unknown && nonfixtureMetadata["publicArchiveEligible"] as? Bool == false && NativeWindowEvidence.Provenance.classify(harness: false, disposable: true, accountless: true) == .unknown
+        results["nativeCaptureExplicitDisposableAndAccountlessProvenance"] = generatedMetadata["generatedTestDataOnly"] as? Bool == true && generatedMetadata["captureProvenance"] as? String == "generated-disposable-fixture" && NativeWindowEvidence.Provenance.classify(harness: true, disposable: false, accountless: true) == .generatedAccountlessHarness
+        results["nativeCaptureFilesAndSidecarsArePrivate"] = [unknown, nongenerated, generated].allSatisfy { file in
+            [file, file.appendingPathExtension("json")].allSatisfy { item in
+                let attributes = try? FileManager.default.attributesOfItem(atPath: item.path)
+                return (attributes?[.posixPermissions] as? NSNumber)?.intValue == 0o600
+            }
+        }
+    }
+}
+
+@MainActor private final class WorkspaceImportFixtureGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var open = false
+    func wait() async {
+        if open { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func release() { open = true; continuation?.resume(); continuation = nil }
+}
+
+extension AppController {
+    /// Held generated imports render bounded loading states; the actual detached file work still runs.
+    func runImportFeedbackAcceptance(output: URL, results: inout [String: Bool]) async throws {
+        workspace.orderOut(nil)
+        defer { workspace.makeKeyAndOrderFront(nil) }
+        let account = try await ChatGPTAccountChecks.makeSettingsFixture()
+        let directory = output.appendingPathComponent("import-feedback-fixture-" + UUID().uuidString)
+        let fixture = try AppModel(testingAccount: account, dataDirectory: directory)
+        fixture.voice.enableFixtures(); fixture.newSession(title: "Generated import owner")
+        fixture.draft = "Owner draft stays editable."
+        let ownerID = fixture.activeID
+        let window = NativeWorkspaceWindow(model: fixture)
+        defer { fixture.suspend(); window.close() }
+        window.makeKeyAndOrderFront(nil)
+        func capture(_ state: String) async throws {
+            await settle()
+            try snapshot(window, to: output.appendingPathComponent(state + ".png"), provenance: .generatedHarness(account: account))
+        }
+        func editor(in view: NSView) -> ComposerTextView? {
+            if let input = view as? ComposerTextView { return input }
+            return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        }
+        let gate = WorkspaceImportFixtureGate()
+        defer { gate.release() }
+        try fixture.installImportFixtureGate { await gate.wait() }
+        let importing = Task { await fixture.importFiles([output.appendingPathComponent("fixtures/A.png"), output.appendingPathComponent("fixtures/Brief.pdf")]) }
+        await until { fixture.importing }
+        window.appearance = NSAppearance(named: .aqua)
+        try await capture("workspace-import-chat-light-generated-account")
+        if let input = window.contentView.flatMap({ editor(in: $0) }) {
+            window.makeFirstResponder(input)
+            input.setSelectedRange(NSRange(location: input.string.utf16.count, length: 0))
+            input.insertText(" More while adding files.", replacementRange: NSRange(location: NSNotFound, length: 0))
+        }
+        await settle()
+        let ownerDraft = "Owner draft stays editable. More while adding files."
+        results["workspaceImportProgressKeepsNativeDraftingAvailable"] = fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files…" && fixture.pendingFiles.isEmpty && fixture.draft == ownerDraft && window.firstResponder === window.contentView.flatMap({ editor(in: $0) })
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.setFrame(NSRect(origin: window.frame.origin, size: window.minSize), display: true)
+        try await capture("workspace-import-minimum-dark-generated-account")
+        results["workspaceImportStatusUsesTrueMinimumFrame"] = window.frame.size == window.minSize
+        window.setContentSize(NSSize(width: 1040, height: 740))
+        fixture.showInspector(.files)
+        try await capture("workspace-import-files-dark-generated-account")
+        fixture.openSettings()
+        try await capture("workspace-import-covered-settings-dark-generated-account")
+        let noImportStop = window.toolbar?.items.contains { $0.itemIdentifier.rawValue == "vale.stop" } == false
+        let coveredStatus = window.toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.activity" }?.toolTip == "Adding files…"
+        fixture.newSession(title: "Generated other chat during import")
+        let otherID = fixture.activeID
+        fixture.draft = "Other chat draft stays here."
+        window.appearance = NSAppearance(named: .aqua)
+        try await capture("workspace-import-other-owner-chat-light-generated-account")
+        fixture.showInspector(.files)
+        try await capture("workspace-import-other-owner-files-light-generated-account")
+        fixture.openSettings()
+        try await capture("workspace-import-other-owner-settings-light-generated-account")
+        results["workspaceImportCoveredAndOtherChatIdentifyOwnerWithoutFalseStop"] = noImportStop && coveredStatus && fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files to Generated import owner…" && window.toolbar?.items.first(where: { $0.itemIdentifier.rawValue == "vale.activity" })?.toolTip == fixture.importStatus && window.toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.stop" }) == false
+        gate.release(); await importing.value; await settle()
+        let owner = fixture.sessions.first { $0.id == ownerID }
+        let ownerRecords = owner?.pendingAttachments ?? []
+        let persisted = try SessionStore(directory: directory).load()
+        let savedOwner = persisted.first { $0.id == ownerID }, savedOther = persisted.first { $0.id == otherID }
+        results["workspaceAsyncImportSuccessKeepsFilesAndBothDraftOwners"] = !fixture.importing && fixture.importOwnerID == nil && fixture.importStatus == nil && fixture.error == nil && ownerRecords.count == 2 && savedOwner?.pendingAttachments.map(\.id) == ownerRecords.map(\.id) && savedOwner?.draft == ownerDraft && savedOther?.draft == "Other chat draft stays here." && owner?.draft == ownerDraft && fixture.activeID == otherID && fixture.pendingFiles.isEmpty && fixture.draft == "Other chat draft stays here." && window.toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.activity" }) == false
+        // A second real asynchronous import fails on a generated nonexistent file.
+        let failureGate = WorkspaceImportFixtureGate()
+        defer { failureGate.release() }
+        if let ownerID { fixture.navigateToChat(ownerID) }
+        try fixture.installImportFixtureGate { await failureGate.wait() }
+        let failing = Task { await fixture.importFiles([output.appendingPathComponent("fixtures/generated-missing-file.txt")]) }
+        await until { fixture.importing }
+        if let otherID { fixture.navigateToChat(otherID) }
+        failureGate.release(); await failing.value; await settle()
+        results["workspaceAsyncImportFailureReplacesProgressWithoutMovingFilesOrDraft"] = !fixture.importing && fixture.importOwnerID == nil && fixture.importStatus == nil && fixture.error?.contains("generated-missing-file.txt") == true && fixture.activeID == otherID && fixture.pendingFiles.isEmpty && fixture.draft == "Other chat draft stays here." && fixture.sessions.first(where: { $0.id == ownerID })?.pendingAttachments.map(\.id) == ownerRecords.map(\.id)
+        fixture.backToChat(); window.appearance = NSAppearance(named: .darkAqua)
+        try await capture("workspace-import-failure-dark-generated-account")
     }
 }

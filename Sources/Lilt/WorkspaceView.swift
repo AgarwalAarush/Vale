@@ -143,6 +143,7 @@ struct WorkspaceView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Files").font(.system(size: 22, weight: .medium))
+                            if let status = model.importStatus { AttachmentImportStatus(text: status) }
                             if model.active?.files.isEmpty != false { Text("Files you attach to this chat appear here.").foregroundStyle(Theme.muted) }
                             ForEach(model.active?.files ?? []) { file in FileChip(record: file, among: model.active?.files ?? [], model: model, removable: SentFile.canRemove(id: file.id, session: model.active)) }
                             Button("Attach files…") { model.attachFiles() }.buttonStyle(QuietButton()).disabled(model.importing)

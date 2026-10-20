@@ -54,7 +54,7 @@ struct CoachView: View {
                         }.font(.system(size: 12)).buttonStyle(ActionButton()).foregroundStyle(Theme.accent)
                     }.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(Theme.warning.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                if model.canRetry { Button("Retry message") { model.retry() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent).font(.system(size: 13)).disabled(!account.permitsPlanUsage) }
+                if model.canRetry { Button("Retry message") { model.retry() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent).font(.system(size: 13)).disabled(!model.retryEnabled).accessibilityIdentifier("vale.retryMessage") }
                 if model.active != nil {
                     if model.context.hasSelection { ContextStrip(model: model).fixedSize(horizontal: false, vertical: true) }
                     if model.paused { HStack { Text("Paused · mic and sharing off").foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent) }.font(.system(size: 12)) }
@@ -101,7 +101,8 @@ struct CoachView: View {
     }
     private var composer: some View {
         let draftID = model.activeID
-        return VStack(spacing: 8) {
+        return VStack(alignment: .leading, spacing: 8) {
+            if let status = model.importStatus { AttachmentImportStatus(text: status) }
             if !model.pendingFiles.isEmpty { ScrollView(.horizontal) { HStack(spacing: 8) { ForEach(model.pendingFiles) { FileChip(record: $0, among: model.pendingFiles, model: model, removable: true) } } }.scrollIndicators(.hidden).fixedSize(horizontal: false, vertical: true) }
             ZStack(alignment: .topLeading) {
                 if FieldPrompt.showsIdle(model.draft) { Text(model.busy ? "Add a thought for your next message…" : "Message Vale…").font(.system(size: 15)).foregroundStyle(Theme.muted).padding(.top, 5).padding(.leading, 2).allowsHitTesting(false).accessibilityHidden(true) }
@@ -151,15 +152,19 @@ struct CoachView: View {
             if account.isSigningIn {
                 HStack(spacing: 8) { ProgressView().controlSize(.small); Button("Cancel") { account.cancelSignIn() }.buttonStyle(.bordered) }.accessibilityLabel("Connecting to ChatGPT")
             } else if account.needsIdentityValidation {
-                Button("Retry connection") { account.refreshModels() }.buttonStyle(.borderedProminent).tint(Theme.action).disabled(account.isSigningOut)
+                Button { account.refreshModels() } label: { connectionLabel("Retry connection") }
+                    .buttonStyle(ActionButton(background: Theme.action, feedback: Theme.onAction)).disabled(account.isSigningOut)
             } else {
-                Button("Continue with ChatGPT") { if account.isSignedIn { account.enablePlanUsage() } else { account.signIn() } }
-                    .buttonStyle(.borderedProminent).tint(Theme.action).disabled(account.isSigningOut)
+                Button { if account.isSignedIn { account.enablePlanUsage() } else { account.signIn() } } label: { connectionLabel("Continue with ChatGPT") }
+                    .buttonStyle(ActionButton(background: Theme.action, feedback: Theme.onAction)).disabled(account.isSigningOut)
             }
         } else {
             Button { if chatVisible { model.send() } } label: { Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30) }
                 .buttonStyle(ActionButton(background: Theme.action, feedback: Theme.onAction)).disabled(!sendReady).help("Send message (Return)").accessibilityLabel("Send message")
         }
+    }
+    private func connectionLabel(_ text: String) -> some View {
+        Text(text).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.onAction).padding(.horizontal, 12).frame(height: 30)
     }
     private func notice(_ text: String) -> some View { Text(text).font(.system(size: 12)).foregroundStyle(Theme.warning).frame(maxWidth: .infinity, alignment: .leading).padding(12) }
     private func revealLatest(_ proxy: ScrollViewProxy) {
@@ -309,5 +314,17 @@ struct EmptyGreeting: View {
     var body: some View {
         Text(session.mode == .learn ? "What are we working through?" : "What would you like to work on?")
             .font(.system(size: 20, weight: .regular)).foregroundStyle(Theme.ink).padding(.bottom, 2)
+    }
+}
+
+/// Passive feedback: Stop response does not cancel an attachment import.
+struct AttachmentImportStatus: View {
+    let text: String
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small).accessibilityHidden(true)
+            Text(text).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+        }.font(.system(size: 12)).foregroundStyle(Theme.muted)
+            .accessibilityElement(children: .ignore).accessibilityLabel(text)
     }
 }

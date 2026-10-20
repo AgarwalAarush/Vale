@@ -1,9 +1,27 @@
 import AppKit
+import CryptoKit
 
 /// App-owned, in-process rendering of the complete native view hierarchy.
 /// This deliberately makes no compositor, physical-input or hardware claim.
 @MainActor enum NativeWindowEvidence {
-    static func capture(_ window: NSWindow, to file: URL) throws {
+    enum Provenance: String {
+        case unknown = "unknown-potentially-personal"
+        case generatedAccountlessHarness = "generated-accountless-harness"
+        case generatedDisposableFixture = "generated-disposable-fixture"
+        var generatedOnly: Bool { self != .unknown }
+
+        /// Generated view data alone is insufficient if a saved account can appear in Settings.
+        static func generatedHarness(account: ChatGPTAccount) -> Self {
+            let harness = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") || CommandLine.arguments.contains("--verify-release-feed")
+            return classify(harness: harness, disposable: account.isDisposableFixture, accountless: account.accounts.isEmpty && account.activeAccountID == nil && !account.isSignedIn && !account.isSigningIn && account.error == nil)
+        }
+        static func classify(harness: Bool, disposable: Bool, accountless: Bool) -> Self {
+            guard harness else { return .unknown }
+            if disposable { return .generatedDisposableFixture }
+            return accountless ? .generatedAccountlessHarness : .unknown
+        }
+    }
+    static func capture(_ window: NSWindow, to file: URL, provenance: Provenance = .unknown) throws {
         guard window.isVisible, let content = window.contentView,
               let close = window.standardWindowButton(.closeButton) else {
             throw AppError("Full-window evidence requires a visible standard app window")
@@ -26,9 +44,10 @@ import AppKit
         guard let png = bitmap.representation(using: .png, properties: [:]) else {
             throw AppError("Couldn’t encode the native window frame")
         }
-        try png.write(to: file, options: .atomic)
+        try writePrivate(png, to: file)
         let metadata: [String: Any] = [
             "method": "in-process-full-window-raster",
+            "pngSHA256": SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined(),
             "limitations": ["Not a window-server compositor screenshot", "Not physical-input or hardware evidence", "Materials and shadows may differ from compositor output"],
             "state": file.deletingPathExtension().lastPathComponent,
             "sourceRevision": ProcessInfo.processInfo.environment["VALE_EVIDENCE_HEAD"] ?? "unrecorded-working-source",
@@ -43,9 +62,20 @@ import AppKit
             "includesWindowControlsInHierarchy": true,
             "toolbarPresent": window.toolbar != nil,
             "toolbarStyle": String(describing: window.toolbarStyle),
-            "generatedTestDataOnly": true
+            "captureProvenance": provenance.rawValue,
+            "publicArchiveEligible": provenance.generatedOnly,
+            "generatedTestDataOnly": provenance.generatedOnly
         ]
-        try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
-            .write(to: file.appendingPathExtension("json"), options: .atomic)
+        try writePrivate(JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys]), to: file.appendingPathExtension("json"))
+    }
+    private static func writePrivate(_ data: Data, to file: URL) throws {
+        let temporary = file.deletingLastPathComponent().appendingPathComponent(".native-evidence-" + UUID().uuidString)
+        guard FileManager.default.createFile(atPath: temporary.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw AppError("Couldn’t create private native evidence") }
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        let handle = try FileHandle(forWritingTo: temporary)
+        do { try handle.write(contentsOf: data); try handle.close() }
+        catch { try? handle.close(); throw error }
+        if FileManager.default.fileExists(atPath: file.path) { _ = try FileManager.default.replaceItemAt(file, withItemAt: temporary, options: .usingNewMetadataOnly) }
+        else { try FileManager.default.moveItem(at: temporary, to: file) }
     }
 }

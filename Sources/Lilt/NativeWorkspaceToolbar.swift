@@ -60,7 +60,7 @@ import LiltCore
             label.lineBreakMode = .byTruncatingTail; label.maximumNumberOfLines = 1
             label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             NSLayoutConstraint.activate([label.widthAnchor.constraint(greaterThanOrEqualToConstant: 80), label.widthAnchor.constraint(lessThanOrEqualToConstant: 200)])
-            item.view = label; item.label = activityText; item.paletteLabel = "Active voice and sharing"
+            item.view = label; item.label = activityText; item.paletteLabel = "Active task"
             item.visibilityPriority = .high; item.autovalidates = false
             return item
         case Item.mode:
@@ -99,6 +99,7 @@ import LiltCore
         if model.context.hasSelection {
             states.append(model.context.capturing ? "Refreshing window" : model.context.live ? "Live window" : "Window shared")
         }
+        if let status = model.importStatus { states.append(status) }
         return states.joined(separator: " · ")
     }
     private var dialogOpen: Bool { window?.attachedSheet != nil || NSApp.modalWindow != nil || NSApp.windows.contains { $0.isVisible && ($0.isSheet || $0.attachedSheet != nil) } }
@@ -115,7 +116,7 @@ import LiltCore
         let layout = WorkspaceLayout(width: window.contentView?.bounds.width ?? 0, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
         setPresent(Item.back, model.workspaceRoute != .chat || !layout.chatVisible, at: 1)
         let stopIndex = toolbar.items.firstIndex(where: { $0.itemIdentifier == Item.stop }) ?? toolbar.items.count
-        setPresent(Item.activity, hasActivity && (model.workspaceRoute != .chat || !layout.chatVisible), at: stopIndex)
+        setPresent(Item.activity, (hasActivity || model.importing) && (model.workspaceRoute != .chat || !layout.chatVisible), at: stopIndex)
         for item in toolbar.items {
             if item.itemIdentifier == Item.mode {
                 item.title = model.active?.mode == .learn ? "Learn" : "Assistant"
@@ -128,6 +129,7 @@ import LiltCore
                 let text = activityText
                 (item.view as? NSTextField)?.stringValue = text
                 item.label = text; item.toolTip = text
+                (item.view as? NSTextField)?.setAccessibilityLabel(text)
                 let overflow = NSMenuItem(title: text, action: nil, keyEquivalent: ""); overflow.isEnabled = false
                 item.menuFormRepresentation = overflow
             }
