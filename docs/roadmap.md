@@ -1,6 +1,6 @@
 # Development roadmap
 
-Vale is a general-purpose native macOS companion with an optional learning mode. Read AGENTS.md before making changes. Preserve the existing dark floating UI, first-class typed input, explicit capture/mic consent, legacy data compatibility, and disabled-by-default updater.
+Vale is a general-purpose native macOS companion with an optional learning mode. Read AGENTS.md before making changes. Use the one-window PRODUCT.md/DESIGN.md contract, first-class typed input, explicit capture/mic consent, legacy data compatibility, and signed automatic updates with saved user choices.
 
 ## Start here
 
@@ -17,7 +17,7 @@ Vale is a general-purpose native macOS companion with an optional learning mode.
 3. Run the packaged app on Apple Silicon. Universal compilation is already supported; Intel is the only runtime verified so far.
 4. Review VoiceOver, keyboard navigation, contrast, large text, and physical file picker/drop/paste flows.
 5. Test account expiry/quota/offline recovery, cold restarts, large histories, and difficult PDFs/documents.
-6. Configure production signing, notarization and signed updates only with explicitly authorized existing credentials and delivery assets. No production feed is configured.
+6. Complete approved publication/live signed-feed verification and one-time laptop bootstrap delivery. The 1.3.0 candidate contains its public feed/key; source, package, live feed and target installation require separate evidence. Preserve the private signing seed across repository maintenance. Developer ID/notarization and an encrypted external key backup remain distribution/maintenance follow-up work.
 
 ## Scope
 

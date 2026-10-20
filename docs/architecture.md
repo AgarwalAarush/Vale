@@ -1,6 +1,6 @@
 # Architecture
 
-AppKit owns the floating panels, menu bar, global shortcut, native text editor, file picker, previews, and pointing overlay. SwiftUI renders the compact capsule, assistant card, history, and settings. The first screen is general chat; there is no learning setup gate.
+AppKit owns one normal resizable workspace, the menu bar, global shortcut, native text editor and standard dialogs. SwiftUI renders the history rail, conversation, in-window Settings and Notes/files/context inspector. The native editor and transcript stay mounted across secondary routes, preserving drafts and selection. A compact layout presents details with Back; wide layouts place them beside the chat. A temporary click-through pointing annotation is feedback over the selected app. The first screen is general chat; there is no learning setup gate. PRODUCT.md and DESIGN.md define the current product and visual contract.
 
 AppModel owns chats, drafts, mode, upload metadata, explicit search choice, and request state. Capture/provider completions validate request and chat identity. File import finishes into the originating chat, and cleans up imported bytes if that chat has been deleted. Pause, cancel, sleep, and lock stop transient context and voice. Uploaded files remain intentional chat data.
 
@@ -14,7 +14,7 @@ VoiceController uses Apple Speech and AVAudioEngine only after Talk. On-device r
 
 LiltCore provides backward-compatible Codable models, structured replies, prompt policy, search, atomic storage, and updater configuration policy. Legacy records without a mode remain Learn chats, with their IDs/drafts intact; the original JSON is backed up before rewrite. The Vale rename preserves `local.lilt.companion`, preference keys, and `Application Support/Lilt`.
 
-UpdateController embeds the pinned official Sparkle 2.10.0 framework. Without an existing HTTPS feed and trusted public key, no updater instance starts or checks the network. Configured builds use signed feeds, signature verification before archive extraction, a same-origin HTTPS policy for the primary archive, its delta enclosures, and the download request, and a manual check action. Automatic checks/downloads are disabled. See updates.md for production requirements.
+UpdateController embeds the pinned official Sparkle 2.10.0 framework. Without an existing HTTPS feed and trusted public key, no updater instance starts or checks the network. Configured builds require signed feeds with strict failure expiration zero, signature verification before archive extraction, and a same-origin HTTPS policy for the primary archive, deltas and initial download request. Automatic checks/downloads default on; stored Sparkle preferences remain authoritative and are editable in Settings. The manual action remains available with automatic checks off. Native fixture modes disable the production backend. See updates.md for configuration, signing and the separate publication boundary.
 
 The native harness runs the same NSWindows and views as the product with isolated generated fixtures. It captures app-owned views, exercises transitions, and optionally sends real multi-image/PDF/text and web requests. It does not imitate the interface in a browser or bypass screen/microphone consent.
 

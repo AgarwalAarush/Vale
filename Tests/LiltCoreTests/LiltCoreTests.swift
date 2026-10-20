@@ -113,6 +113,11 @@ final class LiltCoreTests {
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://user:pass@example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:"bad",requiresSignedFeed:true,verifiesBeforeExtraction:true))
         XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:false,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true,signedFeedFailureExpirationInterval:1_728_000))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true,signedFeedFailureExpirationInterval:.nan))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid/with space",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid:65536/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
+        XCTAssertThrowsError(try UpdateConfiguration(feed:"https://updates.example.invalid:0/feed",publicKey:key,requiresSignedFeed:true,verifiesBeforeExtraction:true))
     }
     func testUpdaterRejectsForeignAndInsecureArchiveURLs() throws {
         let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="
@@ -121,6 +126,7 @@ final class LiltCoreTests {
         XCTAssertFalse(config.permitsRelease(URL(string:"https://elsewhere.example.invalid/Vale.zip")!))
         XCTAssertFalse(config.permitsRelease(URL(string:"http://private.example.invalid/Vale.zip")!))
         XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid:444/Vale.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://private.example.invalid/Vale.zip#other")!))
         let same=[URL(string:"https://private.example.invalid/Vale.zip")!,URL(string:"https://private.example.invalid/Vale.delta")!]
         XCTAssertTrue(config.permitsReleases(same))
         XCTAssertFalse(config.permitsReleases(same+[URL(string:"https://cdn.example.invalid/Vale.zip")!]))
@@ -135,6 +141,28 @@ final class LiltCoreTests {
         let config=try UpdateConfiguration(feed:fixture.feed,publicKey:fixture.publicKey,requiresSignedFeed:true,verifiesBeforeExtraction:true)
         for archive in fixture.archives {XCTAssertEqual(config.permitsRelease(archive.url),archive.allowed)}
         XCTAssertThrowsError(try UpdateConfiguration(feed:fixture.feed,publicKey:fixture.publicKey,requiresSignedFeed:true,verifiesBeforeExtraction:false))
+    }
+    func testUpdaterMetadataAndNativeHarnessIsolation() throws {
+        let key="pfIShU4dEXqPd5ObYNfDBiQWcXozk7estwzTnF9BamQ="
+        var info:[String:Any]=[
+            "SUFeedURL":"https://github.com/fixture/project/releases/latest/download/appcast.xml",
+            "SUPublicEDKey":key,"SURequireSignedFeed":true,"SUVerifyUpdateBeforeExtraction":true,
+            "SUSignedFeedFailureExpirationInterval":0
+        ]
+        let parsed=try UpdateConfiguration.read(from:info)
+        XCTAssertNotNil(parsed)
+        guard let config=parsed else {return}
+        XCTAssertTrue(config.permitsRelease(URL(string:"https://github.com/fixture/project/releases/download/v2/Vale.zip")!))
+        XCTAssertFalse(config.permitsRelease(URL(string:"https://raw.githubusercontent.com/fixture/project/main/Vale.zip")!))
+        try XCTAssertNil(UpdateConfiguration.read(from:[:]))
+        info.removeValue(forKey:"SUSignedFeedFailureExpirationInterval")
+        XCTAssertThrowsError(try UpdateConfiguration.read(from:info))
+        info["SUSignedFeedFailureExpirationInterval"]=1_728_000
+        XCTAssertThrowsError(try UpdateConfiguration.read(from:info))
+        XCTAssertThrowsError(try UpdateConfiguration.read(from:["SUFeedURL":"https://example.invalid/feed"]))
+        XCTAssertTrue(UpdateRuntimePolicy.permitsProductionUpdates(arguments:["Vale"]))
+        XCTAssertFalse(UpdateRuntimePolicy.permitsProductionUpdates(arguments:["Vale","--self-test","fixture-output"]))
+        XCTAssertFalse(UpdateRuntimePolicy.permitsProductionUpdates(arguments:["Vale","--integration-test","fixture-output"]))
     }
 
     func testForgetPurgesTargetFromBackupAndKeepsOthers()throws{
@@ -434,6 +462,10 @@ final class LiltCoreTests {
     func testWebSearchControlIsNamed() {
         XCTAssertEqual(WebSearchLabel.title(enabled:false),"Web search")
         XCTAssertEqual(WebSearchLabel.title(enabled:true),"Web search on")
+        XCTAssertEqual(WebSearchStatus.line(base:"Ready to type", enabled:true, idle:true),"Ready to type · Web search on")
+        XCTAssertEqual(WebSearchStatus.line(base:"Return to send", enabled:true, idle:true),"Return to send · Web search on")
+        XCTAssertEqual(WebSearchStatus.line(base:"Ready to type", enabled:false, idle:true),"Ready to type")
+        XCTAssertEqual(WebSearchStatus.line(base:"Thinking…", enabled:true, idle:false),"Thinking…")
     }
 
     func testPasteKeepsCopiedText() {
@@ -449,6 +481,9 @@ final class LiltCoreTests {
         let fresh=Message(role:"assistant",text:"Use the new button")
         XCTAssertTrue(StaleWindowAnswer.applies(to:stale))
         XCTAssertFalse(StaleWindowAnswer.applies(to:fresh))
+        XCTAssertTrue(StaleWindowAnswer.dropsOnRefresh(lastRole: "assistant", windowChanged: true))
+        XCTAssertFalse(StaleWindowAnswer.dropsOnRefresh(lastRole: "assistant", windowChanged: false))
+        XCTAssertFalse(StaleWindowAnswer.dropsOnRefresh(lastRole: "user", windowChanged: true))
         XCTAssertFalse(StaleWindowAnswer.applies(to:Message(role:"user",text:"Where?",screenChanged:true)))
         var chat=LearningSession(title:"Export")
         chat.messages=[Message(role:"user",text:"Where is it?"),stale]
@@ -712,6 +747,9 @@ final class LiltCoreTests {
 
     func testChatListShowsTheAnswerWhenTheFirstLineIsBlank() {
         XCTAssertEqual(ChatListLine.text(from:"\n\nThe result is 4."),"The result is 4.")
+        var answered=LearningSession(title:"Math")
+        answered.messages=[Message(role:"assistant",text:"\n\nThe result is 4.")]
+        XCTAssertEqual(answered.listPreview,"The result is 4.")
         XCTAssertEqual(ChatListLine.text(from:"The result is 4."),"The result is 4.")
         XCTAssertEqual(ChatListLine.text(from:"  Keep this line"),"Keep this line")
         XCTAssertNil(ChatListLine.text(from:"\n  \n"))
@@ -1118,6 +1156,11 @@ final class LiltCoreTests {
     func testRefreshOfPointItOutStillPoints() {
         XCTAssertTrue(PointRequest.wasPointing(PointRequest.prompt))
         XCTAssertFalse(PointRequest.wasPointing("What is this button?"))
+        XCTAssertEqual(PointRequest.shown(PointRequest.prompt), "Point it out")
+        XCTAssertEqual(PointRequest.shown("What is this button?"), "What is this button?")
+        XCTAssertEqual(HintRequest.shown(HintRequest.prompt), "Hint")
+        XCTAssertEqual(HintRequest.shown("What is this button?"), "What is this button?")
+        XCTAssertEqual(HintRequest.shown(PointRequest.prompt), PointRequest.prompt)
         let again=TutorPrompt.build(session:LearningSession(title:"Window"),question:PointRequest.prompt,hasImage:true,pointing:true,reveal:false,hasWindow:true)
         XCTAssertTrue(again.contains("Pointing requested: Yes"))
         let ordinary=TutorPrompt.build(session:LearningSession(title:"Window"),question:"What is this button?",hasImage:true,pointing:PointRequest.wasPointing("What is this button?"),reveal:false,hasWindow:true)
@@ -1194,6 +1237,9 @@ final class LiltCoreTests {
         let page=URL(string:"https://example.com/notes")!
         let secure=URL(string:"http://example.com/a")!
         XCTAssertEqual(DroppedLink.text(from:[page,secure]),"https://example.com/notes\nhttp://example.com/a")
+        XCTAssertEqual(DroppedLink.inserted(into:"", links:"https://example.com/notes"),"https://example.com/notes")
+        XCTAssertEqual(DroppedLink.inserted(into:"What is this?", links:"https://example.com/notes"),"What is this?\nhttps://example.com/notes")
+        XCTAssertEqual(DroppedLink.inserted(into:"What is this?\n", links:"https://example.com/notes"),"What is this?\nhttps://example.com/notes")
         XCTAssertNil(DroppedLink.text(from:[URL(fileURLWithPath:"/tmp/Notes.md")]))
         XCTAssertNil(DroppedLink.text(from:[URL(string:"javascript:alert(1)")!]))
         XCTAssertNil(DroppedLink.text(from:[]))
@@ -1577,8 +1623,10 @@ final class LiltCoreTests {
         XCTAssertEqual(EmptyCoach.kickerSize, 11)
         XCTAssertEqual(EmptyCoach.bodySize, 15)
         XCTAssertEqual(EmptyCoach.blockSpacing, 16)
+        XCTAssertTrue(EmptyCoach.sitsWithComposer(messageCount: 0))
+        XCTAssertFalse(EmptyCoach.sitsWithComposer(messageCount: 1))
         var chat=LearningSession(title:"New chat")
-        XCTAssertTrue(chat.messages.isEmpty)
+        XCTAssertTrue(EmptyCoach.sitsWithComposer(messageCount: chat.messages.count))
         chat.draft="secret draft"
         XCTAssertFalse(chat.webEnabled)
         XCTAssertFalse(chat.matches("secret"))
@@ -1679,7 +1727,7 @@ final class LiltCoreTests {
 
     func testConversationControlLooksPressable() {
         XCTAssertTrue(ConversationControl.showsAsButton)
-        XCTAssertEqual(ConversationControl.title(on: false), "Conversation")
+        XCTAssertEqual(ConversationControl.title(on: false), "Start conversation")
         XCTAssertEqual(ConversationControl.title(on: true), "End conversation")
         var chat=LearningSession(title:"New chat")
         chat.draft="secret draft"
@@ -1717,6 +1765,27 @@ final class LiltCoreTests {
         XCTAssertTrue(prompt.contains("Web search: Disabled"))
         XCTAssertTrue(prompt.contains("No. Return null for point."))
         XCTAssertFalse(PointTarget(x:1.2,y:0.1,width:0.2,height:0.1,label:"Edge").isValid)
+    }
+
+    func testSendControlLooksReady() {
+        XCTAssertFalse(SendMark.filled(hasInput: false, busy: false, hasChat: true, importing: false))
+        XCTAssertTrue(SendMark.filled(hasInput: true, busy: false, hasChat: true, importing: false))
+        XCTAssertTrue(SendMark.filled(hasInput: false, busy: true, hasChat: true, importing: false))
+        XCTAssertFalse(SendMark.filled(hasInput: true, busy: false, hasChat: false, importing: false))
+        XCTAssertFalse(SendMark.filled(hasInput: true, busy: false, hasChat: true, importing: true))
+        let chat = LearningSession(title: "New chat")
+        XCTAssertFalse(chat.webEnabled)
+        XCTAssertEqual(chat.mode, .assistant)
+    }
+
+    func testFocusTimerStaysInLearn() {
+        XCTAssertFalse(FocusTimer.shows(mode: .assistant, running: false))
+        XCTAssertTrue(FocusTimer.shows(mode: .learn, running: false))
+        XCTAssertTrue(FocusTimer.shows(mode: .assistant, running: true))
+        let chat = LearningSession(title: "New chat")
+        XCTAssertEqual(chat.mode, .assistant)
+        XCTAssertFalse(FocusTimer.shows(mode: chat.mode, running: chat.duration > 0))
+        XCTAssertFalse(chat.webEnabled)
     }
 
     func testMicrophoneSitsWithTheTools() {
@@ -1780,6 +1849,10 @@ final class LiltCoreTests {
     func testGuideControlLeavesTheComposer() {
         XCTAssertTrue(GuideControl.inTheMenu)
         XCTAssertEqual(GuideControl.title, "Start step-by-step help")
+        XCTAssertEqual(GuideTurn.shown(GuideTurn.windowPrompt), GuideControl.title)
+        XCTAssertEqual(GuideTurn.shown(GuideTurn.request("Install the update")), "Install the update")
+        XCTAssertEqual(GuideTurn.shown("What is this?"), "What is this?")
+        XCTAssertEqual(GuideTurn.request("Install the update"), "Guide me step by step: Install the update")
         var chat=LearningSession(title:"New chat")
         chat.draft="secret draft"
         XCTAssertFalse(chat.webEnabled)
@@ -1895,6 +1968,11 @@ final class LiltCoreTests {
 
     func testReplyShowsTheAddress() {
         XCTAssertEqual(ReplyAddress.forDisplay("See [the guide](https://example.com/guide)."), "See [the guide (https://example.com/guide)](https://example.com/guide).")
+        XCTAssertEqual(ReplyCopy.text(from: "See [the guide](https://example.com/guide)."), "See the guide (https://example.com/guide).")
+        XCTAssertEqual(ReplyCopy.text(from: "Write [me](mailto:a@b.com)."), "Write me (a@b.com).")
+        XCTAssertEqual(ReplyCopy.text(from: "Use `save` now."), "Use save now.")
+        XCTAssertEqual(ReplyCopy.text(from: "A plain reply."), "A plain reply.")
+        XCTAssertTrue(ReplyCopy.text(from: "```\n[the guide](https://example.com)\n```").contains("[the guide](https://example.com)"))
         XCTAssertEqual(ReplyAddress.forDisplay("See [https://example.com](https://example.com)."), "See [https://example.com](https://example.com).")
         XCTAssertEqual(ReplyAddress.forDisplay("Write [me](mailto:a@b.com)."), "Write [me (a@b.com)](mailto:a@b.com).")
         XCTAssertEqual(ReplyAddress.forDisplay("Line one.\n[docs](https://ex.com)\n"), "Line one.\n[docs (https://ex.com)](https://ex.com)\n")
@@ -1947,6 +2025,13 @@ final class LiltCoreTests {
         XCTAssertFalse(ReplyPlayback.reading(message: "Other.", spoken: "The answer.", speaking: true))
         XCTAssertTrue(ReplyPlayback.reading(message: "The answer.", spoken: "The answer.", speaking: true))
         XCTAssertFalse(ReplyPlayback.reading(message: "", spoken: "", speaking: true))
+        let linked = "See [the docs](https://example.com/docs)"
+        XCTAssertTrue(ReplyPlayback.reading(message: linked, spoken: SpokenReply.text(from: linked), speaking: true))
+        XCTAssertFalse(ReplyPlayback.reading(message: linked, spoken: SpokenReply.text(from: "Other"), speaking: true))
+        XCTAssertEqual(ReplyPlayback.symbol(reading: false), "speaker.wave.2")
+        XCTAssertEqual(ReplyPlayback.symbol(reading: true), "stop.fill")
+        XCTAssertEqual(ReplyPlayback.label(reading: false), "Read")
+        XCTAssertEqual(ReplyPlayback.label(reading: true), "Stop reading")
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)
@@ -2164,6 +2249,9 @@ final class LiltCoreTests {
         XCTAssertTrue(FailedAnswer.shows(failed: true, waiting: false))
         XCTAssertFalse(FailedAnswer.shows(failed: true, waiting: true))
         XCTAssertFalse(FailedAnswer.shows(failed: false, waiting: false))
+        XCTAssertFalse(FailedAnswer.stillFailed(hadFailed: true, answerArrived: true))
+        XCTAssertTrue(FailedAnswer.stillFailed(hadFailed: true, answerArrived: false))
+        XCTAssertFalse(FailedAnswer.stillFailed(hadFailed: false, answerArrived: false))
         let message = Message(role: "user", text: "Hi", answerFailed: true)
         let data = try JSONEncoder().encode(message)
         let decoded = try JSONDecoder().decode(Message.self, from: data)
@@ -2183,6 +2271,9 @@ final class LiltCoreTests {
     func testUndoDoesNotRestoreASentQuestion() {
         XCTAssertTrue(ComposerUndo.dropsSentText)
         XCTAssertFalse(ComposerUndo.restoresSentText())
+        XCTAssertTrue(ComposerUndo.clearsUndo(previous: "What is this?", replacement: ""))
+        XCTAssertFalse(ComposerUndo.clearsUndo(previous: "", replacement: ""))
+        XCTAssertFalse(ComposerUndo.clearsUndo(previous: "What is this?", replacement: "What is this? And"))
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)
@@ -2192,6 +2283,9 @@ final class LiltCoreTests {
     func testQuestionOpensAtTheStart() {
         XCTAssertTrue(QuestionScroll.opensAtTheStart(role: "user"))
         XCTAssertFalse(QuestionScroll.opensAtTheStart(role: "assistant"))
+        XCTAssertFalse(QuestionScroll.opensAtTheStart(role: "assistant", text: "A short reply."))
+        XCTAssertTrue(QuestionScroll.opensAtTheStart(role: "assistant", text: String(repeating: "A long answer. ", count: 40)))
+        XCTAssertTrue(QuestionScroll.opensAtTheStart(role: "assistant", text: (0..<9).map { "Line \($0)" }.joined(separator: "\n")))
         XCTAssertFalse(QuestionScroll.opensAtTheStart(role: nil))
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
@@ -2255,6 +2349,12 @@ final class LiltCoreTests {
     func testNewChatKeepsAnUnsentQuestion() {
         XCTAssertFalse(NewChat.leaves(hasUnsentWork: true))
         XCTAssertTrue(NewChat.leaves(hasUnsentWork: false))
+        XCTAssertTrue(NewChat.hasUnsentWork(draft: "What is this?", fileCount: 0, importing: false))
+        XCTAssertTrue(NewChat.hasUnsentWork(draft: "", fileCount: 1, importing: false))
+        XCTAssertTrue(NewChat.hasUnsentWork(draft: "", fileCount: 0, importing: true))
+        XCTAssertFalse(NewChat.hasUnsentWork(draft: "  ", fileCount: 0, importing: false))
+        XCTAssertFalse(NewChat.leaves(hasUnsentWork: NewChat.hasUnsentWork(draft: "What is this?", fileCount: 0, importing: false)))
+        XCTAssertEqual(NewChat.keptMessage, "Send or clear what you’ve written before starting a new chat.")
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)
@@ -2354,6 +2454,11 @@ final class LiltCoreTests {
         XCTAssertEqual(FileCopy.detail(for: other, among: files), "TXT")
         XCTAssertEqual(FileCopy.detail(for: first, among: [first]), "Image")
         XCTAssertEqual(first.name, second.name)
+        let pdfA = AttachmentRecord(name: "notes.pdf", kind: .pdf, byteCount: 10, detail: "PDF · 3 pages")
+        let pdfB = AttachmentRecord(name: "notes.pdf", kind: .pdf, byteCount: 12, detail: "3 pages")
+        XCTAssertEqual(FileCopy.line(for: pdfA, among: [pdfA]), "PDF · 3 pages")
+        XCTAssertEqual(FileCopy.line(for: pdfA, among: [pdfA, pdfB]), "PDF · 3 pages · 1")
+        XCTAssertEqual(FileCopy.line(for: pdfB, among: [pdfA, pdfB]), "PDF · 3 pages · 2")
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)
@@ -2416,6 +2521,12 @@ final class LiltCoreTests {
         XCTAssertEqual(PdfChip.detail(pages: 1), "PDF · 1 page")
         XCTAssertEqual(PdfChip.detail(pages: 3), "PDF · 3 pages")
         XCTAssertFalse(PdfChip.detail(pages: 2).hasPrefix("2"))
+        XCTAssertEqual(PdfChip.symbol, "doc.fill")
+        XCTAssertEqual(PdfChip.shown(kind: .pdf, stored: "3 pages"), "PDF · 3 pages")
+        XCTAssertEqual(PdfChip.shown(kind: .pdf, stored: "PDF · 1 page"), "PDF · 1 page")
+        XCTAssertEqual(PdfChip.shown(kind: .pdf, stored: "  "), "PDF")
+        XCTAssertEqual(PdfChip.shown(kind: .text, stored: "SWIFT"), "SWIFT")
+        XCTAssertEqual(PdfChip.shown(kind: .image, stored: "Image"), "Image")
         let chat = LearningSession(title: "New chat")
         XCTAssertFalse(chat.webEnabled)
         XCTAssertEqual(chat.mode, .assistant)
@@ -2563,6 +2674,13 @@ final class LiltCoreTests {
         XCTAssertFalse(PointControl.enabled(waiting: true))
     }
 
+    func testCapsuleMicStaysOffTheOpenCoach() {
+        XCTAssertFalse(CapsuleMic.shows(coachOpen: true))
+        XCTAssertTrue(CapsuleMic.shows(coachOpen: false))
+        XCTAssertTrue(CapsuleMic.idleIsQuiet(listening: false, speaking: false, busy: false))
+        XCTAssertFalse(CapsuleMic.idleIsQuiet(listening: true, speaking: false, busy: false))
+    }
+
 }
 
 @main struct CoreChecks {
@@ -2587,6 +2705,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Resume newest unfinished chat",tests.testLaunchResumesNewestUnfinishedChat),
  ("Codex lookup locations and shell path",tests.testCodexLookupIncludesUserInstallAndParsesShellPath),
  ("Updater local release fixtures",tests.testUpdaterLocalReleasePolicyFixtures),
+ ("Updater metadata and native harness isolation",tests.testUpdaterMetadataAndNativeHarnessIsolation),
  ("Forget purges backup and preserves unrelated sessions",tests.testForgetPurgesTargetFromBackupAndKeepsOthers),
  ("Forget failure preserves retryable chat",tests.testForgetFailurePreservesRetryableChat),
  ("Visible conversation limit",tests.testConversationLimitIsExplicit),
@@ -2731,6 +2850,8 @@ let cases: [(String, () throws -> Void)] = [
  ("Conversation control looks pressable",tests.testConversationControlLooksPressable),
  ("Idle wave stays quiet until voice",tests.testIdleWaveStaysQuietUntilVoice),
  ("Send sits on the typed line",tests.testSendSitsOnTheTypedLine),
+ ("The send control looks ready",tests.testSendControlLooksReady),
+ ("A focus timer stays in Learn",tests.testFocusTimerStaysInLearn),
  ("Microphone sits with the tools",tests.testMicrophoneSitsWithTheTools),
  ("Empty thread says where the reply shows",tests.testEmptyThreadSaysWhereTheReplyShows),
  ("Coach dismiss is not a quit mark",tests.testCoachDismissIsNotAQuitMark),
@@ -2803,6 +2924,7 @@ let cases: [(String, () throws -> Void)] = [
  ("Wait stays while a file is added",tests.testWaitStaysWhileAFileIsAdded),
  ("Retry waits until the reply fails",tests.testRetryWaitsUntilTheReplyFails),
  ("Point it out explains a missing window",tests.testPointControlExplainsAMissingWindow),
+ ("The capsule microphone waits while the coach is open",tests.testCapsuleMicStaysOffTheOpenCoach),
 ]
 var resultMap:[String:Bool]=[:]
 for (name, test) in cases {

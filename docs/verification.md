@@ -1,3 +1,18 @@
+# Vale 1.3 verification
+
+The versioned `verification-1.3.0.json` records current assertions and evidence boundaries. The release manifest identifies the frozen source, architectures, exact packaged hashes, updater configuration and delivery status. Historical 1.2.x totals below do not establish current acceptance.
+
+Native verification uses the actual AppKit workspace, native NSTextView and SwiftUI routes with generated data. It checks one persistent window, draft/selection/marked-text continuity, direct history, Notes/files/PDF, close/reopen, existing recovery, and synthetic capture/voice/privacy transitions. Light/dark and minimum/default/wide view PNGs are inspected separately from assertion counts. Some controls are exercised through their bound model methods; this is not physical mouse/drop/picker, VoiceOver or hardware consent proof. Repeated runs validate fixture isolation; integration totals overlap native checks.
+
+Real Sparkle verification uses two independently compiled, ad-hoc signed disposable app versions. The actual SDK automatically fetches a signed feed/archive, installs and relaunches version 2, and generated draft, note, attachment and preference bytes survive. Altered-feed and altered-archive cases require signature-related SDK errors and an unchanged old executable. These loopback tests do not establish GitHub HTTPS availability, notarization or target installation. The separate release-feed probe uses Vale's actual UpdateController and Settings in a temporary nonce bundle/defaults/data domain, preserving automatic choices off across relaunch before checking the production address. A no-update check is not an older-to-newer installation.
+
+Real provider integration requests public image/PDF/text analysis, explicit Web search and a guide from a labeled synthetic screen. A URL is insufficient for the Web assertion: an actual provider Web event is required. The known unavailable Web assertion remains false in any explicitly acknowledged private candidate. Execution tools and paid fallbacks stay disabled.
+
+Reproduce with `VALE_ARCH=universal scripts/verify.sh --integration --repeat`; developer compilation requires the workspace module-cache environment configured by that script. `scripts/package-release.py --plan` lists precise required results and outputs. Default packaging requires every integration assertion to pass; the explicit private-candidate flag can acknowledge only the named Web failure and leaves `releaseReady:false`. Production signing/publication is a separate parent-authorized step. See [updates](updates.md) and [laptop handoff](laptop-update.md).
+
+<details>
+<summary>Historical 1.2.x verification (not current acceptance)</summary>
+
 # Verification
 
 ## Vale 1.2.2 branding release
@@ -39,3 +54,5 @@ These are app-owned view captures inspected by Codex, not whole-desktop captures
 ## Reproduce
 
 Run `VALE_ARCH=universal scripts/verify.sh --integration --repeat`, then `python3 scripts/package-release.py`. Result JSON, logs, public fixtures, privacy proofs, and PNGs are under artifacts/; source/evidence packaging includes curated reviewed PNGs and result/proof files, not test-library user stores or authentication data. The extracted release app is also checked for signature integrity and native behavior before handoff.
+
+</details>

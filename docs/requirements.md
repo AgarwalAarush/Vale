@@ -1,6 +1,6 @@
-# Vale 1.2
+# Vale 1.3
 
-Build a general-purpose companion with explicit live-window context, interruption-safe spoken turn-taking, typing fallback, and step-by-step learning help. Preserve the dark floating UI, Lilt persona, legacy bundle/data identity, uploaded files, and saved chats. Exclude notch integration, persistent agents, routine/connector platforms, and autonomous computer actions.
+Build a general-purpose companion with explicit live-window context, interruption-safe spoken turn-taking, typing fallback, and step-by-step learning help. Use one polished native workspace with light/dark appearances, direct chat history, and in-window Settings, Notes and previews. Preserve the Lilt persona, legacy bundle/data identity, uploaded files and saved chats. Exclude notch integration, persistent agents, routine/connector platforms, and autonomous computer actions.
 
 ## Required behavior
 
@@ -10,7 +10,7 @@ Build a general-purpose companion with explicit live-window context, interruptio
 - Conversation requires explicit opt-in. Reopen the mic only after the current reply playback finishes. The microphone is off while thinking/speaking; a mic tap interrupts and listens. Typing, stop, pause, Escape, session changes, sleep/lock, and errors prevent unwanted rearming. No full-duplex or streaming claims.
 - Show capture/mic state and last refresh. Permission denial, capture timeouts and connection failures retain messages/drafts with clear recovery and text fallback. Never grant OS permissions automatically.
 - Validate short guide plans (2–8 steps, bounded text), persist the user's place, and ask against fresh context on navigation. Do not fabricate completion or mastery.
-- Preserve Return/Shift–Return and input-method composition, native shortcuts, optional panel expansion, accessible button labels, loading/empty/error states, and optional voice controls.
+- Preserve Return/Shift–Return and input-method composition, native shortcuts, normal window resizing, direct history/Settings navigation, accessible button labels, loading/empty/error states, and optional voice controls.
 - Keep attachment/history behavior: eight files/chat, 25 MB/file, up to twelve uploaded visual pages/images plus one selected-window frame; 60k extracted text/file and 100k total. Scanned PDFs contribute their first four pages. Images normalize to bounded PNGs.
 - Send at most eighteen recent conversation messages, excerpted to 8k characters each and 48k total, with a visible notice when context is limited. Full history remains saved locally.
 - Forget must purge target content from the active library and legacy backup, preserve unrelated sessions/files, and propagate unlink/write failures. Partial deletion stays retryable and reports its state. Do not discard a chat while its files are importing.
@@ -21,4 +21,4 @@ Build a general-purpose companion with explicit live-window context, interruptio
 
 Local refresh is bounded snapshot context, not video streaming. Spoken interaction is turn-taking through final CLI responses. Synthetic adapters do not establish real microphone, speech, picker, capture or overlay accuracy. Hardware consent, VoiceOver, real drop/paste/picker gestures, multi-display/fullscreen behavior, and Apple Silicon runtime require further testing. Strict pixel comparison can react to animations and needs hardware UX validation.
 
-The embedded Sparkle updater remains manual and inactive without an authorized private HTTPS feed, existing trusted Ed25519 signing assets and a signed/notarized deployment workflow. No Gatekeeper or denied computer-use access may be bypassed. Hardware testing must use explicit native consent.
+A securely configured Sparkle updater starts at launch, respects saved automatic-check/download choices, and requires signed feeds and archives. The previously unconfigured build needs one manual bootstrap replacement. Local SDK verification, production publication and laptop installation require separate evidence; ad-hoc signing is not notarization. No Gatekeeper or denied computer-use access may be bypassed. Hardware testing must use explicit native consent.
