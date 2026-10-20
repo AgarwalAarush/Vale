@@ -75,8 +75,8 @@ def create(args):
 
 '''
         if preview:
-            readme += '''This preview includes direct Continue with ChatGPT and the single native
-workspace. Local checks and generated account/stream fixtures do not establish
+            readme += '''This preview includes direct Continue with ChatGPT and the compact native
+companion. Local checks and generated account/stream fixtures do not establish
 genuine sign-in or replies. Connect your own eligible account in Vale; personal
 browser consent cannot be completed by the build process. Authenticated replies,
 Web, renewal and revocation still require real-account acceptance. This preview

@@ -10,7 +10,7 @@ Native macOS app using AppKit and SwiftUI, minimum macOS14. Impeccable currently
 
 ## Users and purpose
 
-A personal desktop companion for chat, writing, learning and help grounded in user-selected files or a window. The owner confirmed on2026-10-19 that chats/files, Learn mode, notes and opt-in screen/voice help all remain in the redesigned single workspace.
+A tiny desktop companion beside the user's work: summon it with a keyboard shortcut at the top right, type or dictate a question, optionally include selected screen context/screenshots/files, and read a compact reply while continuing the original task. The owner clarified on 2026-10-20 that the resting footprint is approximately 300×45pt and the panel expands in place. The large chat-history/sidebar workspace is a rejected product direction. Chats/files, Learn, notes and opt-in screen/voice help remain available through secondary on-demand routes.
 
 ## Operating context
 
@@ -18,13 +18,13 @@ Typing is first-class. The 1.3.1 candidate connects through direct ChatGPT brows
 
 ## Capabilities and constraints
 
-Preserve general chat, Learn/hints/step guides, notes, focus timer, history/search, rename/export/Forget, files/PDF/images, read-aloud/Talk/Conversation, and optional fresh selected-window context. One primary app content window replaces capsule/coach/library and detached content previews. Native OS dialogs remain appropriate; the deliberate temporary click-through pointing annotation is feedback, not a second assistant workspace.
+Preserve general chat, Learn/hints/step guides, notes, focus timer, history/search, rename/export/Forget, files/PDF/images, read-aloud/Talk/Conversation, and optional fresh selected-window context. One small floating assistant panel changes size in place. History and settings must not create a permanent large default workspace; preserve capabilities without presenting all navigation at rest. Native OS dialogs remain appropriate; the deliberate temporary click-through pointing annotation is feedback, not a second assistant workspace.
 
 Preserve legacy bundleID local.lilt.companion, store, chats, drafts, attachments and settings. Do not add model command/file/app/browser/code execution, startup capture/mic, login agents, automatic window selection or credentials logging. Only explicitly enabled supported web search may be exposed. Web availability depends on the connected account/workspace/model and must not be advertised as working without a genuine hosted-tool event.
 
 ## Brand commitments
 
-Vale name and canonical folded-ribbon V artwork remain. The owner requests significant visual improvement inspired by the supplied Refero Intercom, Superhuman and Dala references. The old two-window appearance is an anti-reference. The owner chose code-first, then inspection of the actual native app.
+Vale name and canonical folded-ribbon V artwork remain. The owner requests exceptional native craft and a Liquid Glass look, informed by the supplied Refero/Uiarc references and Freya/Stratum density. Both the old two-window appearance and the large workspace are anti-references. The latest request explicitly chooses generated visual mockups before further implementation; this supersedes the earlier code-first choice. See [compact companion exploration](docs/design/compact-companion-2026-10-20/README.md).
 
 ## Evidence on hand
 
@@ -44,4 +44,4 @@ Preserve native keyboard/IME/undo behavior, readable semantic colors, labeled co
 
 ## Open decisions
 
-Warm editorial light and coherent dark appearances, precise window sizes and compact navigation thresholds are implementation defaults to verify visually. Publication is explicitly authorized in this task. The production feed is live; preserve its existing protected signing-key custody. Direct ChatGPT consent/inference, next-source visual acceptance and target-laptop installation remain separate acceptance milestones.
+The owner selected the Pearl Glass Ready→Ask→Answer mockup on 2026-10-20. Implement its compact topology and hierarchy with native text/material and a coherent dark appearance. Generated images do not prove native material rendering or measured dimensions. Publication remains authorized in the broader task, but no new binary or feed changes accompany this exploration. Preserve protected signing-key custody. Direct ChatGPT consent/inference, compact native visual/interaction acceptance and target-laptop installation remain separate milestones.

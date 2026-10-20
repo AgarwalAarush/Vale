@@ -26,7 +26,20 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var selectedID: UUID?
     @Published var workspaceRoute: WorkspaceRoute = .chat
     @Published var inspector: WorkspaceInspector?
-    @Published var sidebarVisible = true
+    @Published var sidebarVisible = false
+    /// Presentation state only; the editor and per-chat draft remain mounted.
+    @Published var companionExpanded = false
+    @Published var companionShowsEarlierMessages = false
+    @Published var companionReplyHeight: CGFloat = 0
+    @Published var companionInputHeight: CGFloat = 26
+    var requestCompanionEscape: (() -> Void)?
+    var chatSurfaceVisible: Bool { workspaceRoute == .chat && inspector == nil && !compactHistoryVisible }
+    func expandCompanion() { companionExpanded = true; composerFocus += 1 }
+    func collapseCompanion() {
+        commitComposer?()
+        if busy || voice.starting || voice.listening || voice.speaking || conversation || context.hasSelection { stopInteraction() }
+        companionExpanded = false
+    }
     @Published var compactHistoryVisible = false
     @Published var historyQuery = ""
     @Published var historyFocus = 0
@@ -125,20 +138,20 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
     func openSettings() {
-        commitComposer?(); workspaceRoute = .settings; showWorkspace?()
+        commitComposer?(); companionExpanded = true; workspaceRoute = .settings; showWorkspace?()
     }
     func showHistory() {
-        commitComposer?(); inspector = nil; contextPreview = nil
+        commitComposer?(); companionExpanded = true; inspector = nil; contextPreview = nil
         workspaceRoute = .chat; sidebarVisible = true; compactHistoryVisible = true; historyFocus += 1; showWorkspace?()
     }
-    func backToChat() { workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
+    func backToChat() { companionExpanded = true; workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
     func navigateToChat(_ id: UUID) {
         guard sessions.contains(where: { $0.id == id }) else { return }
         if activeID != id { resume(id) }
         else { commitComposer?(); workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
     }
     func showInspector(_ detail: WorkspaceInspector) {
-        commitComposer?(); compactHistoryVisible = false
+        commitComposer?(); companionExpanded = true; compactHistoryVisible = false
         if detail != .context { contextPreview = nil }; inspector = detail; workspaceRoute = .chat; showWorkspace?()
     }
     func closeInspector() { inspector = nil; contextPreview = nil; composerFocus += 1 }

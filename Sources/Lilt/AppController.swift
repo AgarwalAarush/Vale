@@ -16,6 +16,7 @@ import LiltCore
     private var showingStatusMenu = false
     private var testing = false
     private var workspaceToolbar: NativeWorkspaceToolbar?
+    private var previousApplication: NSRunningApplication?
     /// AppKit can dispatch menu key equivalents even when a local monitor yields
     /// to a sheet. Share this boundary with validation, actions and focus retries.
     private var nativeDialogOpen: Bool {
@@ -33,6 +34,7 @@ import LiltCore
         setupWorkspace(); setupMenu()
         if !testing { registerHotKey() }
         model.showWorkspace = { [weak self] in self?.openWorkspace() }
+        model.requestCompanionEscape = { [weak self] in self?.handleCompanionEscape() }
         model.hideOverlay = { [weak self] in self?.clearAnnotation() }
         model.showPoint = { [weak self] point, snapshot in self?.point(point, snapshot: snapshot) }
         model.contextReset = { [weak self] in
@@ -54,7 +56,7 @@ import LiltCore
             guard let self else { return event }
             let dialog = self.nativeDialogOpen
             if event.keyCode == 53 {
-                if EscapeKey.stopsSession(dialogOpen: dialog) { self.model.stopInteraction(); self.clearAnnotation(); return nil }
+                if EscapeKey.stopsSession(dialogOpen: dialog) { self.handleCompanionEscape(); return nil }
             }
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
             if dialog {
@@ -84,23 +86,39 @@ import LiltCore
         if !testing { bringWorkspaceOnScreen() }
     }
     private func bringWorkspaceOnScreen() {
-        let screens = NSScreen.screens.map { DisplayRect(x: $0.visibleFrame.minX, y: $0.visibleFrame.minY, width: $0.visibleFrame.width, height: $0.visibleFrame.height) }
-        let frame = workspace.frame
-        if !WindowPlacement.isVisible(DisplayRect(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height), on: screens) { workspace.center() }
-        if let screen = workspace.screen ?? NSScreen.main, frame.width > screen.visibleFrame.width || frame.height > screen.visibleFrame.height {
-            workspace.setFrame(screen.visibleFrame.insetBy(dx: 12, dy: 12), display: true)
-        }
+        guard let panel = workspace as? NativeWorkspaceWindow else { return }
+        let screens = NSScreen.screens
+        let onScreen = screens.contains { $0.visibleFrame.intersects(panel.frame) }
+        if !onScreen { panel.summon() }
+        else { panel.applyCompanionLayout(animated: false) }
     }
     func openWorkspace() {
         guard !nativeDialogOpen else { return }
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApplication = frontmost }
+        if !workspace.isVisible { (workspace as? NativeWorkspaceWindow)?.summon() }
         bringWorkspaceOnScreen(); model.workspaceOpen = true
         workspace.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         if composerMayReceiveFocus { focusComposer(attemptsLeft: ComposerFocus.attempts) }
         else { workspace.makeFirstResponder(nil) }
     }
+    func handleCompanionEscape() {
+        guard !nativeDialogOpen else { return }
+        model.commitComposer?()
+        if model.busy || model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation || model.context.hasSelection {
+            model.stopInteraction(); clearAnnotation(); return
+        }
+        if !model.chatSurfaceVisible { model.backToChat(); return }
+        if model.companionExpanded { model.collapseCompanion(); previousApplication?.activate(options: []); return }
+        dismissCompanion()
+    }
+    private func dismissCompanion() {
+        model.commitComposer?(); model.persist(); model.workspaceOpen = false
+        workspace.orderOut(nil)
+        previousApplication?.activate(options: [])
+    }
     private var composerMayReceiveFocus: Bool {
-        let layout = WorkspaceLayout(width: workspace.contentView?.bounds.width ?? 0, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
-        return !nativeDialogOpen && workspace.isVisible && !workspace.isMiniaturized && model.workspaceRoute == .chat && layout.chatVisible
+        !nativeDialogOpen && workspace.isVisible && !workspace.isMiniaturized && model.chatSurfaceVisible
     }
     private func focusComposer(attemptsLeft: Int) {
         guard composerMayReceiveFocus, let root = workspace.contentView else { return }
@@ -132,7 +150,7 @@ import LiltCore
         editMenu.addItem(.separator())
         let findItem = NSMenuItem(title: "Find in chats", action: #selector(menuLibrary), keyEquivalent: "f"); findItem.target = self; editMenu.addItem(findItem)
         let viewItem = NSMenuItem(); main.addItem(viewItem); let viewMenu = NSMenu(title: "View"); viewItem.submenu = viewMenu
-        let sidebarItem = NSMenuItem(title: "Toggle sidebar", action: #selector(menuSidebar), keyEquivalent: "s"); sidebarItem.keyEquivalentModifierMask = [.command, .control]; sidebarItem.target = self; viewMenu.addItem(sidebarItem)
+        let sidebarItem = NSMenuItem(title: "Chat history", action: #selector(menuSidebar), keyEquivalent: "s"); sidebarItem.keyEquivalentModifierMask = [.command, .control]; sidebarItem.target = self; viewMenu.addItem(sidebarItem)
         let detailsItem = NSMenuItem(title: "Show files and notes", action: #selector(menuDetails), keyEquivalent: "i"); detailsItem.keyEquivalentModifierMask = [.command, .option]; detailsItem.target = self; viewMenu.addItem(detailsItem)
         viewMenu.addItem(.separator())
         let backItem = NSMenuItem(title: "Back to chat", action: #selector(menuBack), keyEquivalent: "["); backItem.target = self; viewMenu.addItem(backItem)
@@ -140,7 +158,7 @@ import LiltCore
         NSApp.mainMenu = main
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vale")
-        statusItem.button?.toolTip = "Vale · open workspace · Control–Option–Space"
+        statusItem.button?.toolTip = "Vale · Control–Option–Space"
         statusItem.button?.target = self
         statusItem.button?.action = #selector(statusItemClicked)
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -157,7 +175,9 @@ import LiltCore
         let handler: EventHandlerUPP = { _, _, data in
             guard let data else { return OSStatus(eventNotHandledErr) }
             let controller = Unmanaged<AppController>.fromOpaque(data).takeUnretainedValue()
-            DispatchQueue.main.async { controller.openWorkspace() }; return noErr
+            DispatchQueue.main.async {
+                if !controller.nativeDialogOpen { (controller.workspace as? NativeWorkspaceWindow)?.summon(); controller.openWorkspace() }
+            }; return noErr
         }
         InstallEventHandler(GetApplicationEventTarget(), handler, 1, &event, pointer, &hotHandler)
         let id = EventHotKeyID(signature: 0x4C696C74, id: 1)
@@ -209,7 +229,7 @@ import LiltCore
         return true
     }
     @objc func systemSuspend() { model.suspend() }
-    @objc private func menuClose() { guard !nativeDialogOpen else { return }; NSApp.keyWindow?.performClose(nil) }
+    @objc private func menuClose() { guard !nativeDialogOpen else { return }; if NSApp.keyWindow === workspace { model.stopInteraction(); dismissCompanion() } else { NSApp.keyWindow?.performClose(nil) } }
     @objc private func menuNew() { guard !nativeDialogOpen else { return }; model.newSession() }
     @objc private func menuUpdates() { guard !nativeDialogOpen, model.updates.canCheck else { return }; model.updates.check() }
     func validateMenuItem(_ item: NSMenuItem) -> Bool {

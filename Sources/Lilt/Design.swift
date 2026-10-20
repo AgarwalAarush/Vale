@@ -219,6 +219,7 @@ struct DraftEditor: NSViewRepresentable {
     @Binding var text: String
     var draftID: UUID? = nil
     var focusToken: Int = 0
+    var fontSize: CGFloat = 15
     var ownsDraft: () -> Bool = { true }
     var permitsFocus: (NSWindow) -> Bool = { _ in true }
     var submit: () -> Void
@@ -238,7 +239,7 @@ struct DraftEditor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         let editor = ComposerTextView(); editor.isRichText = false; editor.drawsBackground = false; editor.allowsUndo = true
-        editor.font = .systemFont(ofSize: 15); editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
+        editor.font = .systemFont(ofSize: fontSize); editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
         editor.textContainerInset = NSSize(width: 2, height: 5); editor.isVerticallyResizable = true; editor.isHorizontallyResizable = false
         editor.autoresizingMask = [.width]; editor.textContainer?.widthTracksTextView = true
         editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false; editor.isAutomaticTextReplacementEnabled = false
@@ -267,6 +268,7 @@ struct DraftEditor: NSViewRepresentable {
         configureInteraction(editor, coordinator: context.coordinator)
         editor.resignIfCovered()
         editor.observeFocus()
+        editor.font = .systemFont(ofSize: fontSize)
         editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
         editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         installCommit { [weak editor, weak coordinator = context.coordinator] in

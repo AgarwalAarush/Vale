@@ -31,32 +31,25 @@ struct WorkspaceView: View {
 
     private var colorScheme: ColorScheme? { appearance == "light" ? .light : appearance == "dark" ? .dark : nil }
     var body: some View {
-        GeometryReader { geometry in
-            let layout = WorkspaceLayout(width: geometry.size.width, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
-            let chatVisible = model.workspaceRoute == .chat && layout.chatVisible
-            HStack(spacing: 0) {
-                if layout.showsSidebar {
-                    navigation.frame(width: WorkspaceLayout.sidebarWidth)
-                    Rectangle().fill(Theme.line).frame(width: 1)
-                }
-                HStack(spacing: 0) {
-                    ZStack {
-                        // Keep the actual NSTextView mounted across every secondary route.
-                        CoachView(model: model, chatVisible: chatVisible)
-                            .opacity(chatVisible ? 1 : 0)
-                            .allowsHitTesting(chatVisible)
-                            .accessibilityHidden(!chatVisible)
-                        if model.workspaceRoute == .settings { SettingsView(model: model) }
-                        else if model.inspector != nil && !layout.inlineInspector { inspector(inline: false) }
-                        else if layout.compact && model.compactHistoryVisible { compactNavigation }
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if model.workspaceRoute == .chat, layout.inlineInspector, model.inspector != nil {
-                        Rectangle().fill(Theme.line).frame(width: 1)
-                        inspector(inline: true).frame(width: WorkspaceLayout.inspectorWidth)
+        VStack(spacing: 0) {
+            ZStack {
+                // Keep one NSTextView mounted through collapsed/expanded and every route.
+                CompactCompanionView(model: model, chatVisible: model.chatSurfaceVisible)
+                    .opacity(model.chatSurfaceVisible ? 1 : 0)
+                    .allowsHitTesting(model.chatSurfaceVisible)
+                    .accessibilityHidden(!model.chatSurfaceVisible)
+                if !model.chatSurfaceVisible {
+                    VStack(spacing: 0) {
+                        secondaryHeader
+                        Group {
+                            if model.workspaceRoute == .settings { SettingsView(model: model) }
+                            else if model.inspector != nil { inspector(inline: false) }
+                            else { compactNavigation }
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                }.frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
-            }.background(Theme.background).foregroundStyle(Theme.ink)
-        }
+                }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }.foregroundStyle(Theme.ink)
         .preferredColorScheme(colorScheme)
         .environment(\.openURL, OpenURLAction { AnswerLink.canOpen($0) ? .systemAction : .discarded })
         .alert("Rename chat", isPresented: Binding(get: { renameID != nil }, set: { if !$0 { renameID = nil } })) {
@@ -97,6 +90,26 @@ struct WorkspaceView: View {
         .alert("ChatGPT is connected", isPresented: Binding(get: { planConfirmationAccount != nil }, set: { if !$0 { acknowledgePlanUsage() } })) {
             Button("Got it") { acknowledgePlanUsage() }
         } message: { Text("Eligible requests in Vale use your ChatGPT plan and app limits. You can manage usage or disconnect Vale in ChatGPT Settings → Usage. Your draft is ready when you choose to send it.") }
+    }
+
+    private var secondaryHeader: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 9) {
+                Button { model.backToChat() } label: { Label("Back to chat", systemImage: "chevron.left") }
+                    .buttonStyle(ActionButton()).font(.system(size: 12, weight: .medium))
+                    .help("Return to your question").accessibilityIdentifier("vale.companion.back")
+                Spacer(minLength: 0)
+                if model.busy || model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation || model.context.hasSelection {
+                    Button("Stop", systemImage: "stop.fill") { model.stopInteraction() }
+                        .buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.accent)
+                }
+                CompactOverflowMenu(model: model)
+            }.padding(.horizontal, 17).frame(height: 48)
+            if let status = model.importStatus {
+                AttachmentImportStatus(text: status).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 17).padding(.bottom, 10)
+            }
+        }.background(Theme.fillRaised.opacity(0.22))
     }
 
     private var navigation: some View {
@@ -143,7 +156,6 @@ struct WorkspaceView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Files").font(.system(size: 22, weight: .medium))
-                            if let status = model.importStatus { AttachmentImportStatus(text: status) }
                             if model.active?.files.isEmpty != false { Text("Files you attach to this chat appear here.").foregroundStyle(Theme.muted) }
                             ForEach(model.active?.files ?? []) { file in FileChip(record: file, among: model.active?.files ?? [], model: model, removable: SentFile.canRemove(id: file.id, session: model.active)) }
                             Button("Attach files…") { model.attachFiles() }.buttonStyle(QuietButton()).disabled(model.importing)
@@ -162,7 +174,7 @@ struct WorkspaceView: View {
                 case nil: EmptyView()
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
-        }.background(Theme.fillRaised)
+        }.background(Theme.fillRaised.opacity(0.3))
     }
 }
 

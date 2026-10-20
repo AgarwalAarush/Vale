@@ -2,162 +2,34 @@ import AppKit
 import Combine
 import LiltCore
 
-/// AppKit owns the window chrome, item sizing, overflow and menu tracking.
-/// Content never supplies a second toolbar or reserves titlebar space.
-@MainActor final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate, NSMenuDelegate, NSUserInterfaceValidations {
+/// Retains the native app/menu commands without attaching workspace chrome.
+/// The companion exposes these same actions from its compact overflow.
+@MainActor final class NativeWorkspaceToolbar: NSObject, NSMenuDelegate, NSUserInterfaceValidations {
     static let command = Notification.Name("ValeWorkspaceCommand")
-    private enum Item {
-        static let sidebar = NSToolbarItem.Identifier("vale.sidebar")
-        static let newChat = NSToolbarItem.Identifier("vale.newChat")
-        static let mode = NSToolbarItem.Identifier("vale.mode")
-        static let details = NSToolbarItem.Identifier("vale.details")
-        static let actions = NSToolbarItem.Identifier("vale.actions")
-        static let stop = NSToolbarItem.Identifier("vale.stop")
-        static let back = NSToolbarItem.Identifier("vale.back")
-        static let activity = NSToolbarItem.Identifier("vale.activity")
-    }
     private weak var window: NSWindow?
     private let model: AppModel
-    // AppKit synchronizes item membership across matching toolbar identifiers, even without
-    // customization/autosave. Route and activity items belong only to this window's model.
-    private let toolbar = NSToolbar(identifier: "vale.workspace.toolbar." + UUID().uuidString)
     private var observations: [AnyCancellable] = []
-    private var refreshQueued = false
-    private var lastAppliedAppearance: String?
-
     init(window: NSWindow, model: AppModel) {
         self.window = window; self.model = model
         super.init()
-        toolbar.delegate = self; toolbar.displayMode = .iconOnly
-        toolbar.allowsUserCustomization = false; toolbar.autosavesConfiguration = false
-        toolbar.allowsExtensionItems = false
-        window.toolbarStyle = .unifiedCompact; window.toolbar = toolbar
-        model.objectWillChange.sink { [weak self] in self?.queueRefresh() }.store(in: &observations)
-        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).sink { [weak self] _ in self?.queueRefresh() }.store(in: &observations)
-        NotificationCenter.default.publisher(for: NSWindow.didResizeNotification, object: window).sink { [weak self] _ in self?.queueRefresh() }.store(in: &observations)
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).sink { [weak self] _ in self?.refresh() }.store(in: &observations)
         refresh()
     }
-
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [Item.sidebar, Item.newChat, .flexibleSpace, Item.mode, Item.details, Item.actions]
-    }
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        toolbarDefaultItemIdentifiers(toolbar) + [Item.stop, Item.back, Item.activity]
-    }
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        switch identifier {
-        case Item.sidebar: return button(identifier, label: "Chat history", symbol: "sidebar.left", action: #selector(sidebarAction))
-        case Item.newChat: return button(identifier, label: "New chat", symbol: "square.and.pencil", action: #selector(newAction))
-        case Item.details: return button(identifier, label: "Files and notes", symbol: "sidebar.right", action: #selector(detailsAction))
-        case Item.back:
-            let item = button(identifier, label: "Back to chat", symbol: "chevron.left", action: #selector(backAction))
-            item.isNavigational = true; item.visibilityPriority = .high; return item
-        case Item.stop:
-            let item = button(identifier, label: "Stop", symbol: "stop.fill", action: #selector(stopAction))
-            item.title = "Stop"; item.visibilityPriority = .high; return item
-        case Item.activity:
-            let item = NSToolbarItem(itemIdentifier: identifier)
-            let label = NSTextField(labelWithString: activityText)
-            label.font = .systemFont(ofSize: 12); label.textColor = .secondaryLabelColor
-            label.lineBreakMode = .byTruncatingTail; label.maximumNumberOfLines = 1
-            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-            NSLayoutConstraint.activate([label.widthAnchor.constraint(greaterThanOrEqualToConstant: 80), label.widthAnchor.constraint(lessThanOrEqualToConstant: 200)])
-            item.view = label; item.label = activityText; item.paletteLabel = "Active task"
-            item.visibilityPriority = .high; item.autovalidates = false
-            return item
-        case Item.mode:
-            let item = NSMenuToolbarItem(itemIdentifier: identifier)
-            item.label = "Chat mode"; item.paletteLabel = "Chat mode"; item.title = "Assistant"
-            item.menu = makeMenu(title: "Chat mode"); item.toolTip = "Chat mode"; item.visibilityPriority = .low
-            return item
-        case Item.actions:
-            let item = NSMenuToolbarItem(itemIdentifier: identifier)
-            item.label = "Chat actions"; item.paletteLabel = "Chat actions"
-            item.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "Chat actions")
-            item.showsIndicator = false; item.menu = chatMenu(); item.toolTip = "Chat actions"
-            return item
-        default: return nil
-        }
-    }
-    private func button(_ identifier: NSToolbarItem.Identifier, label: String, symbol: String, action: Selector) -> NSToolbarItem {
-        let item = NSToolbarItem(itemIdentifier: identifier)
-        item.label = label; item.paletteLabel = label; item.toolTip = label
-        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
-        item.target = self; item.action = action
-        return item
-    }
-    private func queueRefresh() {
-        guard !refreshQueued else { return }; refreshQueued = true
-        DispatchQueue.main.async { [weak self] in self?.refreshQueued = false; self?.refresh() }
-    }
     private var hasActivity: Bool { model.busy || model.context.hasSelection || model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
-    private var activityText: String {
-        var states: [String] = []
-        if model.voice.starting { states.append("Starting microphone…") }
-        else if model.voice.listening { states.append(model.conversation ? "Conversation · listening" : "Listening") }
-        else if model.voice.speaking { states.append(model.conversation ? "Conversation · speaking" : "Speaking") }
-        else if model.conversation { states.append("Conversation on") }
-        if model.busy { states.append("Thinking…") }
-        if model.context.hasSelection {
-            states.append(model.context.capturing ? "Refreshing window" : model.context.live ? "Live window" : "Window shared")
-        }
-        if let status = model.importStatus { states.append(status) }
-        return states.joined(separator: " · ")
-    }
     private var dialogOpen: Bool { window?.attachedSheet != nil || NSApp.modalWindow != nil || NSApp.windows.contains { $0.isVisible && ($0.isSheet || $0.attachedSheet != nil) } }
     private func refresh() {
-        guard let window else { return }
-        window.title = model.workspaceRoute == .settings ? "Settings" : model.compactHistoryVisible && (window.contentView?.bounds.width ?? 0) < WorkspaceLayout.sidebarThreshold ? "Chat history" : model.active?.title ?? "Vale"
-        window.setAccessibilityTitle("\(window.title) — Vale")
         let appearance = UserDefaults.standard.string(forKey: "valeAppearance") ?? "system"
-        if lastAppliedAppearance != appearance {
-            lastAppliedAppearance = appearance
-            window.appearance = appearance == "light" ? NSAppearance(named: .aqua) : appearance == "dark" ? NSAppearance(named: .darkAqua) : nil
-        }
-        setPresent(Item.stop, hasActivity, at: toolbar.items.count)
-        let layout = WorkspaceLayout(width: window.contentView?.bounds.width ?? 0, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
-        setPresent(Item.back, model.workspaceRoute != .chat || !layout.chatVisible, at: 1)
-        let stopIndex = toolbar.items.firstIndex(where: { $0.itemIdentifier == Item.stop }) ?? toolbar.items.count
-        setPresent(Item.activity, (hasActivity || model.importing) && (model.workspaceRoute != .chat || !layout.chatVisible), at: stopIndex)
-        for item in toolbar.items {
-            if item.itemIdentifier == Item.mode {
-                item.title = model.active?.mode == .learn ? "Learn" : "Assistant"
-                item.isEnabled = model.active != nil && !dialogOpen
-            } else if item.itemIdentifier == Item.details || item.itemIdentifier == Item.actions {
-                item.isEnabled = model.active != nil && !dialogOpen
-            } else if item.itemIdentifier == Item.stop {
-                item.toolTip = "Stop response, voice and window sharing (Escape)"; item.isEnabled = !dialogOpen
-            } else if item.itemIdentifier == Item.activity {
-                let text = activityText
-                (item.view as? NSTextField)?.stringValue = text
-                item.label = text; item.toolTip = text
-                (item.view as? NSTextField)?.setAccessibilityLabel(text)
-                let overflow = NSMenuItem(title: text, action: nil, keyEquivalent: ""); overflow.isEnabled = false
-                item.menuFormRepresentation = overflow
-            }
-        }
-    }
-    private func setPresent(_ identifier: NSToolbarItem.Identifier, _ present: Bool, at index: Int) {
-        if let current = toolbar.items.firstIndex(where: { $0.itemIdentifier == identifier }) {
-            if !present { toolbar.removeItem(at: current) }
-        } else if present { toolbar.insertItem(withItemIdentifier: identifier, at: min(index, toolbar.items.count)) }
+        window?.appearance = appearance == "light" ? NSAppearance(named: .aqua) : appearance == "dark" ? NSAppearance(named: .darkAqua) : nil
+        window?.setAccessibilityTitle("Vale companion")
     }
     func toggleSidebar() {
-        guard !dialogOpen else { return }; model.commitComposer?()
-        if (window?.contentView?.bounds.width ?? 0) < WorkspaceLayout.sidebarThreshold {
-            if model.compactHistoryVisible { model.backToChat() } else { model.showHistory() }
-        } else { model.compactHistoryVisible = false; model.sidebarVisible.toggle() }
+        guard !dialogOpen else { return }
+        if model.compactHistoryVisible { model.backToChat() } else { model.showHistory() }
     }
     func toggleDetails() {
         guard !dialogOpen, model.active != nil else { return }
-        if model.inspector == nil { model.showInspector(.notes) } else { model.closeInspector() }
+        if model.inspector == nil { model.showInspector(.notes) } else { model.backToChat() }
     }
-    @objc private func sidebarAction() { toggleSidebar() }
-    @objc private func detailsAction() { toggleDetails() }
-    @objc private func newAction() { guard !dialogOpen else { return }; model.newSession() }
-    @objc private func backAction() { guard !dialogOpen else { return }; model.backToChat() }
-    @objc private func stopAction() { guard !dialogOpen else { return }; model.stopInteraction() }
-
     func chatMenu() -> NSMenu { makeMenu(title: "Chat") }
     private func makeMenu(title: String) -> NSMenu {
         let menu = NSMenu(title: title); menu.delegate = self; populate(menu); return menu

@@ -18,35 +18,37 @@ extension AppController {
             return nil
         }
         func oneWorkspace() -> Bool {
-            let content = NSApp.windows.filter { $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
+            let content = NSApp.windows.filter { $0.isVisible && $0.identifier?.rawValue == "vale.workspace" }
             return workspace.windowNumber == initialWindow && content.count == 1 && content.first === workspace
         }
         func capture(_ name: String) async throws {
             await settle()
+            applyHarnessCompanionLayout(workspace)
             try snapshot(workspace, to: output.appendingPathComponent(name + ".png"))
         }
         model.voice.enableFixtures()
         model.sessions = []; model.activeID = nil; model.selectedID = nil
         model.newSession(title: "New chat")
+        try await runCompactCompanionAcceptance(output: output, results: &results)
         workspace.appearance = NSAppearance(named: .aqua)
-        workspace.setContentSize(NSSize(width: 1040, height: 740))
-        model.sidebarVisible = true; model.compactHistoryVisible = false
+        applyHarnessCompanionLayout(workspace)
+        model.sidebarVisible = false; model.compactHistoryVisible = false
         openWorkspace()
         try await capture("workspace-01-empty-light")
         settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
         results["workspaceOneWindowAtLaunch"] = oneWorkspace()
-        results["workspaceUsesNativeCompactToolbar"] = workspace.toolbar != nil && workspace.toolbarStyle == .unifiedCompact
+        results["companionHasNoPermanentWorkspaceToolbar"] = workspace is NSPanel && workspace.toolbar == nil && workspace.styleMask == .borderless
         let emptyEditor = workspace.contentView.flatMap { composer(in: $0) }
         workspace.appearance = NSAppearance(named: .darkAqua)
         try await capture("workspace-01b-empty-dark")
-        workspace.setContentSize(workspace.contentMinSize)
+        applyHarnessCompanionLayout(workspace)
         try await capture("workspace-01c-empty-minimum-dark")
-        results["workspaceMinimumDarkUsesProductionFrameConstraint"] = workspaceMinimumIsValid(workspace, atMinimum: true)
+        results["companionDarkUsesProductionPresentation"] = workspaceMinimumIsValid(workspace)
         workspace.appearance = NSAppearance(named: .aqua)
         try await capture("workspace-01d-empty-minimum-light")
-        results["workspaceMinimumLightUsesProductionFrameConstraint"] = workspaceMinimumIsValid(workspace, atMinimum: true)
+        results["companionLightUsesProductionPresentation"] = workspaceMinimumIsValid(workspace)
         workspace.appearance = NSAppearance(named: .aqua)
-        workspace.setContentSize(NSSize(width: 1040, height: 740))
+        applyHarnessCompanionLayout(workspace)
 
         let fixtureFiles = [output.appendingPathComponent("fixtures/A.png"), output.appendingPathComponent("fixtures/Brief.pdf")]
         await model.importFiles(fixtureFiles)
@@ -162,9 +164,9 @@ extension AppController {
         model.openSettings(); try await capture("workspace-09-settings-dark")
         model.backToChat()
         workspace.appearance = NSAppearance(named: .aqua)
-        workspace.setContentSize(workspace.contentMinSize); model.compactHistoryVisible = false
+        applyHarnessCompanionLayout(workspace); model.compactHistoryVisible = false
         try await capture("workspace-10-compact-chat")
-        results["workspaceMinimumConversationUsesProductionFrameConstraint"] = workspaceMinimumIsValid(workspace, atMinimum: true)
+        results["companionConversationUsesProductionPresentation"] = workspaceMinimumIsValid(workspace)
         model.showInspector(.notes); try await capture("workspace-11-compact-notes")
         results["workspaceCompactInspectorKeepsWindowIdentity"] = oneWorkspace() && model.draft == composedDraft && model.inspector == .notes
         model.showInspector(.files); model.showHistory(); await settle()
@@ -183,13 +185,13 @@ extension AppController {
         results["workspaceQueuedFocusDoesNotEnterHiddenComposer"] = model.workspaceRoute == .settings && workspace.firstResponder !== editor && model.draft == composedDraft
         model.backToChat(); await settle()
         model.closeInspector()
-        workspace.setContentSize(NSSize(width: 1280, height: 800))
+        applyHarnessCompanionLayout(workspace)
         model.showInspector(.notes); try await capture("workspace-12-wide-notes")
-        results["workspaceWideInspectorKeepsWindowIdentity"] = oneWorkspace() && model.draft == composedDraft
+        results["companionDetailKeepsWindowIdentity"] = oneWorkspace() && model.draft == composedDraft
         model.closeInspector(); model.backToChat()
 
         // Combined panel sizing is a visual acceptance case, not independent panel thumbnails.
-        workspace.setContentSize(NSSize(width: 1040, height: 740)); model.sidebarVisible = true
+        applyHarnessCompanionLayout(workspace); model.sidebarVisible = false
         model.showInspector(.notes); try await capture("workspace-12b-default-details")
         model.closeInspector(); model.backToChat()
 
@@ -209,7 +211,7 @@ extension AppController {
         try await runChatGPTSettingsVisualAcceptance(output: output)
         await settle()
         settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
-        results["workspaceMinimumConstraintsSurviveSettledRoutesAndFixtureRestoration"] = settledMinimumChecks.allSatisfy { $0 }
+        results["companionPresentationSurvivesSettledRoutesAndFixtureRestoration"] = settledMinimumChecks.allSatisfy { $0 }
         try await runChatGPTWorkspaceVisualAcceptance(output: output, results: &results)
         try await runImportFeedbackAcceptance(output: output, results: &results)
     }
@@ -228,7 +230,7 @@ extension AppController {
             fixture.voice.enableFixtures(); fixture.newSession()
             let window = NativeWorkspaceWindow(model: fixture, rememberFrame: false)
             defer { fixture.suspend(); window.close() }
-            window.setContentSize(NSSize(width: 1040, height: 740)); window.center()
+            fixture.expandCompanion(); window.summon(on: NSScreen.main)
             window.makeKeyAndOrderFront(nil)
             func editor(in view: NSView) -> ComposerTextView? {
                 if let input = view as? ComposerTextView { return input }
@@ -243,13 +245,13 @@ extension AppController {
                 try snapshot(window, to: output.appendingPathComponent("workspace-full-\(state)-\(dark ? "dark" : "light")-generated-account.png"), provenance: .generatedHarness(account: account))
             }
             if identityPending {
-                window.setContentSize(window.contentMinSize)
+                applyHarnessCompanionLayout(window)
                 for dark in [false, true] {
                     window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                     await settle()
                     try snapshot(window, to: output.appendingPathComponent("workspace-full-retry-connection-minimum-\(dark ? "dark" : "light")-generated-account.png"), provenance: .generatedHarness(account: account))
                 }
-                results["workspaceRetryConnectionUsesTrueMinimumFrame"] = workspaceMinimumIsValid(window, atMinimum: true) && account.needsIdentityValidation && !account.permitsPlanUsage
+                results["companionRetryConnectionUsesProductionPresentation"] = workspaceMinimumIsValid(window) && account.needsIdentityValidation && !account.permitsPlanUsage
             }
             if granted && !identityPending {
                 try runCaptureProvenanceAcceptance(window: window, account: account, output: output, results: &results)
@@ -288,65 +290,55 @@ extension AppController {
                     func sendKey(_ text: String, code: UInt16) {
                         if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: text, charactersIgnoringModifiers: text, isARepeat: false, keyCode: code) { NSApp.sendEvent(event) }
                     }
-                    window.setContentSize(NSSize(width: 1200, height: 740)); fixture.sidebarVisible = true
-                    fixture.showInspector(.notes); fixture.draft = "Generated draft protected while resizing."
+                    fixture.backToChat(); fixture.draft = "Generated draft protected while opening Settings."
                     await settle(); window.makeFirstResponder(input)
-                    let resizeDraft = fixture.draft, messageCount = fixture.active?.messages.count
-                    window.setContentSize(NSSize(width: 1040, height: 740)); await settle()
-                    let resignedOnResize = window.firstResponder !== input
+                    let coveredDraft = fixture.draft, messageCount = fixture.active?.messages.count
+                    fixture.openSettings(); await settle(); applyHarnessCompanionLayout(window)
+                    let resignedOnSettings = window.firstResponder !== input
                     sendKey("x", code: 7); sendKey("\r", code: 36); await settle()
-                    results["workspaceResizeCoverResignsComposerAndRejectsHiddenKeys"] = resignedOnResize && fixture.draft == resizeDraft && fixture.active?.messages.count == messageCount && sent == 0
+                    results["companionSettingsCoverResignsComposerAndRejectsHiddenKeys"] = resignedOnSettings && fixture.draft == coveredDraft && fixture.active?.messages.count == messageCount && sent == 0
 
-                    // Separate direct sidebar command from resizing, with a real marked composition.
-                    fixture.stopInteraction(); fixture.sidebarVisible = false; fixture.showInspector(.notes)
+                    // On-demand history commits real marked composition before covering chat.
+                    fixture.stopInteraction(); fixture.backToChat()
                     fixture.draft = "Generated draft protected while showing history."
                     await settle(); window.makeFirstResponder(input)
                     input.setSelectedRange(NSRange(location: input.string.utf16.count, length: 0))
                     input.setMarkedText(" 追加", selectedRange: NSRange(location: 3, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
                     let markedDraft = input.string
                     window.chrome.toggleSidebar(); await settle()
-                    let resignedOnSidebar = window.firstResponder !== input
+                    let resignedOnHistory = window.firstResponder !== input
                     sendKey("x", code: 7); sendKey("\r", code: 36); await settle()
-                    results["workspaceSidebarCoverCommitsMarkedTextAndRejectsHiddenKeys"] = resignedOnSidebar && fixture.draft == markedDraft && fixture.active?.draft == markedDraft && !input.hasMarkedText() && sent == 0
+                    results["companionHistoryCoverCommitsMarkedTextAndRejectsHiddenKeys"] = resignedOnHistory && fixture.draft == markedDraft && fixture.active?.draft == markedDraft && !input.hasMarkedText() && sent == 0
                 } else {
                     results["workspaceGeneratedConnectedNativeReturnSendsOriginalAttachments"] = false
-                    results["workspaceResizeCoverResignsComposerAndRejectsHiddenKeys"] = false
-                    results["workspaceSidebarCoverCommitsMarkedTextAndRejectsHiddenKeys"] = false
+                    results["companionSettingsCoverResignsComposerAndRejectsHiddenKeys"] = false
+                    results["companionHistoryCoverCommitsMarkedTextAndRejectsHiddenKeys"] = false
                 }
             }
             await settle()
             settledMinimumChecks.append(workspaceMinimumIsValid(window))
         }
-        results["workspaceGeneratedAccountWindowsKeepPositiveSettledMinimum"] = settledMinimumChecks.allSatisfy { $0 }
+        results["companionGeneratedAccountWindowsKeepBoundedPresentation"] = settledMinimumChecks.allSatisfy { $0 }
     }
 }
 
 extension AppController {
-    /// Actual Settings component with explicit generated accounts; never OAuth or personal credentials.
+    /// Exact compact Settings route with generated accounts; never OAuth or personal credentials.
     func runChatGPTSettingsVisualAcceptance(output: URL) async throws {
-        let previousView = workspace.contentView
-        let previousFrame = workspace.frame
-        let previousAppearance = workspace.appearance
-        defer {
-            workspace.contentView = previousView
-            workspace.appearance = previousAppearance
-            workspace.setFrame(previousFrame, display: true)
-        }
-        workspace.setContentSize(NSSize(width: 740, height: 650))
+        workspace.orderOut(nil)
+        defer { workspace.makeKeyAndOrderFront(nil) }
         for granted in [true, false] {
             let account = try await ChatGPTAccountChecks.makeSettingsFixture(planGranted: granted)
-            let content = ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("Generated account layout fixture · no OAuth performed").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                    ChatGPTAccountSettings(account: account)
-                }.padding(32).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
-            }.background(Theme.background).foregroundStyle(Theme.ink)
-            workspace.contentView = NativeWorkspaceWindow.contentContainer(for: content, size: workspace.contentView?.bounds.size ?? NSSize(width: 740, height: 650))
+            let fixture = try AppModel(testingAccount: account, dataDirectory: output.appendingPathComponent("settings-route-\(granted)-fixture"))
+            fixture.voice.enableFixtures(); fixture.newSession(); fixture.openSettings()
+            let window = NativeWorkspaceWindow(model: fixture)
+            defer { fixture.suspend(); window.close() }
+            window.makeKeyAndOrderFront(nil)
             for dark in [false, true] {
-                workspace.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                await settle()
+                window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                await settle(); applyHarnessCompanionLayout(window)
                 let state = granted ? "connected" : "grant-needed"
-                try snapshot(workspace, to: output.appendingPathComponent("workspace-account-\(state)-\(dark ? "dark" : "light")-fixture.png"), provenance: .generatedHarness(account: account))
+                try snapshot(window, to: output.appendingPathComponent("workspace-account-\(state)-\(dark ? "dark" : "light")-fixture.png"), provenance: .generatedHarness(account: account))
             }
         }
     }
@@ -612,6 +604,18 @@ extension AppController {
         let unknownMetadata = try metadata(unknown), nonfixtureMetadata = try metadata(nongenerated), generatedMetadata = try metadata(generated)
         results["nativeCaptureDefaultsUnknownAndNonfixtureStaysPrivate"] = unknownMetadata["generatedTestDataOnly"] as? Bool == false && unknownMetadata["publicArchiveEligible"] as? Bool == false && nonfixture == .unknown && nonfixtureMetadata["publicArchiveEligible"] as? Bool == false && NativeWindowEvidence.Provenance.classify(harness: false, disposable: true, accountless: true) == .unknown
         results["nativeCaptureExplicitDisposableAndAccountlessProvenance"] = generatedMetadata["generatedTestDataOnly"] as? Bool == true && generatedMetadata["captureProvenance"] as? String == "generated-disposable-fixture" && NativeWindowEvidence.Provenance.classify(harness: true, disposable: false, accountless: true) == .generatedAccountlessHarness
+        results["nativeCompanionCaptureProvesCompleteBorderlessRootAndCornerAlpha"] = generatedMetadata["windowClass"] as? String == "NativeWorkspaceWindow" && generatedMetadata["windowIdentifier"] as? String == "vale.workspace" && generatedMetadata["chromeKind"] as? String == "borderless-companion" && generatedMetadata["completeRootMatchesWindowFrame"] as? Bool == true && generatedMetadata["includesWindowControlsInHierarchy"] as? Bool == false && generatedMetadata["rasterHasAlpha"] as? Bool == true && generatedMetadata["roundedCornerAlphaVerified"] as? Bool == true
+        let impostor = NSPanel(contentRect: window.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        impostor.isReleasedWhenClosed = false
+        impostor.identifier = NSUserInterfaceItemIdentifier("vale.workspace")
+        impostor.contentView = NSView(frame: NSRect(origin: .zero, size: window.frame.size))
+        impostor.makeKeyAndOrderFront(nil)
+        let unrelated = directory.appendingPathComponent("unrelated-borderless-panel.png")
+        var unrelatedRejected = false
+        do { try NativeWindowEvidence.capture(impostor, to: unrelated, provenance: .generatedHarness(account: account)) }
+        catch { unrelatedRejected = true }
+        impostor.close(); window.makeKeyAndOrderFront(nil)
+        results["nativeCaptureRejectsUnrelatedBorderlessPanelDespiteMatchingIdentifier"] = unrelatedRejected && !FileManager.default.fileExists(atPath: unrelated.path) && !FileManager.default.fileExists(atPath: unrelated.appendingPathExtension("json").path)
         results["nativeCaptureFilesAndSidecarsArePrivate"] = [unknown, nongenerated, generated].allSatisfy { file in
             [file, file.appendingPathExtension("json")].allSatisfy { item in
                 let attributes = try? FileManager.default.attributesOfItem(atPath: item.path)
@@ -646,7 +650,7 @@ extension AppController {
         defer { fixture.suspend(); window.close() }
         window.makeKeyAndOrderFront(nil)
         func capture(_ state: String) async throws {
-            await settle()
+            await settle(); applyHarnessCompanionLayout(window)
             try snapshot(window, to: output.appendingPathComponent(state + ".png"), provenance: .generatedHarness(account: account))
         }
         func editor(in view: NSView) -> ComposerTextView? {
@@ -669,16 +673,16 @@ extension AppController {
         let ownerDraft = "Owner draft stays editable. More while adding files."
         results["workspaceImportProgressKeepsNativeDraftingAvailable"] = fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files…" && fixture.pendingFiles.isEmpty && fixture.draft == ownerDraft && window.firstResponder === window.contentView.flatMap({ editor(in: $0) })
         window.appearance = NSAppearance(named: .darkAqua)
-        window.setContentSize(window.contentMinSize)
+        applyHarnessCompanionLayout(window)
         try await capture("workspace-import-minimum-dark-generated-account")
-        results["workspaceImportStatusUsesTrueMinimumFrame"] = workspaceMinimumIsValid(window, atMinimum: true)
-        window.setContentSize(NSSize(width: 1040, height: 740))
+        results["companionImportUsesProductionPresentation"] = workspaceMinimumIsValid(window)
+        applyHarnessCompanionLayout(window)
         fixture.showInspector(.files)
         try await capture("workspace-import-files-dark-generated-account")
         fixture.openSettings()
         try await capture("workspace-import-covered-settings-dark-generated-account")
-        let noImportStop = window.toolbar?.items.contains { $0.itemIdentifier.rawValue == "vale.stop" } == false
-        let coveredStatus = window.toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.activity" }?.toolTip == "Adding files…"
+        let noImportStop = companionElement(in: window, identifier: "vale.companion.stop", label: "Stop") == nil
+        let coveredStatus = companionShowsImportStatus(in: window, expected: "Adding files…")
         fixture.newSession(title: "Generated other chat during import")
         let otherID = fixture.activeID
         fixture.draft = "Other chat draft stays here."
@@ -688,85 +692,66 @@ extension AppController {
         try await capture("workspace-import-other-owner-files-light-generated-account")
         fixture.openSettings()
         try await capture("workspace-import-other-owner-settings-light-generated-account")
-        results["workspaceImportCoveredAndOtherChatIdentifyOwnerWithoutFalseStop"] = noImportStop && coveredStatus && fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files to Generated import owner…" && window.toolbar?.items.first(where: { $0.itemIdentifier.rawValue == "vale.activity" })?.toolTip == fixture.importStatus && window.toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.stop" }) == false
-        // Reconcile the hidden original window after every covered-route transition. Matching
-        // NSToolbar identifiers previously let that other model remove this window's Back/status.
-        var toolbarTrace: [[String: Any]] = []
+        results["workspaceImportCoveredAndOtherChatIdentifyOwnerWithoutFalseStop"] = noImportStop && coveredStatus && fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files to Generated import owner…" && companionShowsImportStatus(in: window, expected: fixture.importStatus ?? "missing") && companionElement(in: window, identifier: "vale.companion.stop", label: "Stop") == nil
+        // Revisit the hidden original model between routes; compact controls must
+        // remain owned by this fixture and reflect its exact import owner.
+        var controlTrace: [[String: Any]] = []
         var coveredRouteChecks: [Bool] = [], backActionChecks: [Bool] = []
-        func recordCoveredToolbar(_ state: String, expectedStatus: String) -> Bool {
-            let toolbar = window.toolbar
-            let back = toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.back" }
-            let activity = toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.activity" }
-            let label = activity?.view as? NSTextField
-            let visible = toolbar?.visibleItems?.map { $0.itemIdentifier.rawValue } ?? []
-            let sourceItems = workspace.toolbar?.items.map { $0.itemIdentifier.rawValue } ?? []
-            let isolated = toolbar != nil && workspace.toolbar != nil && toolbar?.identifier != workspace.toolbar?.identifier
-            let passed = isolated && !workspace.isVisible && !sourceItems.contains("vale.back") && back?.isEnabled == true && back?.action != nil && visible.contains("vale.back") && visible.contains("vale.activity") && activity?.toolTip == expectedStatus && label?.stringValue == expectedStatus && label?.accessibilityLabel() == expectedStatus && activity?.menuFormRepresentation?.title == expectedStatus && toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.stop" }) == false
-            // Keep heterogeneous diagnostics in small typed assignments for the Swift compiler.
-            var row: [String: Any] = [:]
-            row["state"] = state
-            row["passed"] = passed
-            row["expectedStatus"] = expectedStatus
-            row["windowTitle"] = window.title
-            row["route"] = fixture.workspaceRoute.rawValue
-            row["appearance"] = window.effectiveAppearance.name.rawValue
-            row["frame"] = ["width": window.frame.width, "height": window.frame.height]
-            row["sourceHidden"] = !workspace.isVisible
-            row["identifiersAreDistinct"] = isolated
-            row["sourceToolbarIdentifier"] = workspace.toolbar?.identifier ?? "none"
-            row["fixtureToolbarIdentifier"] = toolbar?.identifier ?? "none"
-            row["sourceItems"] = sourceItems
-            row["fixtureItems"] = toolbar?.items.map { $0.itemIdentifier.rawValue } ?? []
-            row["fixtureVisibleItems"] = visible
-            row["activityTooltip"] = activity?.toolTip ?? "missing"
-            row["activityText"] = label?.stringValue ?? "missing"
-            row["activityAccessibilityLabel"] = label?.accessibilityLabel() ?? "missing"
-            toolbarTrace.append(row)
+        func recordCoveredControls(_ state: String, expectedStatus: String) -> Bool {
+            let back = companionElement(in: window, identifier: "vale.companion.back", label: "Back to chat")
+            let activity = companionElement(in: window, identifier: "vale.companion.import-status", label: expectedStatus)
+            let isolated = window !== workspace && window.contentView !== workspace.contentView && window.windowNumber != workspace.windowNumber
+            let hasStatus = companionShowsImportStatus(in: window, expected: expectedStatus)
+            let noStop = companionElement(in: window, identifier: "vale.companion.stop", label: "Stop") == nil
+            let passed = isolated && !workspace.isVisible && back?.isAccessibilityEnabled() == true && hasStatus && noStop && workspaceMinimumIsValid(window)
+            controlTrace.append(["state": state, "passed": passed, "expectedStatus": expectedStatus,
+                "route": fixture.workspaceRoute.rawValue, "appearance": window.effectiveAppearance.name.rawValue,
+                "width": window.frame.width, "height": window.frame.height,
+                "sourceHidden": !workspace.isVisible, "windowRootsAreDistinct": isolated,
+                "backPresent": back != nil, "backEnabled": back?.isAccessibilityEnabled() == true,
+                "activityAccessibilityLabel": activity?.accessibilityLabel() ?? "missing", "noImportStop": noStop])
             return passed
         }
         if let ownerID, let otherID {
             let hiddenSourceIsNormalChat = model.workspaceRoute == .chat && model.inspector == nil && !model.compactHistoryVisible
             for dark in [false, true] {
-                for minimum in [false, true] {
+                for cycle in 1...2 {
                     window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                    window.setContentSize(minimum ? window.contentMinSize : NSSize(width: 1040, height: 740))
+                    applyHarnessCompanionLayout(window)
                     for chatID in [ownerID, otherID] {
                         fixture.navigateToChat(chatID)
                         let otherOwner = chatID == otherID
                         let expectedStatus = otherOwner ? "Adding files to Generated import owner…" : "Adding files…"
                         let ownerName = otherOwner ? "other-owner" : "owner"
-                        let state = "\(ownerName)-\(minimum ? "minimum" : "default")-\(dark ? "dark" : "light")"
+                        let state = "\(ownerName)-cycle\(cycle)-\(dark ? "dark" : "light")"
                         fixture.showInspector(.files); await settle()
                         model.composerFocus += 1; await settle()
-                        coveredRouteChecks.append(hiddenSourceIsNormalChat && recordCoveredToolbar(state + "-files", expectedStatus: expectedStatus))
+                        coveredRouteChecks.append(hiddenSourceIsNormalChat && recordCoveredControls(state + "-files", expectedStatus: expectedStatus))
                         fixture.openSettings(); await settle()
                         model.composerFocus += 1; await settle()
-                        coveredRouteChecks.append(recordCoveredToolbar(state + "-settings", expectedStatus: expectedStatus) && (!minimum || workspaceMinimumIsValid(window, atMinimum: true)))
-                        if minimum { try await capture("workspace-import-repeat-\(ownerName)-settings-minimum-\(dark ? "dark" : "light")-generated-account") }
-                        let back = window.toolbar?.items.first { $0.itemIdentifier.rawValue == "vale.back" }
-                        let accepted: Bool
-                        if let back, let action = back.action { accepted = NSApp.sendAction(action, to: back.target, from: back) }
-                        else { accepted = false }
+                        coveredRouteChecks.append(recordCoveredControls(state + "-settings", expectedStatus: expectedStatus))
+                        if cycle == 2 { try await capture("companion-import-repeat-\(ownerName)-settings-\(dark ? "dark" : "light")-generated-account") }
+                        let accepted = pressCompanionControl(in: window, identifier: "vale.companion.back", label: "Back to chat")
                         await settle()
                         let expectedDraft = otherOwner ? "Other chat draft stays here." : ownerDraft
                         let returned = accepted && fixture.workspaceRoute == .chat && fixture.inspector == nil && !fixture.compactHistoryVisible && fixture.activeID == chatID && fixture.draft == expectedDraft && window.firstResponder === window.contentView.flatMap({ editor(in: $0) })
                         backActionChecks.append(returned)
-                        toolbarTrace.append(["state": state + "-back-action", "passed": returned, "actionAccepted": accepted])
+                        controlTrace.append(["state": state + "-back-action", "passed": returned, "actionAccepted": accepted])
                     }
                 }
             }
             // Keep the original success/failure ownership precondition: the other chat is active.
             fixture.navigateToChat(otherID); fixture.openSettings(); await settle()
         }
-        results["workspaceImportToolbarIsolatedAcrossOwnersRoutesSizesAndAppearances"] = coveredRouteChecks.count == 16 && coveredRouteChecks.allSatisfy { $0 }
+        results["companionImportControlsIsolatedAcrossOwnersRoutesAndAppearances"] = coveredRouteChecks.count == 16 && coveredRouteChecks.allSatisfy { $0 }
         results["workspaceImportNativeBackReturnsToEachDraftAcrossRepeatedRoutes"] = backActionChecks.count == 8 && backActionChecks.allSatisfy { $0 }
-        try JSONSerialization.data(withJSONObject: ["method": "generated native toolbar cross-window transition checks", "states": toolbarTrace], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("import-toolbar-transitions.json"), options: .atomic)
+        try JSONSerialization.data(withJSONObject: ["method": "generated native compact accessibility controls across repeated owner routes", "physicalInputVerified": false, "states": controlTrace], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("import-companion-transitions.json"), options: .atomic)
         gate.release(); await importing.value; await settle()
         let owner = fixture.sessions.first { $0.id == ownerID }
         let ownerRecords = owner?.pendingAttachments ?? []
         let persisted = try SessionStore(directory: directory).load()
         let savedOwner = persisted.first { $0.id == ownerID }, savedOther = persisted.first { $0.id == otherID }
-        results["workspaceAsyncImportSuccessKeepsFilesAndBothDraftOwners"] = !fixture.importing && fixture.importOwnerID == nil && fixture.importStatus == nil && fixture.error == nil && ownerRecords.count == 2 && savedOwner?.pendingAttachments.map(\.id) == ownerRecords.map(\.id) && savedOwner?.draft == ownerDraft && savedOther?.draft == "Other chat draft stays here." && owner?.draft == ownerDraft && fixture.activeID == otherID && fixture.pendingFiles.isEmpty && fixture.draft == "Other chat draft stays here." && window.toolbar?.items.contains(where: { $0.itemIdentifier.rawValue == "vale.activity" }) == false
+        results["workspaceAsyncImportSuccessKeepsFilesAndBothDraftOwners"] = !fixture.importing && fixture.importOwnerID == nil && fixture.importStatus == nil && fixture.error == nil && ownerRecords.count == 2 && savedOwner?.pendingAttachments.map(\.id) == ownerRecords.map(\.id) && savedOwner?.draft == ownerDraft && savedOther?.draft == "Other chat draft stays here." && owner?.draft == ownerDraft && fixture.activeID == otherID && fixture.pendingFiles.isEmpty && fixture.draft == "Other chat draft stays here." && companionElement(in: window, identifier: "vale.companion.import-status") == nil
         // A second real asynchronous import fails on a generated nonexistent file.
         let failureGate = WorkspaceImportFixtureGate()
         defer { failureGate.release() }
@@ -783,18 +768,20 @@ extension AppController {
 }
 
 extension AppController {
-    /// Compare against the independent product floor and toolbar-aware geometry, not minSize alone.
-    func workspaceMinimumIsValid(_ window: NSWindow, atMinimum: Bool = false) -> Bool {
-        let floor = NativeWorkspaceWindow.minimumFrameSize
-        let minimumContent = window.contentMinSize
-        let expectedFrame = window.frameRect(forContentRect: NSRect(origin: .zero, size: minimumContent)).size
-        let values = [minimumContent.width, minimumContent.height, expectedFrame.width, expectedFrame.height, window.minSize.width, window.minSize.height]
-        guard values.allSatisfy({ $0.isFinite && $0 > 0 }),
-              floor.width >= 740, floor.height >= 560,
-              window.minSize.width >= floor.width, window.minSize.height >= floor.height,
-              expectedFrame.width >= floor.width, expectedFrame.height >= floor.height else { return false }
-        guard atMinimum else { return true }
-        guard let actualContent = window.contentView?.bounds.size else { return false }
-        return abs(actualContent.width - minimumContent.width) < 1 && abs(actualContent.height - minimumContent.height) < 1 && abs(window.frame.width - expectedFrame.width) < 1 && abs(window.frame.height - expectedFrame.height) < 1 && window.frame.width >= 740 && window.frame.height >= 560
+    /// Check the actual compact production target and screen containment, not self-reported minima.
+    func workspaceMinimumIsValid(_ window: NSWindow) -> Bool {
+        guard let panel = window as? NativeWorkspaceWindow, let content = panel.contentView,
+              panel.styleMask == .borderless, panel.toolbar == nil else { return false }
+        var target = panel.presentationTargetSize
+        if let safe = (panel.screen ?? NSScreen.main)?.visibleFrame {
+            target.width = min(target.width, safe.width - 36)
+            target.height = min(target.height, safe.height - 36)
+            guard panel.frame.minX >= safe.minX - 1, panel.frame.maxX <= safe.maxX + 1,
+                  panel.frame.minY >= safe.minY - 1, panel.frame.maxY <= safe.maxY + 1 else { return false }
+        }
+        let values = [target.width, target.height, panel.frame.width, panel.frame.height, content.bounds.width, content.bounds.height]
+        return values.allSatisfy { $0.isFinite && $0 > 0 } && target.width <= 520 && target.height <= 650 &&
+            abs(panel.frame.width - target.width) < 1 && abs(panel.frame.height - target.height) < 1 &&
+            abs(content.bounds.width - panel.frame.width) < 1 && abs(content.bounds.height - panel.frame.height) < 1
     }
 }

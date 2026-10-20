@@ -6,15 +6,15 @@ Adopted after the October19 owner rejection, [research dossier](macos-workflow-r
 
 Record current source/build, owner defect and evidence method. A user screenshot overrides earlier visual PASS. Read AGENTS, PRODUCT, DESIGN and tracker; correct stale descriptions. Define primary task, capability routes, state map and supported OS. Keep data/privacy/trust boundaries. Resolve routine reversible choices without another approval interview.
 
-The rejected product is already a single window: duplicate chrome, competing first-run actions, oversized empty editor and redundant history are the defects. A single-window assertion cannot close them.
+The owner clarified the target on October20 and approved the Pearl Glass mockup: a shortcut-summoned top-right companion around300×45pt at rest, expanding in place through Ready, Ask and Answer. The full workspace itself is rejected. See compact-companion-2026-10-20/README.md and the approved 01-pearl-glass.png sidecar. Earlier source/test/release evidence does not establish acceptance of the corrected product.
 
 ## 2. Resolve native structure before styling
 
-Build one structural implementation in the real AppKit window with the existing stable editor; a second variant is justified only by an unresolved consequential choice. Start with disconnected empty, ordinary conversation and narrow chat/details. Use a real compact NSToolbar, standard traffic lights/drag/resize, native menus and responder behavior, system type and semantic colors. No web rewrite, hero, touch-first dimensions, global kit installation or service rewrite for visual exploration.
+Build the approved one-panel Pearl structure in a real AppKit floating panel with a stable native editor. Start with Ready, disconnected/connected Ask and ordinary Answer. Keep the top-right anchor fixed as it changes size; no titlebar, traffic lights, persistent sidebar or second assistant workspace. Use system type, native symbols, native material, native menus and responder behavior. Retained history/settings/files/notes/Learn routes reveal on demand in the same panel. No web rewrite, hero, global kit installation or service rewrite.
 
-The composer stays at the bottom. Disconnected users can draft/attach locally; Connect ChatGPT to send replaces unavailable Send. Connecting/cancel/retry remains adjacent. Browser return never automatically sends. Connected empty needs a brief invitation and focused editor; restored work resumes directly. Optional capabilities stay discoverable but subordinate; active voice/sharing always has an immediate stop.
+The Ready editor is the input pill; expansion preserves its identity. In Answer the follow-up composer stays at the bottom. Disconnected users can draft/attach locally; Connect ChatGPT to send replaces unavailable Send. Connecting/cancel/retry remains adjacent. Browser return never automatically sends. Optional capabilities stay discoverable but subordinate; active voice/sharing always has an immediate stop.
 
-Layout depends on remaining conversation space. A maximum prose measure is not a universal minimum. Details replace chat if the combined sidebar/detail layout leaves insufficient usable width. Test combinations rather than isolated breakpoints. DESIGN numbers are hypotheses, not HIG law.
+Layout is content-led and bounded to the screen visible frame. Long questions/replies scroll; secondary routes may use a practical bounded expansion while retaining the same physical panel. The approved comp governs topology; normal-size text, safe placement and privacy govern translation details. Point dimensions are implementation choices, not HIG law. This host runs macOS15. Its matching Xcode26SDK can compile native glass, but an inherited SDKROOT originally pointed to an older CLTSDK. Build with the matching SDK explicitly; inspect the material fallback here and keep exact26optics unverified.
 
 ## 3. Implement with bounded ownership and appropriate checks
 

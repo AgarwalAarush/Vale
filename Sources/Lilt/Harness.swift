@@ -115,14 +115,14 @@ extension AppController {
             if let unsent=model.pendingFiles.last{model.removeFile(unsent);results["removeDeletesUnsentManagedFile"]=model.fileStore?.image(for:unsent)==nil && model.pendingFiles.isEmpty && model.active?.files.count==4}
             model.openSettings();await settle();try snapshot(workspace,to:output.appendingPathComponent("09-settings-updates.png"))
             func scrollSettings(_ view:NSView)->Bool {
-                if let scroll=view as? NSScrollView,scroll.convert(.zero,to:workspace.contentView).x>190,let document=scroll.documentView{
+                if let scroll=view as? NSScrollView, !scroll.isHiddenOrHasHiddenAncestor, let document=scroll.documentView, document.bounds.height > scroll.contentView.bounds.height + 1 {
                     document.scroll(NSPoint(x:0,y:document.isFlipped ? max(0,document.bounds.height-scroll.contentView.bounds.height) : 0));scroll.reflectScrolledClipView(scroll.contentView);return true
                 }
                 for child in view.subviews{if scrollSettings(child){return true}};return false
             }
             _=scrollSettings(workspace.contentView!);await settle();try snapshot(workspace,to:output.appendingPathComponent("09b-update-controls.png"))
             results["unconfiguredUpdaterStaysInactive"] = !model.updates.canCheck && model.updates.configuration==nil
-            results["singleStableWorkspace"]=workspace.contentView?.bounds.size==NSSize(width:1040,height:740) && NSApp.windows.filter{$0.identifier?.rawValue == "vale.workspace"}.count == 1
+            results["singleStableCompanion"]=workspaceMinimumIsValid(workspace) && NSApp.windows.filter{$0.isVisible && $0.identifier?.rawValue == "vale.workspace"}.count == 1
             results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==4}
             model.error="The connection stopped. Your message and attachments are saved.";model.backToChat();openWorkspace();await settle();try snapshot(workspace,to:output.appendingPathComponent("10-recovery.png"))
             if CommandLine.arguments.contains("--integration-test"){

@@ -133,12 +133,15 @@ extension AppController {
         denied.removeFile(record);results["fixture_fileDeletionFailureKeepsAttachmentAndReportsError"]=denied.active?.files.contains(record)==true && denied.fileStore?.image(for:record) != nil && denied.error != nil
         denied.delete(id);results["fixture_forgetFailureKeepsRetryableChat"]=denied.sessions.contains{$0.id==id} && denied.error != nil
         denied.selectedID=id
-        let originalContent = workspace.contentView
-        workspace.contentView = NativeWorkspaceWindow.contentContainer(for: WorkspaceView(model: denied), size: NSSize(width: 1040, height: 740))
-        workspace.setContentSize(NSSize(width: 1040, height: 740))
-        await settle();try snapshot(workspace,to:output.appendingPathComponent("22-deletion-error.png"))
+        workspace.orderOut(nil)
+        let window = NativeWorkspaceWindow(model: denied)
+        defer { window.close(); workspace.makeKeyAndOrderFront(nil) }
+        denied.expandCompanion(); window.makeKeyAndOrderFront(nil)
+        await settle(); applyHarnessCompanionLayout(window)
+        try snapshot(window,to:output.appendingPathComponent("22-deletion-error.png"),provenance:.generatedHarness(account:denied.provider.account))
         fault.recover();denied.delete(id);results["fixture_retryForgetRemovesBytesAndChat"]=denied.sessions.isEmpty && denied.fileStore?.image(for:record)==nil && denied.error==nil
-        await settle();try snapshot(workspace,to:output.appendingPathComponent("23-forget-recovered.png"));workspace.contentView = originalContent
+        await settle(); applyHarnessCompanionLayout(window)
+        try snapshot(window,to:output.appendingPathComponent("23-forget-recovered.png"),provenance:.generatedHarness(account:denied.provider.account))
         denied.suspend();fixture.suspend();model.error=nil;openWorkspace()
     }
 }
