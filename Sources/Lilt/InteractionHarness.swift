@@ -97,6 +97,10 @@ extension AppController {
         model.endGuide()
         model.updateActive{$0.messages=(0..<30).map{Message(role:"user",text:"Generated earlier context message \($0)")}}
         await settle();results["fixture_contextLimitIsExposed"]=model.active?.contextLimited==true;try snapshot(workspace,to:output.appendingPathComponent("21-context-limit.png"))
+        model.newSession(title:"Explicit collapse safety fixture");model.draft="Keep this draft when collapsing active voice and sharing."
+        selectFixture();model.context.startLive();model.setConversation(true);await until{model.context.latest != nil};await settle()
+        let collapseDraft=model.draft;model.collapseCompanion();await settle()
+        results["fixture_explicitCollapseStopsVoiceAndSharingWithoutLosingDraft"] = !model.companionExpanded && !model.busy && !model.conversation && !model.voice.listening && !model.voice.speaking && !model.context.hasSelection && model.context.latest==nil && model.draft==collapseDraft
         model.newSession(title:"Own-window keyboard checks");selectFixture();model.context.startLive();model.setConversation(true);await settle()
         let previousID=model.activeID
         if let key=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.command,timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"n",charactersIgnoringModifiers:"n",isARepeat:false,keyCode:45){NSApp.sendEvent(key)}
