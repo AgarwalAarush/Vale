@@ -11,6 +11,26 @@ import AppKit
     static let toolsHeight: CGFloat = 43
     static let composerBottomInset: CGFloat = 8
 
+    static func connectionMessage(for account: ChatGPTAccount) -> String {
+        account.isSigningIn ? "Finish connecting in your browser." : account.needsIdentityValidation ? "Verify your ChatGPT connection to send." : "Connect ChatGPT to send. Your draft stays here."
+    }
+
+    private static func connectionHeight(for model: AppModel) -> CGFloat {
+        let account = model.provider.account
+        guard !account.permitsPlanUsage else { return 0 }
+        let width = (hasReply(for: model) ? replyWidth : askWidth) - 34
+        let font = NSFont.systemFont(ofSize: 11)
+        let line = ceil(NSLayoutManager().defaultLineHeight(for: font))
+        func textHeight(_ text: String) -> CGFloat {
+            max(line, ceil((text as NSString).boundingRect(with: NSSize(width: width, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font]).height))
+        }
+        // Match the visible sentence, optional three-line error and padding;
+        // a one-line notice must not reserve a multirow empty region.
+        return textHeight(connectionMessage(for: account)) + 10 +
+            (account.error.map { 4 + min(line * 3, textHeight($0)) } ?? 0)
+    }
+
     static func targetSize(for model: AppModel) -> NSSize {
         if model.workspaceRoute == .settings { return NSSize(width: 380, height: 520) }
         if model.compactHistoryVisible { return NSSize(width: 400, height: 500) }
@@ -39,7 +59,7 @@ import AppKit
         if model.canRetry { height += 28 }
         if model.paused { height += 27 }
         if model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation { height += 29 }
-        if !model.provider.account.permitsPlanUsage { height += model.provider.account.error == nil ? 64 : 92 }
+        height += connectionHeight(for: model)
         if model.active?.mode == .learn { height += 30 }
         return height
     }

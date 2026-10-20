@@ -158,6 +158,31 @@ extension AppController {
                 "panelHeight": panel.frame.height, "sameNativeEditor": ownerUIEditor(in: panel.contentView) === input])
             try snapshot(panel, to: output.appendingPathComponent("owner-settings-" + appearance + ".png"), provenance: .generatedHarness(account: account))
         }
+        panel.orderOut(nil)
+        var blockedGeometry: [Bool] = []
+        for pendingIdentity in [false, true] {
+            let blockedAccount = try await ChatGPTAccountChecks.makeSettingsFixture(planGranted: false, identityPending: pendingIdentity)
+            let blocked = try AppModel(testingAccount: blockedAccount, dataDirectory: output.appendingPathComponent("owner-ui-blocked-\(pendingIdentity)"))
+            blocked.voice.enableFixtures(); blocked.newSession(title: "Generated connection geometry")
+            blocked.expandCompanion()
+            let blockedPanel = NativeWorkspaceWindow(model: blocked)
+            defer { blocked.suspend(); blockedPanel.close() }
+            blockedPanel.appearance = NSAppearance(named: .aqua)
+            blockedPanel.makeKeyAndOrderFront(nil)
+            await settle(); applyHarnessCompanionLayout(blockedPanel)
+            if let field = ownerUIEditor(in: blockedPanel.contentView), let root = blockedPanel.contentView {
+                blockedPanel.makeFirstResponder(field)
+                let caret = ownerUICaretRect(field, in: blockedPanel).map { field.convert($0, to: root) }
+                let textTop = caret.map { root.bounds.maxY - $0.maxY } ?? 10_000
+                blockedGeometry.append(!blockedAccount.permitsPlanUsage && blockedAccount.error == nil &&
+                    blockedPanel.frame.height > 120 && blockedPanel.frame.height < 160 && textTop >= 55 && textTop <= 85 &&
+                    field.string.isEmpty && blocked.draft.isEmpty && !blocked.voice.listening && !blocked.context.hasSelection)
+                measurements.append(["state": pendingIdentity ? "retry-empty-ask" : "ungranted-empty-ask",
+                    "panelHeight": blockedPanel.frame.height, "firstTextTopFromPanel": textTop])
+                try snapshot(blockedPanel, to: output.appendingPathComponent(pendingIdentity ? "owner-retry-empty-ask-light.png" : "owner-ungranted-empty-ask-light.png"), provenance: .generatedHarness(account: blockedAccount))
+            }
+        }
+        results["ownerConnectionNoticesKeepEmptyAskContentLed"] = blockedGeometry.count == 2 && blockedGeometry.allSatisfy { $0 }
         results["ownerReadyNativeCaretMatchesPlaceholderAndCentersVisibleLine"] = readyGeometry.count == 2 && readyGeometry.allSatisfy { $0 }
         results["ownerEmptyConnectedAskStartsBelowHeaderWithoutBlankRows"] = askGeometry.count == 2 && askGeometry.allSatisfy { $0 }
         results["ownerNativePlaceholderMatchesTypedGlyphAndUndoRestoresEmptyDraft"] = glyphAndUndo

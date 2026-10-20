@@ -249,7 +249,7 @@ struct CompactCompanionView: View {
     }
     private var connectionStatus: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(account.isSigningIn ? "Finish connecting in your browser." : account.needsIdentityValidation ? "Verify your ChatGPT connection to send." : "Connect ChatGPT to send. Your draft stays here.")
+            Text(CompanionPresentation.connectionMessage(for: account))
             if let error = account.error { Text(error).foregroundStyle(Theme.warning).lineLimit(3) }
         }.font(.system(size: 11)).foregroundStyle(Theme.muted).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 17).padding(.bottom, 10)
     }
