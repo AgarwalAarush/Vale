@@ -503,6 +503,44 @@ final class LiltCoreTests {
         XCTAssertEqual(LearningSession(title:"Empty").historyPreview(matching:""),"Ready when you are.")
     }
 
+    func testHistoryExcerptBringsALateLiteralUnicodeMatchIntoView() {
+        var chat=LearningSession(title:"Notes")
+        let original=String(repeating:"Earlier context. ",count:40)+"👩🏽‍💻  **HaRbOr-73**\n\tCafé e\u{301} "+String(repeating:"Later context. ",count:20)
+        chat.messages=[Message(role:"assistant",text:original),Message(role:"user",text:"Unrelated last message")]
+        let excerpt=chat.historyExcerpt(matching:" harbor-73 ")
+        XCTAssertTrue(excerpt.contains("👩🏽‍💻 **HaRbOr-73** Café e\u{301}"))
+        XCTAssertTrue(excerpt.hasPrefix("…") && excerpt.hasSuffix("…") && excerpt.count<=80)
+        if let match=excerpt.range(of:"HaRbOr-73") { XCTAssertTrue(excerpt.distance(from:excerpt.startIndex,to:match.lowerBound)<=19) }
+        else { XCTAssertTrue(false) }
+        XCTAssertEqual(chat.messages.first?.text,original)
+    }
+
+    func testHistoryExcerptFindsARealTermAcrossSearchFields() {
+        var chat=LearningSession(title:"Orbit planning")
+        chat.takeaway="  Keep\n\tthe Harbor notes  "
+        chat.pendingAttachments=[AttachmentRecord(name:"Map [draft].pdf",kind:.pdf,byteCount:10)]
+        chat.guide=GuideProgress(plan:GuidePlan(title:"Install",steps:["Open the disk image","Move it to Applications"]))
+        chat.messages=[Message(role:"assistant",text:"An unrelated latest answer")]
+        XCTAssertTrue(chat.matches("harbor orbit"))
+        XCTAssertEqual(chat.historyExcerpt(matching:"harbor orbit"),"Keep the Harbor notes")
+        XCTAssertEqual(chat.historyExcerpt(matching:"ORBIT"),"Orbit planning")
+        XCTAssertEqual(chat.historyExcerpt(matching:"[draft].pdf"),"Map [draft].pdf")
+        XCTAssertTrue(chat.historyExcerpt(matching:"DISK\n\timage").contains("disk image"))
+    }
+
+    func testHistoryExcerptHasSensibleFallbackAndCharacterBounds() {
+        var chat=LearningSession(title:"Draft")
+        chat.draft="  👨‍👩‍👧‍👦\tCafé\nA later line  "
+        XCTAssertEqual(chat.historyExcerpt(matching:" \n"),"👨‍👩‍👧‍👦 Café")
+        XCTAssertEqual(chat.historyExcerpt(matching:"absent",limit:4),"👨‍👩‍👧‍👦 C…")
+        XCTAssertEqual(LearningSession(title:"Empty").historyExcerpt(matching:""),"Ready when you are.")
+        chat.messages=[Message(role:"user",text:"prefix 👨‍👩‍👧‍👦 café suffix")]
+        XCTAssertEqual(chat.historyExcerpt(matching:"👩",limit:1),"👨‍👩‍👧‍👦")
+        XCTAssertEqual(chat.historyExcerpt(matching:"café",limit:2),"…c")
+        XCTAssertEqual(chat.historyExcerpt(matching:"café",limit:0),"")
+        XCTAssertEqual(chat.historyExcerpt(matching:"café",limit: -1),"")
+    }
+
     func testSpokenReplyKeepsTheLinkAddress() {
         let spoken=SpokenReply.text(from:"See [the docs](https://example.com/docs) and `code` plus **this**.")
         XCTAssertTrue(spoken.contains("the docs"))
@@ -2748,6 +2786,9 @@ let cases: [(String, () throws -> Void)] = [
  ("Paste keeps copied text",tests.testPasteKeepsCopiedText),
  ("Stale answer stays marked outside the coach",tests.testStaleAnswerStaysMarkedOutsideTheCoach),
  ("History preview shows the matching message",tests.testHistoryPreviewShowsTheMatchingMessage),
+ ("History excerpt reveals late literal Unicode matches",tests.testHistoryExcerptBringsALateLiteralUnicodeMatchIntoView),
+ ("History excerpt selects a real term across fields",tests.testHistoryExcerptFindsARealTermAcrossSearchFields),
+ ("History excerpt fallback and bounds preserve characters",tests.testHistoryExcerptHasSensibleFallbackAndCharacterBounds),
  ("Spoken reply keeps the link address",tests.testSpokenReplyKeepsTheLinkAddress),
  ("Sidebar uses the search while it is visible",tests.testSidebarUsesTheSearchWhileItIsVisible),
  ("History counts the reply",tests.testHistoryCountsTheReply),

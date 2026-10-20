@@ -126,6 +126,39 @@ public struct LearningSession: Codable, Identifiable, Equatable {
         if let guide, guide.savedSteps.localizedCaseInsensitiveContains(q) { return guide.savedSteps }
         return fallback
     }
+    /// A literal, single-line history excerpt with the matching text close to its start.
+    public func historyExcerpt(matching query:String, limit:Int=80)->String {
+        guard limit>0 else { return "" }
+        let words=query.split(whereSeparator: \.isWhitespace).map(String.init)
+        let fallback=listPreview.split(whereSeparator: \.isWhitespace).joined(separator:" ")
+        guard !words.isEmpty else { return Self.boundedHistoryExcerpt(fallback,matching:nil,limit:limit) }
+        let sources=(messages.reversed().map(\.text) + [title,takeaway] + files.map(\.name) + (guide.map { [$0.savedSteps] } ?? []))
+            .map { $0.split(whereSeparator: \.isWhitespace).joined(separator:" ") }
+        // Filtering permits words in separate fields. Prefer the phrase, then a real term.
+        let needles=[words.joined(separator:" ")] + (words.count>1 ? words : [])
+        for needle in needles {
+            for source in sources {
+                if let range=source.range(of:needle,options:.caseInsensitive,locale:.current) {
+                    return Self.boundedHistoryExcerpt(source,matching:range,limit:limit)
+                }
+            }
+        }
+        return Self.boundedHistoryExcerpt(fallback,matching:nil,limit:limit)
+    }
+    private static func boundedHistoryExcerpt(_ text:String, matching range:Range<String.Index>?, limit:Int)->String {
+        // Round partial Unicode matches outward before taking any Character-based bounds.
+        let matchStart=range.flatMap { match in text.indices.last(where: { $0<=match.lowerBound }) } ?? text.startIndex
+        let matchEnd=range.flatMap { match in text.indices.first(where: { $0>=match.upperBound }) } ?? text.endIndex
+        let matchCount=range == nil ? 0 : text.distance(from:matchStart,to:matchEnd)
+        let context=min(18,text.distance(from:text.startIndex,to:matchStart),max(0,limit-2-min(matchCount,limit)))
+        let start=text.index(matchStart,offsetBy:-context)
+        let leading=start>text.startIndex && limit>1
+        let budget=limit-(leading ? 1 : 0)
+        var end=text.index(start,offsetBy:budget,limitedBy:text.endIndex) ?? text.endIndex
+        let trailing=end<text.endIndex && budget>1
+        if trailing { end=text.index(before:end) }
+        return (leading ? "…" : "") + String(text[start..<end]) + (trailing ? "…" : "")
+    }
     public func matches(_ query:String)->Bool {
         let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
         if q.isEmpty { return true }
