@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import subprocess
 import tempfile
 import time
@@ -51,9 +52,13 @@ def run(path):
     if evidence.exists():
         raise ValueError('Refusing to reuse a release-check preference domain')
     evidence.mkdir()
+    source_head = os.environ.get('VALE_EVIDENCE_HEAD')
+    if source_head is not None and not re.fullmatch(r'[0-9a-f]{40}', source_head):
+        raise ValueError('Expected a full source revision for native evidence')
+    launch_environment = ['--env', 'VALE_EVIDENCE_HEAD=' + source_head] if source_head else []
     for phase, options in [('preferences-off', ['--preferences-off']), ('production-feed', [])]:
         receipt = evidence / (phase + '.json')
-        command('/usr/bin/open', '-n', app, '--args', '--verify-release-feed', *options, evidence)
+        command('/usr/bin/open', '-n', *launch_environment, app, '--args', '--verify-release-feed', *options, evidence)
         deadline = time.monotonic() + 110
         while not receipt.exists() and time.monotonic() < deadline:
             time.sleep(0.2)
