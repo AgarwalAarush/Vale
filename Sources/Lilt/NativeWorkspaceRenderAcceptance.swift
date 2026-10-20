@@ -132,6 +132,8 @@ extension AppController {
         guard let input = panel.contentView.flatMap({ editor(in: $0) }) else {
             results["companionContinuousEditorMounted"] = false; return
         }
+        results["companionEditorHasNativeTextSystem"] = input.textStorage != nil && input.layoutManager != nil && input.textContainer != nil
+        guard results["companionEditorHasNativeTextSystem"] == true else { return }
         panel.makeFirstResponder(input)
         let anchor = NSPoint(x: panel.frame.maxX, y: panel.frame.maxY)
         for dark in [false, true] {
@@ -158,6 +160,9 @@ extension AppController {
         let selection = input.selectedRange(), draft = model.draft
         try await capture("companion-ask-light")
         results["companionTypingExpandsSameFocusedEditor"] = model.companionExpanded && abs(panel.frame.width - 320) < 1 && panel.contentView.flatMap({ editor(in: $0) }) === input && panel.firstResponder === input && !draft.isEmpty && (input.font?.pointSize ?? 0) >= 13
+        // Do not click expanded-only coordinates after a failed prerequisite:
+        // on Ready those coordinates belong to a native pop-up menu.
+        guard results["companionTypingExpandsSameFocusedEditor"] == true else { return }
         let collapsed = pressCompanionControl(in: panel, identifier: "vale.companion.collapse", label: "Collapse Vale")
         await settle(); applyHarnessCompanionLayout(panel)
         let collapsedPreserved = collapsed && !model.companionExpanded && model.draft == draft && input.selectedRange() == selection && abs(panel.frame.height - 45) < 1

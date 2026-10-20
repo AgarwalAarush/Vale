@@ -140,7 +140,16 @@ final class ComposerTextView: NSTextView {
         placeholderStorage.addLayoutManager(placeholderLayout)
         placeholderLayout.addTextContainer(placeholderContainer)
     }
-    convenience init() { self.init(frame: .zero, textContainer: nil) }
+    convenience init() {
+        // NSTextView's nil-container initializer intentionally creates an
+        // unattached view. Supply a complete TextKit stack for native editing.
+        let storage = NSTextStorage()
+        let layout = NSLayoutManager()
+        let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        storage.addLayoutManager(layout)
+        layout.addTextContainer(container)
+        self.init(frame: .zero, textContainer: container)
+    }
     required init?(coder: NSCoder) { nil }
 
     /// TextKit draws both the placeholder and editable text from this origin.
