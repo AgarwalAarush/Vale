@@ -35,18 +35,45 @@ struct QuietField: ViewModifier {
 struct QuietButton: ButtonStyle {
     var filled = false
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.system(size: 12, weight: .medium)).padding(.horizontal, 12).padding(.vertical, 8)
-            .background(configuration.isPressed ? Theme.fillPressed : (filled ? Theme.fillRaised : Theme.fill))
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.7))
+        ActionFeedback(label: configuration.label.font(.system(size: 12, weight: .medium)).padding(.horizontal, 12).padding(.vertical, 8), isPressed: configuration.isPressed, background: filled ? Theme.fillRaised : Theme.fill, outlined: true)
+    }
+}
+/// Feedback changes only the surface; native Button activation and focus stay intact.
+struct ActionButton: ButtonStyle {
+    var background: Color = .clear
+    var feedback: Color = Theme.ink
+    func makeBody(configuration: Configuration) -> some View {
+        ActionFeedback(label: configuration.label, isPressed: configuration.isPressed, background: background, feedback: feedback)
+    }
+}
+private struct ActionFeedback<Label: View>: View {
+    let label: Label
+    let isPressed: Bool
+    var background: Color
+    var feedback: Color = Theme.ink
+    var outlined = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.isFocused) private var isFocused
+    @State private var hovered = false
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        label
+            .contentShape(shape)
+            .background {
+                shape.fill(background)
+                    .overlay(shape.fill(feedback.opacity(isEnabled ? (isPressed ? 0.12 : hovered ? 0.06 : 0) : 0)))
+            }
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(isEnabled && isFocused ? Theme.accent : outlined ? Theme.line : .clear, lineWidth: isEnabled && isFocused ? 1 : 0.7))
+            .opacity(isEnabled ? 1 : 0.45)
+            .onHover { hovered = $0 }
     }
 }
 struct IconButton: View {
     var symbol: String; var label: String; var tint: Color = Theme.muted; var action: () -> Void
-    @State private var hover = false
     var body: some View {
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).frame(width: 30, height: 30).background(hover ? Theme.fillRaised : .clear).clipShape(Circle()) }
-            .buttonStyle(.plain).help(label).accessibilityLabel(label).onHover { hover = $0 }
+        Button(action: action) { Image(systemName: symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).frame(width: 30, height: 30) }
+            .buttonStyle(ActionButton()).help(label).accessibilityLabel(label)
     }
 }
 struct LogoMark: View {
@@ -72,6 +99,32 @@ final class ComposerTextView: NSTextView {
     var pasteFiles: (([URL]) -> Void)?
     var pasteImage: ((Data) -> Void)?
     var pastePDF: ((Data) -> Void)?
+    var focusChanged: ((Bool) -> Void)?
+    private(set) var observedFocus = false
+    private var focusObservationPending = false
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { observeFocus() }
+        return accepted
+    }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observeFocus()
+    }
+    /// AppKit finishes the responder transition before SwiftUI receives an update.
+    /// Coalesce changes and read the current responder, never a queued focus value.
+    func observeFocus() {
+        guard !focusObservationPending else { return }
+        focusObservationPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.focusObservationPending = false
+            let focused = self.window?.firstResponder === self
+            guard self.observedFocus != focused else { return }
+            self.observedFocus = focused
+            self.focusChanged?(focused)
+        }
+    }
     override func paste(_ sender: Any?) {
         let board = NSPasteboard.general
         let plain = board.string(forType: .string)
@@ -120,7 +173,9 @@ final class ComposerTextView: NSTextView {
     }
     override func resignFirstResponder() -> Bool {
         commitMarkedTextIfNeeded()
-        return super.resignFirstResponder()
+        let accepted = super.resignFirstResponder()
+        if accepted { observeFocus() }
+        return accepted
     }
     /// Keep an in-progress IME word when leaving or sending from this editor.
     func commitMarkedTextIfNeeded() {
@@ -150,6 +205,7 @@ struct DraftEditor: NSViewRepresentable {
     var pastePDF: ((Data) -> Void)? = nil
     var installCommit: (@escaping () -> Void) -> Void = { _ in }
     var onMeasuredHeight: ((CGFloat) -> Void)? = nil
+    var onFocusChange: ((Bool) -> Void)? = nil
     static func measuredHeight(_ editor: NSTextView) -> CGFloat {
         guard let layout = editor.layoutManager, let container = editor.textContainer else { return 61 }
         layout.ensureLayout(for: container)
@@ -170,6 +226,11 @@ struct DraftEditor: NSViewRepresentable {
         editor.isAutomaticDataDetectionEnabled = ComposerMarks.dataDetectors
         editor.smartInsertDeleteEnabled = PasteSpacing.adjustsAutomatically
         editor.delegate = context.coordinator; editor.identifier = NSUserInterfaceItemIdentifier("lilt.composer")
+        context.coordinator.editor = editor
+        editor.focusChanged = { [weak editor, weak coordinator = context.coordinator] focused in
+            guard let editor, let coordinator, coordinator.editor === editor else { return }
+            coordinator.parent.onFocusChange?(focused)
+        }
         editor.setAccessibilityLabel("Message Vale"); editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         editor.registerForDraggedTypes([.fileURL])
         keepFieldClear(scroll)
@@ -179,6 +240,7 @@ struct DraftEditor: NSViewRepresentable {
         context.coordinator.parent = self
         keepFieldClear(nsView)
         guard let editor = nsView.documentView as? ComposerTextView else { return }
+        editor.observeFocus()
         editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
         editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         installCommit { [weak editor, weak coordinator = context.coordinator] in
@@ -221,8 +283,13 @@ struct DraftEditor: NSViewRepresentable {
             coordinator.parent.onMeasuredHeight?(Self.measuredHeight(editor))
         }
     }
+    static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
+        (nsView.documentView as? ComposerTextView)?.focusChanged = nil
+        coordinator.editor = nil
+    }
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: DraftEditor
+        weak var editor: ComposerTextView?
         var lastFocus: Int
         var draftID: UUID?
         init(_ parent: DraftEditor) { self.parent = parent; lastFocus = parent.focusToken; draftID = parent.draftID }

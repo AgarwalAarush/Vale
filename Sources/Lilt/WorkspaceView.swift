@@ -31,17 +31,17 @@ struct WorkspaceView: View {
                     HStack(spacing: 0) {
                         ZStack {
                             // Retain the native editor and transcript across secondary routes.
-                            CoachView(model: model)
+                            CoachView(model: model, chatVisible: chatVisible)
                                 .opacity(chatVisible ? 1 : 0)
                                 .allowsHitTesting(chatVisible)
                                 .accessibilityHidden(!chatVisible)
                             if model.workspaceRoute == .settings { SettingsView(model: model) }
-                            else if model.inspector != nil && !inlineInspector { inspector }
+                            else if model.inspector != nil && !inlineInspector { inspector(inline: false) }
                             else if compact && model.compactHistoryVisible { compactNavigation }
                         }.frame(maxWidth: .infinity, maxHeight: .infinity)
                         if inlineInspector, model.inspector != nil {
                             Rectangle().fill(Theme.line).frame(width: 1)
-                            inspector.frame(width: 320)
+                            inspector(inline: true).frame(width: 320)
                         }
                     }
                 }.frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
@@ -74,12 +74,12 @@ struct WorkspaceView: View {
                 .padding(.horizontal, 20).padding(.top, 15).padding(.bottom, 24)
             Button { model.newSession() } label: {
                 Label("New chat", systemImage: "square.and.pencil").font(.system(size: 13, weight: .medium)).frame(maxWidth: .infinity, alignment: .leading).padding(10)
-            }.buttonStyle(.plain).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 12)
+            }.buttonStyle(ActionButton()).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 12)
             WorkspaceHistory(model: model, rename: rename, forget: { forgetID = $0 }).padding(.top, 18)
             Spacer(minLength: 8)
             Button { model.openSettings() } label: {
                 Label("Settings", systemImage: "gearshape").font(.system(size: 13)).frame(maxWidth: .infinity, alignment: .leading).padding(10)
-            }.buttonStyle(.plain).foregroundStyle(model.workspaceRoute == .settings ? Theme.ink : Theme.muted)
+            }.buttonStyle(ActionButton()).foregroundStyle(model.workspaceRoute == .settings ? Theme.ink : Theme.muted)
                 .background(model.workspaceRoute == .settings ? Theme.fillPressed : .clear).clipShape(RoundedRectangle(cornerRadius: 8)).padding(12)
         }.frame(maxHeight: .infinity).background(Theme.rail)
     }
@@ -96,7 +96,7 @@ struct WorkspaceView: View {
         HStack(spacing: 12) {
             IconButton(symbol: "sidebar.left", label: (compact ? model.compactHistoryVisible : model.sidebarVisible) ? "Hide chat history" : "Show chat history") { model.commitComposer?(); if compact { if model.compactHistoryVisible { model.backToChat() } else { model.showHistory() } } else { model.compactHistoryVisible = false; model.sidebarVisible.toggle() } }
             if model.workspaceRoute == .settings {
-                Button { model.backToChat() } label: { Label("Back to chat", systemImage: "chevron.left") }.buttonStyle(.plain).font(.system(size: 13))
+                Button { model.backToChat() } label: { Label("Back to chat", systemImage: "chevron.left") }.buttonStyle(ActionButton()).font(.system(size: 13))
             } else {
                 Text(model.active?.title ?? "Your chats").font(.system(size: 14, weight: .medium)).lineLimit(1).help(model.active?.title ?? "Your chats")
             }
@@ -153,13 +153,26 @@ struct WorkspaceView: View {
         return model.context.live ? "Live window" : "Window shared"
     }
 
-    private var inspector: some View {
+    private func inspector(inline: Bool) -> some View {
         VStack(spacing: 0) {
-            HStack {
-                Button { model.closeInspector() } label: { Label("Back to chat", systemImage: "chevron.left") }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.muted)
-                Spacer()
-                Menu("Details") { Button("Notes") { model.showInspector(.notes) }; Button("Files") { model.showInspector(.files) } }.font(.system(size: 12)).fixedSize()
-            }.padding(16)
+            HStack(spacing: 8) {
+                if !inline {
+                    Button { model.closeInspector() } label: { Label("Back to chat", systemImage: "chevron.left") }.buttonStyle(ActionButton()).foregroundStyle(Theme.muted)
+                    Spacer(minLength: 8)
+                }
+                if model.inspector == .context { Text("Window preview").fontWeight(.medium) }
+                if case .file = model.inspector { Text("File preview").fontWeight(.medium) }
+                Button { model.showInspector(.notes) } label: { Text("Notes").padding(.horizontal, 8).padding(.vertical, 6) }
+                    .buttonStyle(ActionButton(background: model.inspector == .notes ? Theme.fill : .clear))
+                    .accessibilityValue(model.inspector == .notes ? "Selected" : "")
+                Button { model.showInspector(.files) } label: { Text("Files").padding(.horizontal, 8).padding(.vertical, 6) }
+                    .buttonStyle(ActionButton(background: model.inspector == .files ? Theme.fill : .clear))
+                    .accessibilityValue(model.inspector == .files ? "Selected" : "")
+                if inline {
+                    Spacer(minLength: 0)
+                    IconButton(symbol: "xmark", label: "Close details") { model.closeInspector() }
+                }
+            }.font(.system(size: 12)).padding(.horizontal, 16).padding(.vertical, 10)
             Rectangle().fill(Theme.line).frame(height: 1)
             Group {
                 switch model.inspector {
@@ -172,7 +185,7 @@ struct WorkspaceView: View {
                             if model.active?.files.isEmpty != false { Text("Files you attach to this chat appear here.").foregroundStyle(Theme.muted) }
                             ForEach(model.active?.files ?? []) { file in FileChip(record: file, among: model.active?.files ?? [], model: model, removable: SentFile.canRemove(id: file.id, session: model.active)) }
                             Button("Attach files…") { model.attachFiles() }.buttonStyle(QuietButton()).disabled(model.importing)
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+                        }.frame(maxWidth: 680, alignment: .leading).padding(24).frame(maxWidth: .infinity)
                     }
                 case .file(let id):
                     if let record = model.active?.files.first(where: { $0.id == id }), let store = model.fileStore {
@@ -208,8 +221,9 @@ private struct WorkspaceHistory: View {
                             Text("Search chats").foregroundStyle(Theme.muted).allowsHitTesting(false).accessibilityHidden(true)
                         }
                     }
-                if !model.historyQuery.isEmpty { Button { model.historyQuery = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.plain).accessibilityLabel("Clear search").foregroundStyle(Theme.muted) }
-            }.font(.system(size: 12)).padding(9).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 12)
+                if !model.historyQuery.isEmpty { Button { model.historyQuery = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(ActionButton()).accessibilityLabel("Clear search").foregroundStyle(Theme.muted) }
+            }.font(.system(size: 12)).padding(9).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(searchFocused ? Theme.accent : .clear, lineWidth: 1)).padding(.horizontal, 12)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 3) {
                     if chats.isEmpty { Text(model.historyQuery.isEmpty ? "Your chats will be here." : "No chats found.").font(.system(size: 12)).foregroundStyle(Theme.muted).padding(12) }
@@ -217,13 +231,12 @@ private struct WorkspaceHistory: View {
                         Button { model.navigateToChat(chat.id); selected() } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack(spacing: 6) {
-                                    Text(chat.title).font(.system(size: 13)).lineLimit(1)
-                                    if chat.unsentDraft != nil || !chat.pendingAttachments.isEmpty { Image(systemName: "pencil").font(.system(size: 10)).accessibilityLabel("Unsent draft") }
+                                    Text(chat.title).font(.system(size: 13)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                                    if chat.unsentDraft != nil || !chat.pendingAttachments.isEmpty { Image(systemName: "pencil").font(.system(size: 10)).help("Unsent draft").accessibilityLabel("Unsent draft") }
                                 }
-                                if !model.historyQuery.isEmpty { Text(ChatListLine.text(from: chat.historyPreview(matching: model.historyQuery)) ?? "").font(.system(size: 11)).foregroundStyle(Theme.muted).lineLimit(2) }
+                                if !model.historyQuery.isEmpty { Text(chat.historyExcerpt(matching: model.historyQuery)).font(.system(size: 11)).foregroundStyle(Theme.muted).lineLimit(2) }
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.vertical, 10)
-                                .background(chat.id == model.activeID && model.workspaceRoute == .chat ? Theme.fillPressed : .clear).clipShape(RoundedRectangle(cornerRadius: 8))
-                        }.buttonStyle(.plain).help(chat.title).contextMenu {
+                        }.buttonStyle(ActionButton(background: chat.id == model.activeID && model.workspaceRoute == .chat ? Theme.fillPressed : .clear)).help(chat.title).contextMenu {
                             Button("Rename…") { rename(chat) }; Button("Export chat…") { model.export(chat) }; Button("Forget chat…", role: .destructive) { forget(chat.id) }
                         }
                     }
@@ -248,7 +261,7 @@ private struct WorkspaceNotes: View {
                 TextEditor(text: $note).font(.system(size: 15)).scrollContentBackground(.hidden).frame(minHeight: 180).padding(10).background(Theme.background).clipShape(RoundedRectangle(cornerRadius: 8)).accessibilityLabel("Chat notes")
                 if let steps = session.guide?.savedSteps { Text("Saved guide").font(.system(size: 14, weight: .medium)); Text(steps).font(.system(size: 13)).lineSpacing(4).textSelection(.enabled) }
                 Text("Saved with this chat").font(.system(size: 12)).foregroundStyle(Theme.muted)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+            }.frame(maxWidth: 680, alignment: .leading).padding(24).frame(maxWidth: .infinity)
         }
         .onAppear { if noteID != session.id || note == storedNote { note = session.takeaway }; storedNote = session.takeaway; noteID = session.id }
         .onChange(of: session.id) { note = session.takeaway; storedNote = session.takeaway; noteID = session.id }

@@ -47,6 +47,8 @@ Share state and Stop sharing remain visible when active; mic/listening/playback/
 
 The signature interaction is continuity: revealing context beside the answer and returning to the same composer without changing windows. Transitions are brief state feedback; Reduce Motion removes animation. Reduced Transparency gets solid surfaces. No idle pulse animation.
 
+Quiet actions share an enabled hover/pressed surface and a keyboard focus outline, without moving content. Composer focus is observed from its mounted native text view; only the visible, actually focused editor receives an accent stroke. History search uses its existing native focus state for the same stroke, and literal excerpts keep matching text in view. Notes and Files are direct detail destinations; previews name their current content. An inline inspector closes with “Close details,” while a replacing route returns with “Back to chat.” Notes and Files use the existing 680-point content measure with aligned 24-point gutters, shrinking naturally in the 320-point inspector. Related read-aloud, consent text and voice options share one 12-point-spaced settings group.
+
 ## Delivery and verification
 
 Inspect actual native empty/populated/history/settings/files/notes/context/loading/retry/guide states in light/dark at compact/default/wide sizes in one batched pass, then one confirmation pass after fixes. Screenshots must use generated fixtures, not private user content. Native interaction, genuine provider, signing/update installation, hardware and target-laptop evidence stay separate. A configured label without a real signed update path is not updater completion.

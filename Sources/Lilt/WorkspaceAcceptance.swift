@@ -52,11 +52,13 @@ extension AppController {
             return
         }
         results["workspaceComposerMounted"] = editor.window === workspace
+        let observesFocusedEditor = editor.observedFocus && workspace.firstResponder === editor
         editor.setSelectedRange(NSRange(location: 3, length: 5))
         let selection = editor.selectedRange()
         try await capture("workspace-02-conversation-light")
 
         model.openSettings(); await settle()
+        let observesCoveredEditor = !editor.observedFocus && workspace.firstResponder !== editor
         results["workspaceSettingsPreserveDraftFilesAndEditor"] = oneWorkspace() && model.workspaceRoute == .settings && model.activeID == originalID && model.draft == savedDraft && model.pendingFiles.map(\.id) == pendingIDs && workspace.contentView.flatMap({ composer(in: $0) }) === editor && editor.selectedRange() == selection
         try await capture("workspace-03-settings-light")
         model.setConversation(true); await settle()
@@ -65,6 +67,7 @@ extension AppController {
         model.stopInteraction(); await settle()
         results["workspaceStopFromCoveredChatClearsActivityAndKeepsDraft"] = model.workspaceRoute == .settings && !model.conversation && !model.voice.listening && !model.context.hasSelection && model.draft == savedDraft
         model.backToChat(); await settle()
+        results["workspaceComposerObservationTracksFocusAndCoveredRoute"] = observesFocusedEditor && observesCoveredEditor && editor.observedFocus && workspace.firstResponder === editor
         results["workspaceBackRestoresComposerSelection"] = model.activeID == originalID && model.draft == savedDraft && editor.selectedRange() == selection && workspace.firstResponder === editor
 
         model.showInspector(.notes); await settle()

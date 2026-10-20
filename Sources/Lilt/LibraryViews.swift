@@ -28,9 +28,11 @@ struct SettingsView: View {
                 Divider().overlay(Theme.line)
                 UpdateSettingsView(updates: model.updates)
                 Divider().overlay(Theme.line)
-                Toggle("Read typed replies aloud", isOn: $model.readAloud).toggleStyle(.switch).font(.system(size: 13))
-                Text("The microphone starts when you choose Talk or Conversation. Conversation listens again after each answer; Pause or Escape stops it. Apple’s on-device speech recognition is used when available.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
-                VoiceSettings()
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle("Read typed replies aloud", isOn: $model.readAloud).toggleStyle(.switch).font(.system(size: 13))
+                    Text("The microphone starts when you choose Talk or Conversation. Conversation listens again after each answer; Pause or Escape stops it. Apple’s on-device speech recognition is used when available.").font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(4)
+                    VoiceSettings()
+                }
                 Divider().overlay(Theme.line)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Your context, your choice").font(.system(size: 16, weight: .medium))

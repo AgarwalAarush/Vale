@@ -3,7 +3,9 @@ import LiltCore
 
 struct CoachView: View {
     @ObservedObject var model: AppModel
+    var chatVisible = true
     @State private var composerHeight: CGFloat = 61
+    @State private var composerFocused = false
     private var sendReady: Bool { model.hasInput && PausedTyping.allowsQuestion(paused: model.paused) && model.active != nil && !model.importing }
     var body: some View {
         VStack(spacing: 0) {
@@ -42,25 +44,25 @@ struct CoachView: View {
                             if model.errorOffersSettings { Button("Open Settings") { model.openSettings() } }
                             if model.context.hasSelection { Button("Change window") { model.context.choose() } }
                             if let id = model.deletionToRetry { Button("Retry Forget") { model.delete(id) } }
-                        }.font(.system(size: 12)).buttonStyle(.plain).foregroundStyle(Theme.accent)
+                        }.font(.system(size: 12)).buttonStyle(ActionButton()).foregroundStyle(Theme.accent)
                     }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Theme.warning.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                if model.canRetry { HStack { Button("Retry message") { model.retry() }.buttonStyle(.plain).foregroundStyle(Theme.accent); Spacer() }.font(.system(size: 13)) }
+                if model.canRetry { HStack { Button("Retry message") { model.retry() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent); Spacer() }.font(.system(size: 13)) }
                 if model.active != nil {
                     if model.context.hasSelection { ContextStrip(model: model).fixedSize(horizontal: false, vertical: true) }
-                    if model.paused { HStack { Text("Paused · mic and sharing off").foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.buttonStyle(.plain).foregroundStyle(Theme.accent) }.font(.system(size: 12)) }
+                    if model.paused { HStack { Text("Paused · mic and sharing off").foregroundStyle(Theme.muted); Spacer(); Button("Resume") { model.togglePause() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent) }.font(.system(size: 12)) }
                     if model.active?.mode == .learn {
                         HStack(spacing: 16) {
                             Button { model.nextHint() } label: { Label("Hint", systemImage: "lightbulb") }
                             Button { model.pointItOut() } label: { Label("Point it out", systemImage: "cursorarrow.rays") }
                             Spacer()
-                        }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused)
+                        }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused)
                     }
                     composer
                     HStack {
                         Text(model.status).font(.system(size: 12)).foregroundStyle(model.voice.listening ? Theme.accent : Theme.muted)
                         Spacer()
-                        Button { model.setConversation(!model.conversation) } label: { Label(ConversationControl.title(on: model.conversation), systemImage: model.conversation ? "waveform.circle.fill" : "waveform.circle") }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted).disabled(model.paused).help("Opt in to spoken turn-taking. Escape stops voice and sharing.")
+                        Button { model.setConversation(!model.conversation) } label: { Label(ConversationControl.title(on: model.conversation), systemImage: model.conversation ? "waveform.circle.fill" : "waveform.circle") }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(model.conversation ? Theme.accent : Theme.muted).disabled(model.paused).help("Opt in to spoken turn-taking. Escape stops voice and sharing.")
                     }.padding(.horizontal, 2)
                 }
             }.fixedSize(horizontal: false, vertical: true).layoutPriority(1).padding(.horizontal, 32).padding(.bottom, 22).frame(maxWidth: 740).frame(maxWidth: .infinity)
@@ -81,7 +83,7 @@ struct CoachView: View {
                     (!model.compactHistoryVisible || (window.contentView?.bounds.width ?? 0) >= 860)
                 }, submit: { if ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
                     let height = CGFloat(ComposerHeight.clamped(Double(measured))); if abs(composerHeight - height) > 0.5 { composerHeight = height }
-                }).frame(height: composerHeight)
+                }, onFocusChange: { composerFocused = $0 }).frame(height: composerHeight)
             }.help("Return sends. Shift–Return adds a line.")
             HStack(spacing: 10) {
                 Button { model.attachFiles() } label: { Label("Attach", systemImage: "plus") }.disabled(model.importing)
@@ -94,10 +96,10 @@ struct CoachView: View {
                 if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
                 IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : "Talk", tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused)
                 Button { if model.busy { model.stopIfSeparate() } else { model.send() } } label: {
-                    Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30).background(sendReady || model.busy ? Theme.action : Theme.muted).clipShape(RoundedRectangle(cornerRadius: 8))
-                }.buttonStyle(.plain).disabled(!model.busy && !sendReady).help(model.busy ? "Stop response" : "Send message (Return)").accessibilityLabel(model.busy ? "Stop response" : "Send message")
-            }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.muted)
-        }.padding(12).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.line, lineWidth: 1))
+                    Image(systemName: model.busy ? "stop.fill" : "arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30)
+                }.buttonStyle(ActionButton(background: sendReady || model.busy ? Theme.action : Theme.muted, feedback: Theme.onAction)).disabled(!model.busy && !sendReady).help(model.busy ? "Stop response" : "Send message (Return)").accessibilityLabel(model.busy ? "Stop response" : "Send message")
+            }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.muted)
+        }.padding(12).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(composerFocused && chatVisible ? Theme.accent : Theme.line, lineWidth: 1))
     }
     private func notice(_ text: String) -> some View { Text(text).font(.system(size: 12)).foregroundStyle(Theme.warning).frame(maxWidth: .infinity, alignment: .leading).padding(12) }
     private func revealLatest(_ proxy: ScrollViewProxy) {
@@ -126,7 +128,7 @@ private struct CoachMessage: View {
                 if StaleWindowAnswer.applies(to: message) {
                     HStack {
                         Image(systemName: "arrow.clockwise"); Text(StaleWindowAnswer.notice)
-                        if message.id == model.active?.messages.last?.id { Button("Refresh") { model.refreshAnswer() }.buttonStyle(.plain).foregroundStyle(Theme.accent) }
+                        if message.id == model.active?.messages.last?.id { Button("Refresh") { model.refreshAnswer() }.buttonStyle(ActionButton()).foregroundStyle(Theme.accent) }
                     }.font(.system(size: 10)).foregroundStyle(Theme.muted)
                 }
                 if message.role == "assistant" { ReplyTools(model: model, message: message) }
@@ -171,7 +173,7 @@ struct MessageAttachments: View {
                     Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: SentPicture.maxHeight, alignment: .leading).clipShape(RoundedRectangle(cornerRadius: 8))
                     Text(FileName.shown(record.name)).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
                 }
-            }.buttonStyle(.plain).help("Preview \(record.name)").accessibilityLabel("Preview \(record.name)")
+            }.buttonStyle(ActionButton()).help("Preview \(record.name)").accessibilityLabel("Preview \(record.name)")
         } else {
             FileChip(record: record, among: records, model: model, removable: SentFile.canRemove(id: record.id, session: session))
         }
@@ -189,13 +191,13 @@ private struct ReplyTools: View {
             Button {
                 if reading { model.voice.stopSpeaking() } else { model.voice.speak(SpokenReply.text(from: message.text)) }
             } label: { Label(ReplyPlayback.label(reading: reading), systemImage: ReplyPlayback.symbol(reading: reading)) }
-                .buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(reading ? Theme.accent : Theme.muted).help(reading ? "Stop reading" : "Read this reply").accessibilityLabel(reading ? "Stop reading" : "Read this reply")
+                .buttonStyle(ActionButton()).font(.system(size: 12, weight: .medium)).foregroundStyle(reading ? Theme.accent : Theme.muted).help(reading ? "Stop reading" : "Read this reply").accessibilityLabel(reading ? "Stop reading" : "Read this reply")
             Button {
                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(ReplyCopy.text(from: message.text), forType: .string)
                 let token = UUID(); copyToken = token; copied = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if copyToken == token { copied = false } }
             } label: { Label(copied ? "Copied" : ReplyActions.copy, systemImage: copied ? "checkmark" : "doc.on.doc") }
-                .buttonStyle(.plain).font(.system(size: 12, weight: .medium)).foregroundStyle(copied ? Theme.accent : Theme.muted).help("Copy reply").accessibilityLabel(copied ? "Copied" : "Copy reply")
+                .buttonStyle(ActionButton()).font(.system(size: 12, weight: .medium)).foregroundStyle(copied ? Theme.accent : Theme.muted).help("Copy reply").accessibilityLabel(copied ? "Copied" : "Copy reply")
         }.padding(.top, 2)
     }
 }
