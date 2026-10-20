@@ -216,6 +216,12 @@ extension AppController {
             defer { fixture.suspend(); window.close() }
             window.setContentSize(NSSize(width: 1040, height: 740)); window.center()
             window.makeKeyAndOrderFront(nil)
+            func editor(in view: NSView) -> ComposerTextView? {
+                if let input = view as? ComposerTextView { return input }
+                return view.subviews.lazy.compactMap { editor(in: $0) }.first
+            }
+            await settle()
+            if let input = window.contentView.flatMap({ editor(in: $0) }) { window.makeFirstResponder(input) }
             let state = granted ? "connected" : "grant-needed"
             for dark in [false, true] {
                 window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
@@ -235,6 +241,36 @@ extension AppController {
                     if case .failure = result { refusedProduction = true }
                 }
                 results["workspaceGeneratedAccountUsesRealViewsAndCannotReachProduction"] = fixture.provider.account === account && refusedProduction
+                if let input = window.contentView.flatMap({ editor(in: $0) }) {
+                    var sent = 0
+                    fixture.provider.fixtureReply = { _, _, _, _ in sent += 1 }
+                    func sendKey(_ text: String, code: UInt16) {
+                        if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: text, charactersIgnoringModifiers: text, isARepeat: false, keyCode: code) { NSApp.sendEvent(event) }
+                    }
+                    window.setContentSize(NSSize(width: 1200, height: 740)); fixture.sidebarVisible = true
+                    fixture.showInspector(.notes); fixture.draft = "Generated draft protected while resizing."
+                    await settle(); window.makeFirstResponder(input)
+                    let resizeDraft = fixture.draft, messageCount = fixture.active?.messages.count
+                    window.setContentSize(NSSize(width: 1040, height: 740)); await settle()
+                    let resignedOnResize = window.firstResponder !== input
+                    sendKey("x", code: 7); sendKey("\r", code: 36); await settle()
+                    results["workspaceResizeCoverResignsComposerAndRejectsHiddenKeys"] = resignedOnResize && fixture.draft == resizeDraft && fixture.active?.messages.count == messageCount && sent == 0
+
+                    // Separate direct sidebar command from resizing, with a real marked composition.
+                    fixture.stopInteraction(); fixture.sidebarVisible = false; fixture.showInspector(.notes)
+                    fixture.draft = "Generated draft protected while showing history."
+                    await settle(); window.makeFirstResponder(input)
+                    input.setSelectedRange(NSRange(location: input.string.utf16.count, length: 0))
+                    input.setMarkedText(" 追加", selectedRange: NSRange(location: 3, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                    let markedDraft = input.string
+                    window.chrome.toggleSidebar(); await settle()
+                    let resignedOnSidebar = window.firstResponder !== input
+                    sendKey("x", code: 7); sendKey("\r", code: 36); await settle()
+                    results["workspaceSidebarCoverCommitsMarkedTextAndRejectsHiddenKeys"] = resignedOnSidebar && fixture.draft == markedDraft && fixture.active?.draft == markedDraft && !input.hasMarkedText() && sent == 0
+                } else {
+                    results["workspaceResizeCoverResignsComposerAndRejectsHiddenKeys"] = false
+                    results["workspaceSidebarCoverCommitsMarkedTextAndRejectsHiddenKeys"] = false
+                }
             }
         }
     }
