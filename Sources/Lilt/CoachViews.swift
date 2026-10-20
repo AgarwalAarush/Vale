@@ -11,6 +11,12 @@ struct CoachView: View {
     private var webEnabled: Bool { model.active?.webEnabled == true }
     private var empty: Bool { model.active?.messages.isEmpty == true && model.active?.guide == nil && !model.busy }
     private var voiceActive: Bool { model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
+    private var voiceStatus: String {
+        if model.voice.starting { return "Starting microphone…" }
+        if model.voice.listening { return model.conversation ? "Conversation · listening" : "Listening" }
+        if model.voice.speaking { return model.conversation ? "Conversation · speaking" : "Speaking" }
+        return "Conversation on"
+    }
     var body: some View {
         VStack(spacing: 0) {
             if let warning = ShortcutNotice.text(model.shortcutWarning) { notice(warning) }
@@ -60,6 +66,13 @@ struct CoachView: View {
                         }.buttonStyle(ActionButton()).font(.system(size: 12)).foregroundStyle(Theme.muted).disabled(model.busy || model.paused || !account.permitsPlanUsage)
                     }
                     if empty, account.permitsPlanUsage, let session = model.active { EmptyGreeting(model: model, session: session) }
+                    if voiceActive {
+                        HStack(spacing: 8) {
+                            Label(voiceStatus, systemImage: model.voice.listening ? "mic.fill" : "waveform").foregroundStyle(Theme.accent)
+                            Spacer(minLength: 8)
+                            Button("Stop voice") { model.stopInteraction() }.buttonStyle(ActionButton()).help("Stop voice and window sharing")
+                        }.font(.system(size: 12))
+                    }
                     connectionStatus
                     composer
                 }
@@ -116,11 +129,7 @@ struct CoachView: View {
     }
     @ViewBuilder private var voiceControl: some View {
         if voiceActive {
-            HStack(spacing: 6) {
-                if model.voice.listening { Button("Finish speaking") { model.toggleVoice() }.foregroundStyle(Theme.accent) }
-                Button { model.stopInteraction() } label: { Label("Stop voice", systemImage: "stop.fill") }
-                    .help(model.status + ". Stop voice and sharing.").accessibilityLabel("Stop voice and sharing. " + model.status)
-            }
+            if model.voice.listening { Button("Finish speaking") { model.toggleVoice() }.foregroundStyle(Theme.accent) }
         } else {
             Menu {
                 Button("Talk") { model.toggleVoice() }.disabled(model.paused || !account.permitsPlanUsage)
