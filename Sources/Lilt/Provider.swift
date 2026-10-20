@@ -22,6 +22,7 @@ import LiltCore
         if let fixtureReply, CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") {
             fixtureReply(prompt, images, search, completion); return
         }
+        guard !account.isDisposableFixture else { completion(.failure(AppError("Generated account fixtures cannot send requests to OpenAI."))); return }
         let id = requestID
         let epoch = account.requestEpoch
         task = Task { [weak self] in
@@ -56,15 +57,10 @@ import LiltCore
                     throw ChatGPTHTTP.failure(http, data: data)
                 }
                 guard http.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("text/event-stream") == true else { throw AppError("ChatGPT didn’t return a response stream. Your question is saved; try again.") }
-                var stream = ChatGPTResponseStream()
-                for try await line in bytes.lines {
-                    try self.checkRequest(id, epoch: epoch)
-                    try stream.consume(line: line)
-                }
-                let reply = try stream.finish()
+                let streamed = try await ChatGPTSSEBytes.read(bytes) { try self.checkRequest(id, epoch: epoch) }
                 try self.checkRequest(id, epoch: epoch)
-                self.usedWebSearch = search && stream.usedWebSearch
-                self.task = nil; completion(.success(reply))
+                self.usedWebSearch = search && streamed.usedWebSearch
+                self.task = nil; completion(.success(streamed.reply))
             } catch {
                 guard self.requestID == id, self.account.requestEpoch == epoch, !Task.isCancelled else { return }
                 self.task = nil

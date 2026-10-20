@@ -34,7 +34,7 @@ public enum ChatGPTIdentityValidator {
         if let nonce, claims["nonce"] as? String != nonce { throw invalid() }
         return ChatGPTIdentity(issuer: ChatGPTOAuth.issuer, subject: subject, email: claims["email"] as? String, name: claims["name"] as? String)
     }
-    private static func invalid() -> ChatGPTError { ChatGPTError("ChatGPT’s identity couldn’t be verified. No account was changed. Try signing in again.") }
+    private static func invalid() -> ChatGPTError { ChatGPTError("ChatGPT’s identity couldn’t be verified. No account was changed. Try signing in again.", code: "invalid_id_token") }
     private static func length(_ count: Int) -> Data {
         if count < 128 { return Data([UInt8(count)]) }
         var remaining = count; var bytes: [UInt8] = []

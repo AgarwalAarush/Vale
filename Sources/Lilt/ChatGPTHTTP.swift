@@ -21,8 +21,18 @@ struct ChatGPTDiscovery: Decodable {
     }
 }
 
-@MainActor final class ChatGPTHTTP {
+@MainActor protocol ChatGPTAccountTransport {
+    var isFixture: Bool { get }
+    func discovery() async throws -> ChatGPTDiscovery
+    func identity(_ token: String, clientID: String, nonce: String?) async throws -> ChatGPTIdentity
+    func token(_ values: [String: String]) async throws -> ChatGPTTokenResponse
+    func revoke(_ tokens: ChatGPTTokens, clientID: String) async throws
+    func models(accessToken: String) async throws -> [ChatGPTModel]
+}
+
+@MainActor final class ChatGPTHTTP: ChatGPTAccountTransport {
     static let shared = ChatGPTHTTP()
+    let isFixture = false
     let session: URLSession
     private var discoveryCache: ChatGPTDiscovery?
     private var keysCache: (data: Data, date: Date)?

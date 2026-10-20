@@ -124,6 +124,8 @@ public enum ChatGPTResponses {
 /// Incremental SSE parser. A partial answer is never promoted to a successful reply.
 public struct ChatGPTResponseStream {
     private var eventLines: [String] = []
+    private var eventByteCount = 0
+    var hasPendingEvent: Bool { !eventLines.isEmpty }
     private var text = ""
     private var completed = false
     private var reply: TutorReply?
@@ -135,11 +137,12 @@ public struct ChatGPTResponseStream {
         if line.hasPrefix("data:") {
             var value = String(line.dropFirst(5)); if value.first == " " { value.removeFirst() }
             eventLines.append(value)
-            guard eventLines.reduce(0, { $0 + $1.utf8.count }) <= 4_194_304 else { throw ChatGPTError("The response exceeded the safe reading limit.") }
+            eventByteCount += value.utf8.count + 1
+            guard eventByteCount <= 4_194_304, eventLines.count <= 4096 else { throw ChatGPTError("The response exceeded the safe reading limit.") }
         }
     }
     private mutating func dispatch() throws {
-        guard !eventLines.isEmpty else { return }; let raw = eventLines.joined(separator: "\n"); eventLines.removeAll(keepingCapacity: true)
+        guard !eventLines.isEmpty else { return }; let raw = eventLines.joined(separator: "\n"); eventLines.removeAll(keepingCapacity: true); eventByteCount = 0
         if raw == "[DONE]" { return }
         guard let data = raw.data(using: .utf8), let event = try JSONSerialization.jsonObject(with: data) as? [String: Any], let type = event["type"] as? String else { throw ChatGPTError("The ChatGPT stream couldn’t be read. Your question is saved; try again.") }
         switch type {

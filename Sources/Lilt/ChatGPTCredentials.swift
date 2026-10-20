@@ -10,7 +10,10 @@ struct ChatGPTTokens: Codable {
     var scopes: [String]
     var expiresAt: Date
     var earliestRefreshAt: Date?
-    var permitsPlanUsage: Bool { scopes.contains("chatgpt.tokens.use.direct") && scopes.contains("resource.invoke") }
+    // Optional for compatibility with credential records created before pending validation existed.
+    var identityValidationPending: Bool?
+    var hasPlanGrant: Bool { scopes.contains("chatgpt.tokens.use.direct") && scopes.contains("resource.invoke") }
+    var permitsPlanUsage: Bool { hasPlanGrant && identityValidationPending != true }
 }
 
 struct ChatGPTRegistration: Codable, Identifiable {
@@ -32,9 +35,11 @@ struct ChatGPTCredentialVault: Codable {
 /// This namespace is intentionally independent of legacy Lilt settings and Codex credentials.
 @MainActor final class ChatGPTCredentialStore {
     private let service = "local.lilt.companion.chatgpt.oauth.v1"
-    private let memoryOnly: Bool
+    let memoryOnly: Bool
     private var memory = ChatGPTCredentialVault()
     private var blockedMemory = Set<String>()
+    private var memoryBusy = false
+    private var memoryWaiters: [CheckedContinuation<Void, Never>] = []
     init(memoryOnly: Bool) { self.memoryOnly = memoryOnly }
     private var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: "account-vault", kSecAttrSynchronizable as String: false]
@@ -86,12 +91,27 @@ struct ChatGPTCredentialVault: Codable {
         } else if status != errSecSuccess { throw saveError() }
     }
     func update(_ mutation: (inout ChatGPTCredentialVault) throws -> Void) async throws -> ChatGPTCredentialVault {
+        try await withExclusiveAccess {
+            var latest = try self.load(includeSignedOutTokens: true)
+            try mutation(&latest); try self.save(latest)
+            return try self.load()
+        }
+    }
+    /// Both real and disposable stores serialize the complete read/network/rotation/write transaction.
+    func withExclusiveAccess<T>(_ operation: () async throws -> T) async throws -> T {
         let lock = ChatGPTRefreshLock()
-        if !memoryOnly { try await lock.acquire() }
-        defer { withExtendedLifetime(lock) {} }
-        var latest = try load(includeSignedOutTokens: true)
-        try mutation(&latest); try save(latest)
-        return try load()
+        if memoryOnly {
+            while memoryBusy { await withCheckedContinuation { memoryWaiters.append($0) } }
+            memoryBusy = true
+        } else { try await lock.acquire() }
+        defer {
+            withExtendedLifetime(lock) {}
+            if memoryOnly {
+                memoryBusy = false
+                if !memoryWaiters.isEmpty { memoryWaiters.removeFirst().resume() }
+            }
+        }
+        return try await operation()
     }
     private func saveError() -> ChatGPTError { ChatGPTError("Vale couldn’t save its ChatGPT connection securely in Keychain. Unlock your login Keychain and try again.") }
 }

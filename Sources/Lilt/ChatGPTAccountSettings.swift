@@ -24,6 +24,8 @@ struct ChatGPTAccountSettings: View {
                 HStack(spacing: 8) {
                     if !account.isSignedIn {
                         Button("Continue with ChatGPT") { account.signIn() }.buttonStyle(QuietButton(filled: true))
+                    } else if account.needsIdentityValidation {
+                        Button("Retry connection") { account.refreshModels() }.buttonStyle(QuietButton(filled: true))
                     } else if !account.permitsPlanUsage {
                         Button("Enable ChatGPT plan usage") { account.enablePlanUsage() }.buttonStyle(QuietButton(filled: true))
                     } else {

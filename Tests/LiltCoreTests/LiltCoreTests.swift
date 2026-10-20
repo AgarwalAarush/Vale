@@ -2721,6 +2721,26 @@ final class LiltCoreTests {
         XCTAssertFalse(CapsuleMic.idleIsQuiet(listening: true, speaking: false, busy: false))
     }
 
+    func testChatGPTSSEByteFramerPreservesDelimitersAndBoundsUTF8() throws {
+        var framer = ChatGPTSSEByteFramer(maximumLineBytes: 8)
+        var lines: [String] = []
+        for byte in Data("a\r\n\r\nb\rc\n\n".utf8) { if let line = try framer.consume(byte) { lines.append(line) } }
+        XCTAssertEqual(lines, ["a", "", "b", "c", ""])
+        try XCTAssertNil(framer.finish())
+        var utf8 = ChatGPTSSEByteFramer()
+        for byte in Data("你好👋".utf8) { _ = try utf8.consume(byte) }
+        try XCTAssertEqual(utf8.consume(10), "你好👋")
+        var bounded = ChatGPTSSEByteFramer(maximumLineBytes: 2)
+        _ = try bounded.consume(65); _ = try bounded.consume(66)
+        XCTAssertThrowsError(try bounded.consume(67))
+        var invalid = ChatGPTSSEByteFramer()
+        _ = try invalid.consume(255)
+        XCTAssertThrowsError(try invalid.consume(10))
+        var fields = ChatGPTResponseStream()
+        for _ in 0..<4096 { try fields.consume(line: "data:") }
+        XCTAssertThrowsError(try fields.consume(line: "data:"))
+    }
+
     func testChatGPTAuthorizationUsesFreshPKCEAndExactCallbackBinding() throws {
         let callback = URL(string: "http://127.0.0.1:54321/auth/callback")!
         let initial = try ChatGPTAuthorization(redirectURI: callback)
@@ -2862,6 +2882,7 @@ static func main() {
 let tests = LiltCoreTests()
 
 let cases: [(String, () throws -> Void)] = [
+ ("ChatGPT byte framer preserves CR LF blank records and bounds UTF8", tests.testChatGPTSSEByteFramerPreservesDelimitersAndBoundsUTF8),
  ("ChatGPT OAuth fresh PKCE and callback registration binding", tests.testChatGPTAuthorizationUsesFreshPKCEAndExactCallbackBinding),
  ("ChatGPT generated RSA signatures and OIDC identity validation", tests.testChatGPTIdentityRequiresVerifiedSignatureAndOIDCClaims),
  ("ChatGPT direct request model discovery and explicit tool policy", tests.testChatGPTRequestsUseDiscoveredModelsAndOnlyExplicitWebTools),

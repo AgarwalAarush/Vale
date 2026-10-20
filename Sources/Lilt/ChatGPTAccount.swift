@@ -30,9 +30,12 @@ struct ChatGPTAuthorizedSession {
     @Published private(set) var activeAccountID: String?
     @Published private(set) var isSignedIn = false
     @Published private(set) var permitsPlanUsage = false
+    @Published private(set) var needsIdentityValidation = false
     private(set) var requestEpoch = UUID()
     private let store: ChatGPTCredentialStore
     private let fixtureMode: Bool
+    private let allowsFixtureSessions: Bool
+    private let http: any ChatGPTAccountTransport
     private var vault = ChatGPTCredentialVault()
     private var authTask: Task<Void, Never>?
     private var refreshTasks: [String: Task<ChatGPTTokens, Error>] = [:]
@@ -40,15 +43,26 @@ struct ChatGPTAuthorizedSession {
     private var signOutTask: Task<Void, Never>?
     private var listener: ChatGPTCallbackListener?
     private var attemptID = UUID()
-    private var activeRegistration: ChatGPTRegistration? { vault.registrations.first { $0.id == vault.activeID } }
+    private var activeRegistration: ChatGPTRegistration? { vault.registrations.first { $0.id == activeAccountID } }
     var accountDisplayName: String { activeRegistration?.displayName ?? "ChatGPT" }
     var selectedModel: ChatGPTModel? { models.first { $0.id == selectedModelID } }
+    var isDisposableFixture: Bool { fixtureMode }
 
     init(memoryOnly: Bool = CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--verify-release-feed")) {
-        fixtureMode = memoryOnly; store = ChatGPTCredentialStore(memoryOnly: memoryOnly)
+        fixtureMode = memoryOnly; allowsFixtureSessions = false; store = ChatGPTCredentialStore(memoryOnly: memoryOnly); http = ChatGPTHTTP.shared
+        loadInitialSelection()
+    }
+    /// Available only to disposable native harnesses. Normal construction always uses protected storage/HTTP.
+    init(testingStore: ChatGPTCredentialStore, testingTransport: any ChatGPTAccountTransport) throws {
+        guard testingStore.memoryOnly, testingTransport.isFixture, Self.isHarness else { throw ChatGPTError("Disposable account injection is restricted to the native test harness.") }
+        fixtureMode = true; allowsFixtureSessions = true; store = testingStore; http = testingTransport
+        loadInitialSelection()
+    }
+    private static var isHarness: Bool { CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") }
+    private func loadInitialSelection() {
         do {
-            vault = try store.load(); publish()
-            if let activeID = vault.activeID, store.isSignedOut(activeID) {
+            vault = try store.load(); activeAccountID = vault.activeID; publish()
+            if let activeID = activeAccountID, store.isSignedOut(activeID) {
                 let pending = try store.load(includeSignedOutTokens: true)
                 needsSignOutRetry = pending.registrations.first(where: { $0.id == activeID })?.tokens != nil
                 if needsSignOutRetry { status = "Signed out locally. Retry sign-out to finish disconnecting the saved session, or manage access in ChatGPT Settings → Usage." }
@@ -57,12 +71,15 @@ struct ChatGPTAuthorizedSession {
         catch { self.error = error.localizedDescription; status = "Reconnect ChatGPT in Settings." }
     }
     private func publish() {
-        activeAccountID = vault.activeID
         accounts = vault.registrations.map { ChatGPTAccountSummary(id: $0.id, name: $0.displayName, label: $0.label, isConnected: $0.tokens != nil) }
         isSignedIn = activeRegistration?.tokens != nil
         permitsPlanUsage = activeRegistration?.tokens?.permitsPlanUsage == true
+        needsIdentityValidation = activeRegistration?.tokens?.identityValidationPending == true
         selectedModelID = activeRegistration?.selectedModel ?? ""
-        if isSignedIn { status = permitsPlanUsage ? "Connected to ChatGPT. Requests use your ChatGPT plan and app limits." : "Signed in. Enable ChatGPT plan usage to send a question." }
+        guard !isSigningIn, !isSigningOut, !needsSignOutRetry else { return }
+        if needsIdentityValidation { status = "ChatGPT renewed the connection. Retry connection to finish verifying its identity before sending questions." }
+        else if isSignedIn { status = permitsPlanUsage ? "Connected to ChatGPT. Requests use your ChatGPT plan and app limits." : "Signed in. Enable ChatGPT plan usage to send a question." }
+        else { status = "Continue with ChatGPT to reconnect and send a question." }
     }
     private func invalidateRequests() {
         requestEpoch = UUID()
@@ -86,8 +103,9 @@ struct ChatGPTAuthorizedSession {
             do {
                 // Save this host's ID before starting its first authorization, including canceled attempts.
                 self.vault = try await self.store.update { _ in }
+                self.publish()
                 try self.checkAttempt(id)
-                let config = try await ChatGPTHTTP.shared.discovery()
+                let config = try await self.http.discovery()
                 try self.checkAttempt(id)
                 let redirect = try await listener.start()
                 try self.checkAttempt(id)
@@ -113,10 +131,10 @@ struct ChatGPTAuthorizedSession {
                 }
                 try self.checkAttempt(id)
                 issuedRegistration = self.vault.registrations.first { $0.id == result.clientID }
-                let response = try await ChatGPTHTTP.shared.token(["grant_type": "authorization_code", "client_id": result.clientID, "code": result.code, "code_verifier": transaction.verifier, "redirect_uri": transaction.redirectURI.absoluteString, "resource": ChatGPTOAuth.resource])
+                let response = try await self.http.token(["grant_type": "authorization_code", "client_id": result.clientID, "code": result.code, "code_verifier": transaction.verifier, "redirect_uri": transaction.redirectURI.absoluteString, "resource": ChatGPTOAuth.resource])
                 try self.checkAttempt(id)
                 let tokens = try response.credentials()
-                let identity = try await ChatGPTHTTP.shared.identity(tokens.idToken, clientID: result.clientID, nonce: transaction.nonce)
+                let identity = try await self.http.identity(tokens.idToken, clientID: result.clientID, nonce: transaction.nonce)
                 try self.checkAttempt(id)
                 if let previous = registration?.identity, previous.subject != identity.subject || previous.issuer != identity.issuer { throw ChatGPTError("That ChatGPT account differs from the selected connection. Use Add account to connect it separately.") }
                 self.vault = try await self.store.update { latest in
@@ -127,7 +145,7 @@ struct ChatGPTAuthorizedSession {
                 try self.checkAttempt(id)
                 try self.store.setSignedOut(result.clientID, false)
                 self.vault = try self.store.load()
-                self.invalidateRequests(); self.publish(); self.error = nil
+                self.invalidateRequests(); self.activeAccountID = result.clientID; self.needsSignOutRetry = false; self.publish(); self.error = nil
                 if !tokens.permitsPlanUsage { self.status = "Signed in. ChatGPT plan usage wasn’t granted. Enable it here to send questions." }
                 self.isSigningIn = false; self.authTask = nil; self.listener = nil
                 NSApp.activate(ignoringOtherApps: true)
@@ -151,8 +169,8 @@ struct ChatGPTAuthorizedSession {
         isSigningIn = false
     }
     func selectAccount(_ id: String) {
-        guard !isSigningOut, id != vault.activeID, vault.registrations.contains(where: { $0.id == id }) else { return }
-        cancelSignIn(); invalidateRequests()
+        guard !isSigningOut, id != activeAccountID, vault.registrations.contains(where: { $0.id == id }) else { return }
+        cancelSignIn(); invalidateRequests(); activeAccountID = id; publish()
         let epoch = requestEpoch
         Task { [weak self] in
             guard let self else { return }
@@ -165,7 +183,7 @@ struct ChatGPTAuthorizedSession {
         }
     }
     func selectModel(_ id: String) {
-        guard !isSigningOut, models.contains(where: { $0.id == id }), let activeID = vault.activeID else { return }
+        guard !isSigningOut, models.contains(where: { $0.id == id }), let activeID = activeAccountID else { return }
         selectedModelID = id
         let epoch = requestEpoch
         Task { [weak self] in
@@ -175,19 +193,19 @@ struct ChatGPTAuthorizedSession {
                     guard self.requestEpoch == epoch, let index = latest.registrations.firstIndex(where: { $0.id == activeID }) else { throw CancellationError() }
                     latest.registrations[index].selectedModel = id
                 }
-                if self.requestEpoch == epoch { self.vault = updated }
+                if self.requestEpoch == epoch { self.vault = updated; self.publish() }
             } catch { if self.requestEpoch == epoch { self.error = self.safeMessage(error) } }
         }
     }
     func refreshModels() {
         catalogTask?.cancel()
-        guard permitsPlanUsage, !fixtureMode else { return }
+        guard activeRegistration?.tokens?.hasPlanGrant == true, !fixtureMode || allowsFixtureSessions else { return }
         let epoch = requestEpoch
         catalogTask = Task { [weak self] in
             guard let self else { return }
             do {
                 let session = try await self.usableSession()
-                let catalog = try await ChatGPTHTTP.shared.models(accessToken: session.accessToken)
+                let catalog = try await self.http.models(accessToken: session.accessToken)
                 try Task.checkCancellation(); guard self.requestEpoch == epoch else { return }
                 self.models = catalog
                 if !catalog.contains(where: { $0.id == self.selectedModelID }), let first = catalog.first { self.selectModel(first.id) }
@@ -200,68 +218,81 @@ struct ChatGPTAuthorizedSession {
         }
     }
     func usableSession() async throws -> ChatGPTAuthorizedSession {
-        guard !fixtureMode else { throw ChatGPTError("Generated account fixtures cannot make ChatGPT requests.") }
+        guard !fixtureMode || allowsFixtureSessions else { throw ChatGPTError("Generated account fixtures cannot make ChatGPT requests.") }
         let epoch = requestEpoch
+        // Only records are merged. The selected identity belongs to this running account object.
+        vault = try store.load(); publish()
         guard !isSigningOut, let registration = activeRegistration, !store.isSignedOut(registration.id), let tokens = registration.tokens else { throw ChatGPTError("Continue with ChatGPT in Settings to send your question.") }
-        guard tokens.permitsPlanUsage else { throw ChatGPTError("Enable ChatGPT plan usage in Settings to send your question.") }
+        guard tokens.hasPlanGrant else { throw ChatGPTError("Enable ChatGPT plan usage in Settings to send your question.") }
         var current = tokens
-        if tokens.expiresAt.timeIntervalSinceNow < 90 {
-            if let refreshTask = refreshTasks[registration.id] { current = try await refreshTask.value }
+        if tokens.expiresAt.timeIntervalSinceNow < 90 || tokens.identityValidationPending == true {
+            let renewal: Task<ChatGPTTokens, Error>
+            if let pending = refreshTasks[registration.id] { renewal = pending }
             else {
-                let task = Task { [weak self] () throws -> ChatGPTTokens in
+                renewal = Task { [weak self] in
                     guard let self else { throw CancellationError() }
-                    let lock = ChatGPTRefreshLock(); try await lock.acquire()
-                    defer { withExtendedLifetime(lock) {} }
-                    // Re-read under the cross-process lock to avoid using an already-rotated refresh token.
-                    var latest = try self.store.load(includeSignedOutTokens: true)
-                    guard !self.store.isSignedOut(registration.id), let index = latest.registrations.firstIndex(where: { $0.id == registration.id }), let stored = latest.registrations[index].tokens else { throw CancellationError() }
-                    if stored.expiresAt.timeIntervalSinceNow >= 90 { if self.requestEpoch == epoch { self.vault = try self.store.load(); self.publish() }; return stored }
-                    if let earliest = stored.earliestRefreshAt, earliest > Date() { throw ChatGPTError("ChatGPT isn’t ready to renew this connection yet. Try again shortly.") }
-                    guard let refresh = stored.refreshToken else { throw ChatGPTError("Reconnect ChatGPT in Settings to renew this session.", code: "invalid_refresh_token") }
-                    let response: ChatGPTTokenResponse
-                    do { response = try await ChatGPTHTTP.shared.token(["grant_type": "refresh_token", "client_id": registration.clientID, "refresh_token": refresh, "resource": ChatGPTOAuth.resource]) }
-                    catch {
-                        if (error as? ChatGPTError)?.invalidatesSession == true {
-                            latest.registrations[index].tokens = nil; try self.store.save(latest)
-                            if self.vault.activeID == registration.id { self.invalidateRequests(); self.vault = try self.store.load(); self.publish(); self.status = "Your ChatGPT connection ended. Continue with ChatGPT to reconnect." }
-                        }
-                        throw error
-                    }
-                    let replacement = try response.credentials(previous: stored)
+                    return try await self.renewAndValidate(registrationID: registration.id)
+                }
+                refreshTasks[registration.id] = renewal
+            }
+            do { current = try await renewal.value; refreshTasks[registration.id] = nil }
+            catch { refreshTasks[registration.id] = nil; throw error }
+        }
+        try Task.checkCancellation()
+        guard epoch == requestEpoch, activeAccountID == registration.id, !store.isSignedOut(registration.id) else { throw CancellationError() }
+        guard current.identityValidationPending != true else { throw ChatGPTError("ChatGPT’s renewed identity still needs verification. Retry connection in Settings.") }
+        guard current.hasPlanGrant else { throw ChatGPTError("ChatGPT plan usage wasn’t granted for the renewed session. Enable it in Settings.") }
+        return ChatGPTAuthorizedSession(accessToken: current.accessToken, clientID: registration.clientID, epoch: epoch)
+    }
+    private func renewAndValidate(registrationID: String) async throws -> ChatGPTTokens {
+        try await store.withExclusiveAccess {
+            var latest = try self.store.load(includeSignedOutTokens: true)
+            guard !self.store.isSignedOut(registrationID), let index = latest.registrations.firstIndex(where: { $0.id == registrationID }), var current = latest.registrations[index].tokens else { throw CancellationError() }
+            do {
+                if current.expiresAt.timeIntervalSinceNow < 90 {
+                    if let earliest = current.earliestRefreshAt, earliest > Date() { throw ChatGPTError("ChatGPT isn’t ready to renew this connection yet. Try again shortly.") }
+                    guard let refresh = current.refreshToken else { throw ChatGPTError("Reconnect ChatGPT in Settings to renew this session.", code: "invalid_refresh_token") }
+                    // This task is not canceled by an inference caller or account switch. Once the
+                    // server rotates, the newest renewable session must survive subsequent failures.
+                    let response = try await self.http.token(["grant_type": "refresh_token", "client_id": registrationID, "refresh_token": refresh, "resource": ChatGPTOAuth.resource])
+                    var replacement = try response.credentials(previous: current)
                     guard response.refresh_token?.isEmpty == false else { throw ChatGPTError("ChatGPT didn’t return a renewable replacement session. Reconnect in Settings.", code: "invalid_refresh_token") }
-                    if let idToken = response.id_token {
-                        do {
-                            let identity = try await ChatGPTHTTP.shared.identity(idToken, clientID: registration.clientID, nonce: nil)
-                            guard identity.subject == registration.identity?.subject, identity.issuer == registration.identity?.issuer else { throw ChatGPTError("ChatGPT returned a different account during renewal. Reconnect in Settings.", code: "invalid_refresh_token") }
-                        } catch {
-                            latest.registrations[index].tokens = nil; try self.store.save(latest)
-                            throw ChatGPTError("ChatGPT’s renewed identity couldn’t be verified. Reconnect in Settings.", code: "invalid_refresh_token")
-                        }
-                    }
-                    // Commit a server rotation even when its original caller switched accounts. A durable
-                    // sign-out marker prevents reuse; sign-out then revokes this newest token under this lock.
+                    replacement.identityValidationPending = response.id_token != nil || current.identityValidationPending == true
                     latest.registrations[index].tokens = replacement
-                    try self.store.save(latest)
-                    if self.requestEpoch == epoch { self.vault = try self.store.load(); self.publish() }
-                    return replacement
+                    try self.store.save(latest) // Durable rotation BEFORE discovery/JWKS or identity awaits.
+                    current = replacement
+                    self.reloadRecords()
                 }
-                refreshTasks[registration.id] = task
-                do { current = try await task.value; refreshTasks[registration.id] = nil }
-                catch {
-                    refreshTasks[registration.id] = nil
-                    if requestEpoch == epoch, (error as? ChatGPTError)?.invalidatesSession == true {
-                        let updated = try await store.update { latest in
-                            if let index = latest.registrations.firstIndex(where: { $0.id == registration.id }) { latest.registrations[index].tokens = nil }
-                        }
-                        invalidateRequests(); vault = updated; publish(); status = "Your ChatGPT connection ended. Continue with ChatGPT to reconnect."
-                    }
-                    throw error
+                if current.identityValidationPending == true {
+                    let identity = try await self.http.identity(current.idToken, clientID: registrationID, nonce: nil)
+                    guard let expected = latest.registrations[index].identity, identity.subject == expected.subject, identity.issuer == expected.issuer else { throw ChatGPTError("ChatGPT returned a different account during renewal. Reconnect in Settings.", code: "identity_mismatch") }
+                    current.identityValidationPending = false
+                    latest.registrations[index].tokens = current; try self.store.save(latest)
                 }
+                self.reloadRecords()
+                // A sign-out marker can arrive while token/JWKS HTTP is suspended. Its task takes
+                // this same lock next and revokes the newest retained refresh, including pending ones.
+                guard !self.store.isSignedOut(registrationID) else { throw CancellationError() }
+                return current
+            } catch {
+                let code = (error as? ChatGPTError)?.code
+                if (error as? ChatGPTError)?.invalidatesSession == true || code == "identity_mismatch" || code == "invalid_id_token" {
+                    latest.registrations[index].tokens = nil; try self.store.save(latest)
+                    if self.activeAccountID == registrationID { self.invalidateRequests() }
+                    self.reloadRecords()
+                    if self.activeAccountID == registrationID { self.status = "Your ChatGPT connection ended. Continue with ChatGPT to reconnect." }
+                } else {
+                    // A timeout, DNS failure or 5xx leaves the protected replacement pending and
+                    // unusable; the next attempt verifies it or refreshes using its NEW refresh token.
+                    self.reloadRecords()
+                }
+                throw error
             }
         }
-        try Task.checkCancellation(); guard epoch == requestEpoch, activeAccountID == registration.id else { throw CancellationError() }
-        guard current.permitsPlanUsage else { throw ChatGPTError("ChatGPT plan usage wasn’t granted for the renewed session. Enable it in Settings.") }
-        return ChatGPTAuthorizedSession(accessToken: current.accessToken, clientID: registration.clientID, epoch: epoch)
+    }
+    private func reloadRecords() {
+        do { vault = try store.load(); publish() }
+        catch { self.error = safeMessage(error) }
     }
     func signOut() {
         guard !isSigningOut, let registration = activeRegistration else { return }
@@ -275,15 +306,16 @@ struct ChatGPTAuthorizedSession {
             guard let self else { return }
             var remoteConfirmed = true
             do {
-                let lock = ChatGPTRefreshLock(); try await lock.acquire(); defer { withExtendedLifetime(lock) {} }
-                var latest = try self.store.load(includeSignedOutTokens: true)
-                if let index = latest.registrations.firstIndex(where: { $0.id == registration.id }) {
-                    if let tokens = latest.registrations[index].tokens {
-                        do { try await ChatGPTHTTP.shared.revoke(tokens, clientID: registration.clientID) } catch { remoteConfirmed = false }
+                try await self.store.withExclusiveAccess {
+                    var latest = try self.store.load(includeSignedOutTokens: true)
+                    if let index = latest.registrations.firstIndex(where: { $0.id == registration.id }) {
+                        if let tokens = latest.registrations[index].tokens {
+                            do { try await self.http.revoke(tokens, clientID: registration.clientID) } catch { remoteConfirmed = false }
+                        }
+                        latest.registrations[index].tokens = nil
                     }
-                    latest.registrations[index].tokens = nil
+                    try self.store.save(latest); self.reloadRecords()
                 }
-                try self.store.save(latest); self.vault = try self.store.load()
             }
             catch { self.error = "Vale couldn’t remove the saved ChatGPT session from Keychain. Unlock Keychain and retry sign-out."; self.needsSignOutRetry = true }
             self.isSigningOut = false; self.signOutTask = nil; self.publish()

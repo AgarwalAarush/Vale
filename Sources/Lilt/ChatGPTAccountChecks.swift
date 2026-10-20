@@ -3,6 +3,9 @@ import LiltCore
 
 /// Disposable protocol checks. These never open a browser or touch the production credential store.
 @MainActor enum ChatGPTAccountChecks {
+    static func makeSettingsFixture(planGranted: Bool = true) async throws -> ChatGPTAccount {
+        try await ChatGPTLifecycleChecks.makeSettingsFixture(planGranted: planGranted)
+    }
     static func run() async -> [String: Bool] {
         guard CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else { return [:] }
         var results: [String: Bool] = [:]
@@ -54,6 +57,15 @@ import LiltCore
             do { _ = try await listener.waitForCallback(); results["chatGPTLoopbackCancellationEndsAttempt"] = false }
             catch { results["chatGPTLoopbackCancellationEndsAttempt"] = true }
         } catch { results["chatGPTLoopbackCancellationEndsAttempt"] = false }
+        results.merge(await ChatGPTLifecycleChecks.run(), uniquingKeysWith: { _, new in new })
+        results.merge(await ChatGPTSSEChecks.run(), uniquingKeysWith: { _, new in new })
+        do {
+            let fixture = try await makeSettingsFixture()
+            let provider = TutorProvider(account: fixture)
+            var rejected = false
+            provider.ask(prompt: "Generated fixture must stay offline") { result in if case .failure = result { rejected = true } }
+            results["chatGPTFixtureAccountCannotReachProductionResponsesTransport"] = rejected
+        } catch { results["chatGPTFixtureAccountCannotReachProductionResponsesTransport"] = false }
         return results
     }
 }
