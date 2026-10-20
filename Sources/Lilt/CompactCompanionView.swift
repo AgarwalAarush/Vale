@@ -132,7 +132,7 @@ struct CompactCompanionView: View {
                     guard chatVisible, model.chatSurfaceVisible, abs(model.companionReplyHeight - height) > 1 else { return }
                     DispatchQueue.main.async { model.companionReplyHeight = height }
                 }
-                .onChange(of: model.active?.messages.last?.id) { _, id in
+                .onChange(of: model.active?.messages.last?.id, initial: true) { _, id in
                     guard let id else { return }
                     // Wait for the new row to enter the native scroll layout.
                     DispatchQueue.main.async {
