@@ -23,6 +23,8 @@ import LiltCore
         await check("chatGPTLifecycleTwoCopiesSerializeActualRotatingRefresh", results: &results) { try await competingRefreshes() }
         await check("chatGPTLifecycleJWKS503RetainsPendingRotationAndRecoversWithNewRefresh", results: &results) { try await transientRecovery(ChatGPTError("Generated JWKS 503", status: 503)) }
         await check("chatGPTLifecycleJWKSTimeoutRetainsPendingRotationAndRecoversWithNewRefresh", results: &results) { try await transientRecovery(URLError(.timedOut)) }
+        await check("chatGPTLifecycleRetryConnectionVerifiesNarrowedGrantAfterJWKS503WithoutCatalogOrSession", results: &results) { try await narrowedGrantRecovery(ChatGPTError("Generated JWKS 503", status: 503)) }
+        await check("chatGPTLifecycleRetryConnectionVerifiesNarrowedGrantAfterJWKSTimeoutWithoutCatalogOrSession", results: &results) { try await narrowedGrantRecovery(URLError(.timedOut)) }
         await check("chatGPTLifecycleTerminalIdentityMismatchClearsAndKeepsDistinctError", results: &results) { try await terminalIdentityFailure(mismatch: true) }
         await check("chatGPTLifecycleTerminalSignatureFailureClearsPendingCredentials", results: &results) { try await terminalIdentityFailure(mismatch: false) }
         await check("chatGPTLifecycleCallerCancellationRetainsCompletedRotation", results: &results) { try await callerRace(switchAccount: false) }
@@ -131,6 +133,37 @@ import LiltCore
         let cleared = try store.load(includeSignedOutTokens: true).registrations.first { $0.id == "alice" }?.tokens == nil
         return cleared && !account.isSignedIn && !account.permitsPlanUsage && account.activeAccountID == "alice" && code == (mismatch ? "identity_mismatch" : "invalid_id_token") && http.tokenCalls.count == 1
     }
+    private static func narrowedGrantRecovery(_ failure: Error) async throws -> Bool {
+        let (store, http) = try fixture()
+        http.returnedScopes = "openid profile email"
+        let account = try ChatGPTAccount(testingStore: store, testingTransport: http)
+        let epoch = account.requestEpoch
+        let gate = ChatGPTFixtureGate(); http.identityGate = gate; http.identityFailures = [failure]; defer { gate.release() }
+        account.refreshModels()
+        try await wait { gate.reached }
+        let pending = try store.load().registrations.first { $0.id == "alice" }!.tokens!
+        let retryWasDisplayed = account.isSignedIn && account.needsIdentityValidation && !account.permitsPlanUsage && account.status.contains("Retry connection")
+        gate.release()
+        try await wait { account.error != nil }
+        let retained = try store.load().registrations.first { $0.id == "alice" }!.tokens!
+        let failedSafely = retained.identityValidationPending == true && retained.refreshToken == pending.refreshToken && http.modelCalls.isEmpty
+        http.identityGate = nil
+        // This is the exact action displayed by Settings for the pending connection.
+        account.refreshModels()
+        try await wait { !account.needsIdentityValidation }
+        try await wait { account.error?.contains("Enable it in Settings") == true }
+        let saved = try store.load().registrations.first { $0.id == "alice" }!.tokens!
+        let consentIsActionable = account.isSignedIn && !account.permitsPlanUsage && account.status.contains("Enable ChatGPT plan usage")
+        var sessionRejected = false
+        do { _ = try await account.usableSession() }
+        catch { sessionRejected = (error as? ChatGPTError)?.message.contains("Enable ChatGPT plan usage") == true }
+        let narrowedRotation = pending.identityValidationPending == true && !pending.hasPlanGrant && pending.idToken == "fixture-id-alice-r1"
+        let savedRotation = saved.identityValidationPending == false && !saved.hasPlanGrant && saved.refreshToken == "fixture-refresh-alice-r1" && saved.idToken == pending.idToken
+        let retriedSavedIdentity = http.tokenCalls.map(\.refresh) == ["fixture-refresh-alice-old"]
+            && http.identityCalls.map(\.token) == ["fixture-id-alice-r1", "fixture-id-alice-r1"] && http.identityCalls.allSatisfy { $0.clientID == "alice" }
+        let stayedLocal = http.modelCalls.isEmpty && account.models.isEmpty && account.activeAccountID == "alice" && account.requestEpoch == epoch
+        return retryWasDisplayed && failedSafely && consentIsActionable && sessionRejected && narrowedRotation && savedRotation && retriedSavedIdentity && stayedLocal
+    }
     private static func callerRace(switchAccount: Bool) async throws -> Bool {
         let (store, http) = try fixture()
         let account = try ChatGPTAccount(testingStore: store, testingTransport: http)
@@ -183,6 +216,8 @@ import LiltCore
     var tokenCalls: [(clientID: String, refresh: String)] = []
     var revokeCalls: [(clientID: String, refresh: String)] = []
     var modelCalls: [String] = []
+    var identityCalls: [(token: String, clientID: String)] = []
+    var returnedScopes: String?
     var identityGate: ChatGPTFixtureGate?
     var identityFailures: [Error] = []
     var identityOverride: ChatGPTIdentity?
@@ -192,6 +227,7 @@ import LiltCore
     }
     func discovery() async throws -> ChatGPTDiscovery { throw ChatGPTError("Browser/discovery requests are disabled in disposable lifecycle fixtures.") }
     func identity(_ token: String, clientID: String, nonce: String?) async throws -> ChatGPTIdentity {
+        identityCalls.append((token, clientID))
         if let identityGate { await identityGate.wait() }
         if !identityFailures.isEmpty { throw identityFailures.removeFirst() }
         return try identityOverride ?? generatedIdentity(clientID)
@@ -200,7 +236,9 @@ import LiltCore
         guard values["grant_type"] == "refresh_token", let id = values["client_id"], let refresh = values["refresh_token"], refresh.hasPrefix("fixture-") else { throw ChatGPTError("Unexpected generated token request.") }
         tokenCalls.append((id, refresh))
         let rotation = tokenCalls.filter { $0.clientID == id }.count
-        let data = try JSONSerialization.data(withJSONObject: ["access_token": "fixture-access-\(id)-r\(rotation)", "refresh_token": "fixture-refresh-\(id)-r\(rotation)", "id_token": "fixture-id-\(id)-r\(rotation)", "token_type": "Bearer", "expires_in": 3600])
+        var response: [String: Any] = ["access_token": "fixture-access-\(id)-r\(rotation)", "refresh_token": "fixture-refresh-\(id)-r\(rotation)", "id_token": "fixture-id-\(id)-r\(rotation)", "token_type": "Bearer", "expires_in": 3600]
+        if let returnedScopes { response["scope"] = returnedScopes }
+        let data = try JSONSerialization.data(withJSONObject: response)
         return try JSONDecoder().decode(ChatGPTTokenResponse.self, from: data)
     }
     func revoke(_ tokens: ChatGPTTokens, clientID: String) async throws {

@@ -199,7 +199,9 @@ struct ChatGPTAuthorizedSession {
     }
     func refreshModels() {
         catalogTask?.cancel()
-        guard activeRegistration?.tokens?.hasPlanGrant == true, !fixtureMode || allowsFixtureSessions else { return }
+        guard let tokens = activeRegistration?.tokens,
+              tokens.hasPlanGrant || tokens.identityValidationPending == true,
+              !fixtureMode || allowsFixtureSessions else { return }
         let epoch = requestEpoch
         catalogTask = Task { [weak self] in
             guard let self else { return }
@@ -223,7 +225,9 @@ struct ChatGPTAuthorizedSession {
         // Only records are merged. The selected identity belongs to this running account object.
         vault = try store.load(); publish()
         guard !isSigningOut, let registration = activeRegistration, !store.isSignedOut(registration.id), let tokens = registration.tokens else { throw ChatGPTError("Continue with ChatGPT in Settings to send your question.") }
-        guard tokens.hasPlanGrant else { throw ChatGPTError("Enable ChatGPT plan usage in Settings to send your question.") }
+        // A rotated session may need identity verification even when its new scopes require consent.
+        // Complete that recovery first; the final checks still forbid models/inference without both.
+        guard tokens.hasPlanGrant || tokens.identityValidationPending == true else { throw ChatGPTError("Enable ChatGPT plan usage in Settings to send your question.") }
         var current = tokens
         if tokens.expiresAt.timeIntervalSinceNow < 90 || tokens.identityValidationPending == true {
             let renewal: Task<ChatGPTTokens, Error>
