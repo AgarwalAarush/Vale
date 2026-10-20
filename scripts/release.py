@@ -375,22 +375,85 @@ def remote_release(tag):
     return found[0] if found else None
 
 
+def remote_tag_commit(tag):
+    """Resolve the authoritative Git ref, peeling at most eight annotated tags."""
+    refs = json.loads(run('gh', 'api', f'repos/{REPO}/git/matching-refs/tags/{tag}'))
+    if not isinstance(refs, list):
+        fail('Unexpected remote tag response.')
+    matches = [ref for ref in refs if ref.get('ref') == 'refs/tags/' + tag]
+    if not matches:
+        return None
+    if len(matches) != 1:
+        fail('Ambiguous remote release tag.')
+    target = matches[0].get('object', {})
+    seen = set()
+    for depth in range(9):
+        kind, revision = target.get('type'), target.get('sha')
+        if not isinstance(revision, str) or not re.fullmatch('[0-9a-f]{40}', revision) or revision in seen:
+            fail('Malformed or cyclic remote tag target.')
+        seen.add(revision)
+        if kind == 'commit':
+            return revision
+        if kind != 'tag' or depth == 8:
+            fail('Unsupported or excessively nested remote tag target.')
+        annotated = json.loads(run('gh', 'api', f'repos/{REPO}/git/tags/{revision}'))
+        if annotated.get('sha') != revision or not isinstance(annotated.get('object'), dict):
+            fail('Annotated tag object does not match its requested revision.')
+        target = annotated['object']
+    fail('Remote release tag could not be resolved.')
+
+
+def require_source_tag(tag, source, *, required=False):
+    actual = remote_tag_commit(tag)
+    if actual is None:
+        if required:
+            fail('The published release tag is missing.')
+    elif actual != source:
+        fail('The immutable remote release tag points at another source commit; no tag was changed.')
+
+
+def publication_branch():
+    remote = run('git', 'remote', 'get-url', 'origin')
+    if remote not in (f'https://github.com/{REPO}.git', f'git@github.com:{REPO}.git', f'https://github.com/{REPO}'):
+        fail('Unexpected Git remote.')
+    branch = run('git', 'symbolic-ref', '--short', 'HEAD')
+    if branch in {'main', 'master'}:
+        fail('Publish from a reviewed release branch; this command does not push main.')
+    return branch
+
+
+def publication_failure(tag, output, *, confirmed):
+    state = f'ALREADY PUBLIC: {tag}.' if confirmed else f'PUBLICATION STATUS UNCERTAIN: {tag} may already be public.'
+    fail(f'{state} Verification did not finish. Release: https://github.com/{REPO}/releases/tag/{tag}\n'
+         f'Frozen binding: {output / "release-binding.json"}\n'
+         'Inspect and verify this release before recovery; do not delete, replace or retag its public assets. '
+         'Tool output remains suppressed.')
+
+
 def publish(tag, source, assets, notes_file, old_feed_hash, output):
+    expected = {p.name: p for p in assets}
+    if len(expected) != len(assets) or 'appcast.xml' not in expected:
+        fail('Publication requires uniquely named assets including the signed appcast.')
+    binding = json.loads(regular(output / 'release-binding.json').read_text())
+    if (binding.get('sourceCommit') != source
+            or binding.get('files') != {p.name: {'sha256': sha(p), 'bytes': p.stat().st_size} for p in assets}):
+        fail('Publication assets differ from their frozen release binding.')
     repository = json.loads(run('gh', 'api', f'repos/{REPO}'))
     if repository.get('private') is not False or repository.get('owner', {}).get('login') != 'AgarwalAarush':
         fail('Publishing requires the pinned owner-controlled public Vale repository.')
     release = remote_release(tag)
     if release is not None and not release['draft']:
         fail('This version is already public; published assets are immutable. Choose a newer version.')
+    require_source_tag(tag, source)
     if release is None:
         run('gh', 'release', 'create', tag, '--repo', REPO, '--target', source, '--draft', '--title', 'Vale ' + tag[1:], '--notes-file', notes_file)
         release = remote_release(tag)
     if release is None or release['target_commitish'] != source or not release['draft']:
         fail('Existing draft does not match the exact reviewed source target.')
-    expected = {p.name: p for p in assets}
     remote = {item['name']: item for item in release['assets']}
     if set(remote) - set(expected):
         fail('Existing draft has unexpected assets; it was not promoted.')
+    print('Uploading and verifying the unpublished draft assets…', file=sys.stderr, flush=True)
     with tempfile.TemporaryDirectory(prefix='vale-draft-check-') as folder:
         for name, path in expected.items():
             if name not in remote:
@@ -403,17 +466,34 @@ def publish(tag, source, assets, notes_file, old_feed_hash, output):
     download(FEED, current)
     if sha(current) != old_feed_hash:
         fail('The production feed changed during preparation; the draft was not promoted.')
-    run('gh', 'release', 'edit', tag, '--repo', REPO, '--draft=false', '--latest')
-    with tempfile.TemporaryDirectory(prefix='vale-public-check-') as folder:
-        for name, path in expected.items():
-            downloaded = Path(folder) / name
-            download(f'https://github.com/{REPO}/releases/download/{tag}/{name}', downloaded)
-            if sha(downloaded) != sha(path):
-                fail('PUBLIC DOWNLOAD VERIFICATION FAILED. Inspect the published release immediately.')
-    current = output / 'production-after-promotion.xml'
-    download(FEED, current)
-    if sha(current) != sha(output / 'appcast.xml'):
-        fail('LATEST FEED VERIFICATION FAILED. Inspect GitHub latest release immediately.')
+    require_source_tag(tag, source)
+    print('Promoting the verified draft to the primary release…', file=sys.stderr, flush=True)
+    try:
+        run('gh', 'release', 'edit', tag, '--repo', REPO, '--draft=false', '--latest')
+    except (Exception, SystemExit, KeyboardInterrupt):
+        try:
+            after = remote_release(tag)
+            confirmed = after is not None and after.get('draft') is False
+        except (Exception, SystemExit, KeyboardInterrupt):
+            confirmed = False
+        publication_failure(tag, output, confirmed=confirmed)
+    print('The release is public. Verifying its tag, anonymous downloads and latest feed…', file=sys.stderr, flush=True)
+    try:
+        require_source_tag(tag, source, required=True)
+        with tempfile.TemporaryDirectory(prefix='vale-public-check-') as folder:
+            for name, path in expected.items():
+                downloaded = Path(folder) / name
+                download(f'https://github.com/{REPO}/releases/download/{tag}/{name}', downloaded)
+                if sha(downloaded) != sha(path):
+                    fail('Public download hash mismatch.')
+        current = output / 'production-after-promotion.xml'
+        download(FEED, current)
+        if sha(current) != sha(expected['appcast.xml']):
+            fail('Latest feed hash mismatch.')
+        write_json(output / 'publication.json', {**binding, 'published': True, 'productionFeedVerified': True,
+            'tagCommitVerified': source, 'releaseURL': f'https://github.com/{REPO}/releases/tag/{tag}'})
+    except (Exception, SystemExit, KeyboardInterrupt):
+        publication_failure(tag, output, confirmed=True)
 
 
 def main():
@@ -439,6 +519,7 @@ def main():
     if run('git', 'status', '--porcelain'):
         fail('Release requires a clean committed working tree, including the release tooling.')
     if args.publish:
+        branch = publication_branch()
         existing = remote_release('v' + args.version)
         if existing is not None and not existing['draft']:
             fail('This version is already public; published assets are immutable. Choose a newer version.')
@@ -526,20 +607,14 @@ def main():
         fail('Release preparation changed from its frozen binding.')
     write_json(binding_path, binding)
     if args.publish:
-        remote = run('git', 'remote', 'get-url', 'origin')
-        if remote not in (f'https://github.com/{REPO}.git', f'git@github.com:{REPO}.git', f'https://github.com/{REPO}'):
-            fail('Unexpected Git remote.')
         # A normal Git push rejects non-fast-forward changes; never force-push or alter main implicitly.
-        branch = run('git', 'symbolic-ref', '--short', 'HEAD')
-        if branch in {'main', 'master'}:
-            fail('Publish from a reviewed release branch; this command does not push main.')
+        if publication_branch() != branch:
+            fail('The release branch changed during preparation.')
         run('git', 'push', 'origin', f'HEAD:refs/heads/{branch}')
         remote_commit = json.loads(run('gh', 'api', f'repos/{REPO}/commits/{source}'))
         if remote_commit.get('sha') != source:
             fail('Push the reviewed source commit to origin before publishing.')
         publish('v' + args.version, source, assets, notes_file, sha(old_feed), work)
-        write_json(work / 'publication.json', {**binding, 'published': True, 'productionFeedVerified': True,
-            'releaseURL': f'https://github.com/{REPO}/releases/tag/v{args.version}'})
     print(json.dumps({'prepared': True, 'published': args.publish, 'version': args.version,
         'releaseURL': f'https://github.com/{REPO}/releases/tag/v{args.version}' if args.publish else None,
         'receipt': str(work / ('publication.json' if args.publish else 'release-binding.json'))}, indent=2))

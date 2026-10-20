@@ -28,7 +28,9 @@ state_path = root/'state.json'
 state = json.loads(state_path.read_text())
 def save(): state_path.write_text(json.dumps(state))
 if args[0] == 'api':
-    if '/releases?' in args[-1]: print(json.dumps([[state['release']] if state['release'] else []]))
+    if '/git/matching-refs/tags/' in args[-1]: print(json.dumps([{'ref':'refs/tags/v1.3.3', 'object':state['tag']}] if state['tag'] else []))
+    elif '/git/tags/' in args[-1]: print(json.dumps(state['tag_objects'][args[-1].rsplit('/',1)[-1]]))
+    elif '/releases?' in args[-1]: print(json.dumps([[state['release']] if state['release'] else []]))
     else: print(json.dumps({'private': False, 'owner': {'login': 'AgarwalAarush'}}))
 elif args[:2] == ['release','create']:
     state['release'] = {'tag_name':args[2], 'draft':True, 'target_commitish':args[args.index('--target')+1], 'assets':[]}; save()
@@ -38,8 +40,12 @@ elif args[:2] == ['release','upload']:
     state['release']['assets'].append({'name': source.name}); save()
 elif args[:2] == ['release','download']:
     name=args[args.index('--pattern')+1]; shutil.copyfile(root/'remote'/name,pathlib.Path(args[args.index('--dir')+1])/name)
+    if os.environ.get('VALE_RELEASE_TAG_CHANGES'): state['tag']={'type':'commit','sha':'b'*40}; save()
 elif args[:2] == ['release','edit']:
-    state['release']['draft']=False; save()
+    state['release']['draft']=False
+    if os.environ.get('VALE_RELEASE_BAD_PUBLIC_TAG'): state['tag']={'type':'commit','sha':'b'*40}
+    elif state['tag'] is None: state['tag']={'type':'commit','sha':state['release']['target_commitish']}
+    save()
 else: sys.exit(32)
 '''
 
@@ -57,6 +63,29 @@ class ReleaseTests(unittest.TestCase):
     def test_invalid_version_fails_before_any_work(self):
         result = subprocess.run([sys.executable, ROOT / 'scripts/release.py', '1.3.4;touch /tmp/nope', '--plan'], capture_output=True)
         self.assertNotEqual(result.returncode, 0)
+
+    def publication_preflight_case(self, *, wrong_remote):
+        def read_only_git(*args, env=None):
+            if args == ('git', 'status', '--porcelain'):
+                return ''
+            if args == ('git', 'remote', 'get-url', 'origin'):
+                return 'git@github.com:unrelated/other.git' if wrong_remote else f'git@github.com:{release.REPO}.git'
+            if args == ('git', 'symbolic-ref', '--short', 'HEAD'):
+                return 'main'
+            self.fail('Preflight unexpectedly reached additional work: ' + repr(args))
+        with patch.object(sys, 'argv', ['release.py', '1.3.4', '--publish']), \
+                patch.object(release, 'run', side_effect=read_only_git), \
+                patch.object(release, 'key_path') as key, patch.object(release, 'build_assets') as build:
+            with self.assertRaises(SystemExit):
+                release.main()
+            key.assert_not_called()
+            build.assert_not_called()
+
+    def test_wrong_remote_preflight_precedes_signing_or_build(self):
+        self.publication_preflight_case(wrong_remote=True)
+
+    def test_main_branch_preflight_precedes_signing_or_build(self):
+        self.publication_preflight_case(wrong_remote=False)
 
     def test_seed_metadata_only_requires_private_owned_file_and_directory(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -148,27 +177,44 @@ class ReleaseTests(unittest.TestCase):
     def test_changed_clone_instruction_sections_prevent_any_native_execution(self):
         self.native_clone_case(instruction_tamper=True)
 
-    def publication_case(self, *, fail_upload=False, changed_feed=False, existing_public=False, mismatch=False):
+    def publication_case(self, *, fail_upload=False, changed_feed=False, existing_public=False, mismatch=False,
+                         wrong_tag=False, annotated=False, bad_peel=False, deep_peel=False,
+                         changing_tag=False, bad_public_tag=False, fail_public_download=False):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             (folder / 'remote').mkdir()
             (folder / 'bin').mkdir()
+            work = folder / 'work'
+            asset_folder = work / 'assets'
+            asset_folder.mkdir(parents=True)
             command = folder / 'bin/gh'
             command.write_text(FAKE_GH)
             command.chmod(0o755)
             source = 'a' * 40
-            state = {'release': {'tag_name': 'v1.3.3', 'draft': not existing_public, 'target_commitish': source, 'assets': []} if existing_public or mismatch else None}
+            state = {'release': {'tag_name': 'v1.3.3', 'draft': not existing_public, 'target_commitish': source, 'assets': []} if existing_public or mismatch else None,
+                     'tag': {'type': 'commit', 'sha': 'b' * 40} if wrong_tag else None, 'tag_objects': {}}
+            if annotated or bad_peel or deep_peel:
+                ids = [f'{n:040x}' for n in range(1, 11)]
+                state['tag'] = {'type': 'tag', 'sha': ids[0]}
+                count = 9 if deep_peel else 2
+                for index in range(count):
+                    state['tag_objects'][ids[index]] = {'sha': ids[index], 'object':
+                        {'type': 'tag', 'sha': ids[index + 1]} if index < count - 1 else {'type': 'commit', 'sha': source}}
+                if bad_peel:
+                    state['tag_objects'][ids[0]]['sha'] = ids[1]
             assets = []
             for name, contents in [('app.zip', b'app-generated'), ('appcast.xml', b'candidate-feed-generated')]:
-                path = folder / name
+                path = asset_folder / name
                 path.write_bytes(contents)
                 assets.append(path)
             if mismatch:
                 state['release']['assets'] = [{'name': 'app.zip'}]
                 (folder / 'remote/app.zip').write_bytes(b'changed-upload')
             (folder / 'state.json').write_text(json.dumps(state))
-            notes = folder / 'notes.md'
+            notes = work / 'notes.md'
             notes.write_text('Generated fixture release')
+            release.write_json(work / 'release-binding.json', {'sourceCommit': source, 'version': '1.3.3',
+                'files': {p.name: {'sha256': release.sha(p), 'bytes': p.stat().st_size} for p in assets}})
             old_hash = hashlib.sha256(b'old-feed-generated').hexdigest()
 
             def generated_download(url, destination):
@@ -179,23 +225,44 @@ class ReleaseTests(unittest.TestCase):
                     else:
                         destination.write_bytes(b'changed-feed' if changed_feed else b'old-feed-generated')
                 else:
+                    if fail_public_download:
+                        raise SystemExit('private-tool-output-should-not-escape')
                     shutil.copyfile(folder / 'remote' / url.rsplit('/', 1)[-1], destination)
 
             environment = {'PATH': str(folder / 'bin') + os.pathsep + os.environ['PATH'], 'VALE_RELEASE_FIXTURE': str(folder)}
             if fail_upload:
                 environment['VALE_RELEASE_FAIL_UPLOAD'] = 'yes'
+            if changing_tag:
+                environment['VALE_RELEASE_TAG_CHANGES'] = 'yes'
+            if bad_public_tag:
+                environment['VALE_RELEASE_BAD_PUBLIC_TAG'] = 'yes'
+            before_failure = fail_upload or changed_feed or existing_public or mismatch or wrong_tag or bad_peel or deep_peel or changing_tag
+            after_failure = bad_public_tag or fail_public_download
             with patch.dict(os.environ, environment), patch.object(release, 'download', side_effect=generated_download):
-                if fail_upload or changed_feed or existing_public or mismatch:
-                    with self.assertRaises(SystemExit):
-                        release.publish('v1.3.3', source, assets, notes, old_hash, folder)
+                if before_failure or after_failure:
+                    with self.assertRaises(SystemExit) as error:
+                        release.publish('v1.3.3', source, assets, notes, old_hash, work)
+                    if after_failure:
+                        self.assertIn('ALREADY PUBLIC: v1.3.3', str(error.exception))
+                        self.assertIn('https://github.com/AgarwalAarush/Vale/releases/tag/v1.3.3', str(error.exception))
+                        self.assertIn(str(work / 'release-binding.json'), str(error.exception))
+                        self.assertNotIn('private-tool-output-should-not-escape', str(error.exception))
                 else:
-                    release.publish('v1.3.3', source, assets, notes, old_hash, folder)
+                    release.publish('v1.3.3', source, assets, notes, old_hash, work)
+                    receipt = json.loads((work / 'publication.json').read_text())
+                    self.assertTrue(receipt['published'])
+                    self.assertTrue(receipt['productionFeedVerified'])
+                    self.assertEqual(receipt['tagCommitVerified'], source)
+                    self.assertFalse((work / 'appcast.xml').exists())
             calls = [json.loads(line) for line in (folder / 'calls.jsonl').read_text().splitlines()]
             promoted = any(call[:2] == ['release', 'edit'] for call in calls)
-            self.assertEqual(promoted, not (fail_upload or changed_feed or existing_public or mismatch))
+            self.assertEqual(promoted, not before_failure)
             if promoted:
                 edit_index = next(index for index, call in enumerate(calls) if call[:2] == ['release', 'edit'])
                 self.assertEqual(sum(call[:2] == ['release', 'download'] for call in calls[:edit_index]), len(assets))
+            if wrong_tag or bad_peel or deep_peel:
+                self.assertFalse(any(call[:2] == ['release', 'create'] for call in calls))
+            self.assertFalse(any('force' in value or 'retag' in value for call in calls for value in call))
 
     def test_draft_upload_failure_never_promotes(self):
         self.publication_case(fail_upload=True)
@@ -211,6 +278,27 @@ class ReleaseTests(unittest.TestCase):
 
     def test_complete_draft_verified_before_promotion(self):
         self.publication_case()
+
+    def test_conflicting_lightweight_tag_prevents_draft_creation(self):
+        self.publication_case(wrong_tag=True)
+
+    def test_recursively_peeled_annotated_tag_matches_source(self):
+        self.publication_case(annotated=True)
+
+    def test_mismatched_annotated_object_is_rejected(self):
+        self.publication_case(bad_peel=True)
+
+    def test_excessively_deep_annotated_tag_is_rejected(self):
+        self.publication_case(deep_peel=True)
+
+    def test_tag_changed_after_upload_prevents_promotion(self):
+        self.publication_case(changing_tag=True)
+
+    def test_post_publication_tag_mismatch_reports_public_release_and_binding(self):
+        self.publication_case(bad_public_tag=True)
+
+    def test_failed_anonymous_download_reports_already_public_and_binding(self):
+        self.publication_case(fail_public_download=True)
 
     def test_public_only_crypto_verifier_rejects_tampering(self):
         with tempfile.TemporaryDirectory() as temporary:

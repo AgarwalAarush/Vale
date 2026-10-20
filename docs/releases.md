@@ -15,6 +15,13 @@ Finally it downloads every public asset anonymously and checks the live latest f
 It never force-pushes, pushes main, replaces published assets, installs Vale, captures
 personal screen/audio, or performs real-account inference.
 
+The actual remote Git tag is checked independently of draft creation metadata,
+including bounded recursive annotated-tag peeling. An existing tag must resolve
+to the exact source before draft creation/resume and immediately before promotion.
+A tag created only on publication must resolve correctly afterward. Conflicts are
+rejected without moving or replacing tags. Origin and the release branch are
+checked before expensive building/signing, and checked again before the normal push.
+
 Run `python3 scripts/release.py 1.3.4 --plan` for a read-only pipeline preview.
 Use `--prepare-only` instead of `--publish` to stop after local signing. Add
 `--notes-file docs/release-notes-1.3.4.md` to supply public release notes. The command
@@ -74,9 +81,14 @@ Local state and frozen file hashes are saved under the Git common directory's
 `codex-factory/releases/vVERSION/`. Retrying the same command resumes an unchanged
 draft, verifies existing uploads and avoids duplicate assets. A failed upload or
 changed production feed leaves the draft unpublished. A public version is immutable:
-after publication, use a new version. If final anonymous verification fails after
-publication, the command reports that failure explicitly; inspect the existing
-release before deciding how to repair delivery. It never silently rewrites history.
+after publication, use a new version. If tag or anonymous verification fails after
+publication, the command explicitly reports **ALREADY PUBLIC**, the release URL and
+the frozen `release-binding.json` path. A promotion command with an unknown remote
+outcome reports **PUBLICATION STATUS UNCERTAIN**. Inspect and verify that existing
+release before recovery; do not delete, replace or retag public assets. Successful
+verification writes `publication.json` under the release's private state directory;
+the appcast is verified from the exact supplied assets path, normally `assets/`.
+Tool output remains suppressed so signer errors cannot expose private material.
 
 Run `python3 scripts/test-release.py` to exercise the release command's offline
 preflight, feed and draft-publication failure boundaries.
