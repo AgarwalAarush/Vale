@@ -67,8 +67,33 @@ def create(args):
         (setup / 'verification.json').write_text(json.dumps(proof, indent=2, sort_keys=True) + '\n')
         signature = proof.get('signature', {}).get('kind', 'unverified')
         web = proof.get('knownFailureAcknowledged') == 'explicitWebSearchUsesRealTool'
-        readme = f'''Vale {version} (build {build}) — configured bootstrap setup
+        preview = proof.get('status') == 'preview-needs-chatgpt-consent'
+        automatic_delivery = proof.get('deliveryChannel') == 'automatic-update'
+        if preview and (proof.get('releaseReady') is not False or proof.get('genuineChatGPTVerified') is not False):
+            raise SystemExit('A ChatGPT preview must retain explicit unaccepted integration labels.')
+        pearl = proof.get('interface') == 'pearl-companion'
+        heading = 'Pearl compact companion preview' if preview and pearl else 'ChatGPT sign-in preview' if preview else 'configured bootstrap setup'
+        readme = f'''Vale {version} (build {build}) — {heading}
 
+'''
+        if preview:
+            if pearl:
+                readme += '''Control–Option–Space opens the top-right companion. Its small input pill
+expands in place for questions, selected context and replies. Type or explicitly
+start dictation; use + for files/window context and … for history, Learn and Settings.
+On macOS26 it uses native Liquid Glass; macOS14–15 use native frosted material.
+The26appearance is compiled but not runtime-verified on the macOS15 build host.
+
+'''
+            readme += '''This preview includes direct Continue with ChatGPT and the compact native
+companion. Local checks and generated account/stream fixtures do not establish
+genuine sign-in or replies. Connect your own eligible account in Vale; personal
+browser consent cannot be completed by the build process. Authenticated replies,
+Web, renewal and revocation still require real-account acceptance. This preview
+is not promoted to the stable automatic-update feed. See verification.json.
+
+'''
+        readme += f'''
 Open “Install Vale.command” on your laptop. It stages and verifies this app,
 requests normal quit of matching Vale/Lilt copies, installs ~/Applications/Vale.app,
 and verifies its launch before moving superseded app bundles to Trash. The previous
@@ -92,6 +117,11 @@ feed/key does not mean the production HTTPS feed has been published or verified;
 until that delivery step completes a check can report an unavailable feed.
 
 '''
+        if automatic_delivery:
+            readme += '''\nThis package is intended for the automatic-update channel. Its included receipt
+records software verification at preparation time. Read the current GitHub release
+and automatic-update receipt for publication/feed verification; preparation does
+not establish genuine account, hardware, target-laptop or notarization acceptance.\n'''
         if web:
             readme += '''Known limitation: the genuine Web integration assertion failed in the
 tested CLI/runtime with execution tools disabled. Its false result remains in

@@ -3,12 +3,10 @@ import PDFKit
 import LiltCore
 
 extension AppController {
-    func snapshot(_ window:NSWindow,to file:URL)throws{
-        guard let view=window.contentView else{throw AppError("Missing content view")}
-        view.layoutSubtreeIfNeeded();view.displayIfNeeded()
-        guard let rep=view.bitmapImageRepForCachingDisplay(in:view.bounds) else{throw AppError("Couldn’t render native view")}
-        view.cacheDisplay(in:view.bounds,to:rep)
-        guard let data=rep.representation(using:.png,properties:[:]) else{throw AppError("Couldn’t encode native view")};try data.write(to:file)
+    func snapshot(_ window:NSWindow,to file:URL,provenance:NativeWindowEvidence.Provenance? = nil)throws{
+        // Only this harness supplies the primary window's generated-data assertion.
+        let source = provenance ?? (window === workspace ? .generatedHarness(account: model.provider.account) : .unknown)
+        try NativeWindowEvidence.capture(window, to: file, provenance: source)
     }
     func settle()async{try? await Task.sleep(nanoseconds:650_000_000)}
     func waitForReply()async{let start=Date();while model.busy && Date().timeIntervalSince(start)<155{try? await Task.sleep(nanoseconds:200_000_000)}}
@@ -32,6 +30,20 @@ extension AppController {
         do{
             try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
             model.voice.enableFixtures();model.sessions=[];model.activeID=nil;model.selectedID=nil;model.prepareChat();await settle()
+            if CommandLine.arguments.contains("--compact-control-probe") {
+                _ = try makeFixtures(in: output)
+                try await runCompactCompanionAcceptance(output: output, results: &results)
+                try await runImportFeedbackAcceptance(output: output, results: &results)
+                try await runChatGPTWorkspaceVisualAcceptance(output: output, results: &results)
+                for (name, passed) in await CurrentWorkContextChecks.run() { results[name] = passed }
+                try await runCurrentWorkIntegrationAcceptance(output: output, results: &results)
+                try await runManualHiddenCaptureAcceptance(output: output, results: &results)
+                try await runCompanionCommandAcceptance(output: output, results: &results)
+                try await runCurrentWorkVisualAcceptance(output: output, results: &results)
+                let data = try JSONSerialization.data(withJSONObject: results, options: [.prettyPrinted, .sortedKeys])
+                try data.write(to: output.appendingPathComponent("results.json")); print(String(data: data, encoding: .utf8)!)
+                model.suspend(); exit(results.values.allSatisfy { $0 } ? 0 : 1)
+            }
             results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && workspace.isVisible
             try snapshot(workspace,to:output.appendingPathComponent("01-new-chat.png"))
             func findEditor(_ view:NSView)->ComposerTextView?{if let editor=view as? ComposerTextView{return editor};for child in view.subviews{if let found=findEditor(child){return found}};return nil}
@@ -72,13 +84,31 @@ extension AppController {
             if CommandLine.arguments.contains("--integration-test"){
                 model.draft="Compare the two images, then give the verification token in the PDF and the reminder in the text file. Be brief."
                 await settle()
-                if editor != nil,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){NSApp.sendEvent(enter)}
-                results["returnSendsMessage"]=model.active?.messages.last?.role == "user" && model.draft.isEmpty
-                await waitForReply()
-                let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text.lowercased() : ""
-                results["realMultiImagePDFTextReply"]=answer.contains("red") && answer.contains("blue") && answer.contains("harbor-73") && answer.contains("notebook")
-                results["messageRetainsAttachments"]=model.active?.messages.first?.attachments.count==4 && model.pendingFiles.isEmpty
-                await settle();try snapshot(workspace,to:output.appendingPathComponent("07-real-general-reply.png"))
+                let eligible = model.provider.account.permitsPlanUsage
+                let unsentDraft = model.draft, unsentFiles = model.pendingFiles
+                let messageCount = model.active?.messages.count
+                let unsentBytes = try unsentFiles.map { try Data(contentsOf: model.fileStore!.url(for: $0)) }
+                if let editor,let enter=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36){workspace.makeFirstResponder(editor);NSApp.sendEvent(enter)}
+                if eligible {
+                    results["returnSendsMessage"]=model.active?.messages.last?.role == "user" && model.draft.isEmpty
+                    await waitForReply()
+                    let answer=model.active?.messages.last?.role == "assistant" ? model.active!.messages.last!.text.lowercased() : ""
+                    results["realMultiImagePDFTextReply"]=answer.contains("red") && answer.contains("blue") && answer.contains("harbor-73") && answer.contains("notebook")
+                    results["messageRetainsAttachments"]=model.active?.messages.first?.attachments.count==4 && model.pendingFiles.isEmpty
+                    await settle();try snapshot(workspace,to:output.appendingPathComponent("07-real-general-reply.png"))
+                } else {
+                    let retainedBytes = try model.pendingFiles.map { try Data(contentsOf: model.fileStore!.url(for: $0)) }
+                    results["disconnectedReturnPreservesExactDraftFilesAndMessageCount"] = model.draft == unsentDraft && model.pendingFiles.map(\.id) == unsentFiles.map(\.id) && retainedBytes == unsentBytes && model.active?.messages.count == messageCount && !model.busy
+                    results["realMultiImagePDFTextReply"] = false
+                    // Separate offline model/storage journey. This is not native Return or inference evidence.
+                    let previousAdapter = model.provider.fixtureReply
+                    var localCalls = 0
+                    model.provider.fixtureReply = { _, _, _, complete in localCalls += 1; complete(.failure(AppError("Generated offline storage journey; no account request"))) }
+                    model.send(); await until { !model.busy }
+                    model.provider.fixtureReply = previousAdapter
+                    results["offlineModelSendEstablishesSentFilePersistence"] = localCalls == 1 && model.active?.messages.last?.role == "user" && model.draft.isEmpty && model.active?.messages.first?.attachments.map(\.id) == unsentFiles.map(\.id) && model.pendingFiles.isEmpty
+                    await settle();try snapshot(workspace,to:output.appendingPathComponent("07-offline-storage-journey.png"))
+                }
             }else{
                 let records=model.pendingFiles
                 model.updateActive{$0.messages=[Message(role:"user",text:"Compare these and summarize the documents.",attachments:records),Message(role:"assistant",text:"A shows a red circle; B shows a blue square. The PDF’s verification token is HARBOR-73. Your note says to bring a notebook.")];$0.pendingAttachments=[];$0.title="Compare images and documents"}
@@ -99,14 +129,14 @@ extension AppController {
             if let unsent=model.pendingFiles.last{model.removeFile(unsent);results["removeDeletesUnsentManagedFile"]=model.fileStore?.image(for:unsent)==nil && model.pendingFiles.isEmpty && model.active?.files.count==4}
             model.openSettings();await settle();try snapshot(workspace,to:output.appendingPathComponent("09-settings-updates.png"))
             func scrollSettings(_ view:NSView)->Bool {
-                if let scroll=view as? NSScrollView,scroll.convert(.zero,to:workspace.contentView).x>190,let document=scroll.documentView{
+                if let scroll=view as? NSScrollView, !scroll.isHiddenOrHasHiddenAncestor, let document=scroll.documentView, document.bounds.height > scroll.contentView.bounds.height + 1 {
                     document.scroll(NSPoint(x:0,y:document.isFlipped ? max(0,document.bounds.height-scroll.contentView.bounds.height) : 0));scroll.reflectScrolledClipView(scroll.contentView);return true
                 }
                 for child in view.subviews{if scrollSettings(child){return true}};return false
             }
             _=scrollSettings(workspace.contentView!);await settle();try snapshot(workspace,to:output.appendingPathComponent("09b-update-controls.png"))
             results["unconfiguredUpdaterStaysInactive"] = !model.updates.canCheck && model.updates.configuration==nil
-            results["singleStableWorkspace"]=workspace.contentView?.bounds.size==NSSize(width:1040,height:740) && NSApp.windows.filter{$0.identifier?.rawValue == "vale.workspace"}.count == 1
+            results["singleStableCompanion"]=workspaceMinimumIsValid(workspace) && NSApp.windows.filter{$0.isVisible && $0.identifier?.rawValue == "vale.workspace"}.count == 1
             results["sessionStoreRoundTrip"]=try SessionStore(directory:output.appendingPathComponent("test-library")).load().contains{$0.id==id && $0.draft == "A draft to preserve" && $0.files.count==4}
             model.error="The connection stopped. Your message and attachments are saved.";model.backToChat();openWorkspace();await settle();try snapshot(workspace,to:output.appendingPathComponent("10-recovery.png"))
             if CommandLine.arguments.contains("--integration-test"){
@@ -129,6 +159,12 @@ extension AppController {
                 }
                 try await runWorkspaceAcceptance(output:output,results:&results)
             }
+            for (name, passed) in await ChatGPTAccountChecks.run() { results[name] = passed }
+            for (name, passed) in await CurrentWorkContextChecks.run() { results[name] = passed }
+            try await runCurrentWorkIntegrationAcceptance(output: output, results: &results)
+            try await runManualHiddenCaptureAcceptance(output: output, results: &results)
+            try await runCompanionCommandAcceptance(output: output, results: &results)
+            try await runCurrentWorkVisualAcceptance(output: output, results: &results)
             let data=try JSONSerialization.data(withJSONObject:results,options:[.prettyPrinted,.sortedKeys]);try data.write(to:output.appendingPathComponent("results.json"));print(String(data:data,encoding:.utf8)!);model.suspend();exit(results.values.allSatisfy{$0} ? 0 : 1)
         }catch{print("Harness failed: \(error)");exit(1)}
     }

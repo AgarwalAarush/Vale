@@ -12,6 +12,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var busy = false
     @Published var conversation=false
     @Published var importing = false
+    @Published private(set) var importOwnerID: UUID?
+    private var fixtureImportGate: (@MainActor () async -> Void)?
     @Published private(set) var errorOffersSettings = false
     private var settingsForNextError = false
     @Published var error: String? {
@@ -24,11 +26,25 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var selectedID: UUID?
     @Published var workspaceRoute: WorkspaceRoute = .chat
     @Published var inspector: WorkspaceInspector?
-    @Published var sidebarVisible = true
+    @Published var sidebarVisible = false
+    /// Presentation state only; the editor and per-chat draft remain mounted.
+    @Published var companionExpanded = false
+    @Published var companionShowsEarlierMessages = false
+    @Published var companionReplyHeight: CGFloat = 0
+    @Published var companionInputHeight: CGFloat = 26
+    var requestCompanionEscape: (() -> Void)?
+    var chatSurfaceVisible: Bool { workspaceRoute == .chat && inspector == nil && !compactHistoryVisible }
+    func expandCompanion() { companionExpanded = true; composerFocus += 1 }
+    func collapseCompanion() {
+        commitComposer?()
+        if busy || voice.starting || voice.listening || voice.speaking || conversation || context.hasSelection { stopInteraction() }
+        companionExpanded = false
+    }
     @Published var compactHistoryVisible = false
     @Published var historyQuery = ""
     @Published var historyFocus = 0
-    @Published var workspaceOpen = false
+    @Published var workspaceOpen = false { didSet { if workspaceOpen { companionHiddenByUser = false } } }
+    private var companionHiddenByUser = false
     @Published var contextPreview: NSImage?
     @Published var composerFocus = 0
     var commitComposer: (() -> Void)?
@@ -37,12 +53,13 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     @Published var readAloud = UserDefaults.standard.bool(forKey: "readAloud") { didSet {
         UserDefaults.standard.set(readAloud, forKey: "readAloud")
         guard readAloud != oldValue else { return }
-        if let text = ReadAloud.replyToSpeak(messages: active?.messages ?? [], enabled: readAloud, alreadySpeaking: voice.speaking) { voice.speak(text) }
+        if !companionHiddenByUser, let text = ReadAloud.replyToSpeak(messages: active?.messages ?? [], enabled: readAloud, alreadySpeaking: voice.speaking) { voice.speak(text) }
         else if !readAloud && !conversation { voice.stopSpeaking() }
     } }
     let context = WindowContext()
+    let workContext: CurrentWorkContext
     let voice = VoiceController()
-    let provider = TutorProvider()
+    let provider: TutorProvider
     let updates = UpdateController()
     let fileStore: AttachmentStore?
     private let store: SessionStore?
@@ -51,6 +68,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     private var saveWork: DispatchWorkItem?
     private var requestID = UUID()
     private var captureTask: Task<Void, Never>?
+    private var contextAssemblyID: UUID?
     private var loading = false
     private var observerTokens: [AnyCancellable] = []
     private var failedQuestion: String?
@@ -73,13 +91,33 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     var contextName: String? { context.title }
     var pendingFiles: [AttachmentRecord] { active?.pendingAttachments ?? [] }
     var hasInput: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty }
-    var canRetry: Bool { ReplyRetry.isAvailable(busy: busy, hasFailedQuestion: failedQuestion != nil, lastRole: active?.messages.last?.role) }
+    var canRetry: Bool { ReplyRetry.isAvailable(busy: busy, hasFailedQuestion: failedQuestion != nil || active?.messages.last?.answerFailed == true, lastRole: active?.messages.last?.role) }
+    var retryEnabled: Bool { canRetry && provider.account.permitsPlanUsage && !paused && !importing }
+    var importStatus: String? {
+        guard importing else { return nil }
+        guard importOwnerID != activeID else { return "Adding files…" }
+        let title = sessions.first { $0.id == importOwnerID }?.title ?? "another chat"
+        return "Adding files to \(title)…"
+    }
     var status: String {
         let line = FooterStatus.line(paused: paused, importing: importing, microphoneStarting: voice.starting, listening: voice.listening, waiting: busy, speaking: voice.speaking, conversation: conversation)
         if line == "Voice off" { return CompanionStatus(canSend: hasInput && active != nil).line }
         return line
     }
-    init(dataDirectory: URL? = nil,fileRemoval:(@Sendable(URL)throws->Void)?=nil) {
+    convenience init(dataDirectory: URL? = nil,fileRemoval:(@Sendable(URL)throws->Void)?=nil) {
+        self.init(dataDirectory: dataDirectory, fileRemoval: fileRemoval, account: .shared)
+    }
+    /// Generated account state for the app-owned native harness; never a personal session.
+    convenience init(testingAccount: ChatGPTAccount, dataDirectory: URL) throws {
+        guard testingAccount.isDisposableFixture,
+              CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else {
+            throw AppError("Generated account models are restricted to the disposable native harness")
+        }
+        self.init(dataDirectory: dataDirectory, fileRemoval: nil, account: testingAccount)
+    }
+    private init(dataDirectory: URL?, fileRemoval: (@Sendable(URL) throws -> Void)?, account: ChatGPTAccount) {
+        workContext = CurrentWorkContext(isTesting: account.isDisposableFixture || CommandLine.arguments.contains("--verify-release-feed"))
+        provider = TutorProvider(account: account)
         // Retain the 1.0 storage identifier so the Vale rename never strands chats.
         let directory = dataDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("Lilt")
         var loadedStore: SessionStore?; var loadedFiles: AttachmentStore?
@@ -88,7 +126,13 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         store=loadedStore; fileStore=loadedFiles
         updates.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         context.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
+        workContext.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
         voice.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
+        provider.account.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in:&observerTokens)
+        NotificationCenter.default.publisher(for: ChatGPTAccount.connectionWillChange, object: provider.account)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.accountConnectionWillChange() }
+            }.store(in: &observerTokens)
         context.failed = { [weak self] message in self?.stopResponse();self?.error=message }
         context.changed = { [weak self] in guard let self else{return};self.contextReset?(); self.hideOverlay?(); if self.busy { self.cancel(); self.error="Sharing changed. Your message is saved; retry when you’re ready." } }
         voice.failed = { [weak self] message in self?.conversation=false;self?.conversationTask?.cancel();self?.error=message }
@@ -96,26 +140,23 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         voice.playbackInterrupted = { [weak self] in self?.conversation=false }
         voice.partial = { [weak self] text in guard let self else{return}; self.draft=self.spokenDraftPrefix+text }
         voice.finished = { [weak self] _ in self?.send(spoken:true) }
-        provider.located = { [weak self] in self?.objectWillChange.send() }
-        provider.lookupEnded = { [weak self] in self?.objectWillChange.send() }
-        provider.locateWithLoginShell()
         timer=Timer.scheduledTimer(withTimeInterval:1,repeats:true) { [weak self] _ in MainActor.assumeIsolated {self?.tick()} }
     }
     func openSettings() {
-        commitComposer?(); workspaceRoute = .settings; showWorkspace?()
+        commitComposer?(); companionExpanded = true; workspaceRoute = .settings; showWorkspace?()
     }
     func showHistory() {
-        commitComposer?(); inspector = nil; contextPreview = nil
+        commitComposer?(); companionExpanded = true; inspector = nil; contextPreview = nil
         workspaceRoute = .chat; sidebarVisible = true; compactHistoryVisible = true; historyFocus += 1; showWorkspace?()
     }
-    func backToChat() { workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
+    func backToChat() { companionExpanded = true; workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
     func navigateToChat(_ id: UUID) {
         guard sessions.contains(where: { $0.id == id }) else { return }
         if activeID != id { resume(id) }
         else { commitComposer?(); workspaceRoute = .chat; compactHistoryVisible = false; closeInspector(); showWorkspace?() }
     }
     func showInspector(_ detail: WorkspaceInspector) {
-        commitComposer?(); compactHistoryVisible = false
+        commitComposer?(); companionExpanded = true; compactHistoryVisible = false
         if detail != .context { contextPreview = nil }; inspector = detail; workspaceRoute = .chat; showWorkspace?()
     }
     func closeInspector() { inspector = nil; contextPreview = nil; composerFocus += 1 }
@@ -159,13 +200,40 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if active?.elapsed.isMultiple(of:30)==true {persist()}
     }
     func togglePause() {if paused {paused=false; lastTick=Date(); error=nil} else{tick();suspend()};persist()}
-    func suspend() {paused=true;conversation=false;conversationTask?.cancel();voice.stop();cancel();context.stop();hideOverlay?();persist()}
+    func suspend() {paused=true;conversation=false;conversationTask?.cancel();voice.stop();cancel();context.stop();workContext.suspend();hideOverlay?();persist()}
+    /// Hiding keeps an already-sent answer running, but never leaves voice or
+    /// local context sampling active behind a hidden panel.
+    func companionDidHide() {
+        let assembling = contextAssemblyID == requestID
+        if assembling { contextAssemblyID = nil }
+        captureTask?.cancel(); captureTask = nil
+        companionHiddenByUser = true
+        spokenReplyGeneration = UUID()
+        conversation = false; conversationTask?.cancel(); conversationTask = nil
+        voice.stop(); context.suspendCapture(); workContext.suspend()
+        contextPreview = nil; hideOverlay?()
+        if assembling {
+            busy = false; setAnswerFailed(true)
+            error = "Vale was hidden before the question went out. It’s saved; try again."
+            persist()
+        }
+    }
     func complete() {
         commitComposer?(); closeInspector(); workspaceRoute = .chat
         tick();updateActive{$0=LaunchSelection.chatAfterClose($0)};suspend();selectedID=activeID;activeID=nil
         loading=true;draft="";loading=false;persist();showWorkspace?()
     }
-    func cancel() {requestID=UUID();captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
+    func cancel() {requestID=UUID();contextAssemblyID=nil;captureTask?.cancel();captureTask=nil;provider.cancel();busy=false;voice.stopSpeaking();hideOverlay?()}
+    private func accountConnectionWillChange() {
+        let interrupted = busy
+        conversation = false; conversationTask?.cancel(); conversationTask = nil
+        voice.stop(); cancel(); context.stop(); workContext.suspend(); contextPreview = nil; contextReset?()
+        if interrupted {
+            setAnswerFailed(true)
+            showError("Your ChatGPT connection changed. Your question is saved; retry when you’re ready.", settings: true)
+        }
+        persist()
+    }
     func send(_ override: String? = nil, spoken: Bool = false, pointing: Bool = false, reveal: Bool = false, retry: Bool = false,guideRequested:Bool=false,preserveDraft:Bool=false) {
         if override == nil && !spoken { commitComposer?() }
         guard var chat=active else{return}
@@ -173,7 +241,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         let raw = override ?? draft
         let kept = OutgoingMessage.text(raw)
         let retryFiles = retry ? chat.messages.last(where:{$0.role=="user"})?.attachments ?? [] : []
-        let hasFiles = !chat.pendingAttachments.isEmpty || !retryFiles.isEmpty
+        let hasFiles = retry ? !retryFiles.isEmpty : !chat.pendingAttachments.isEmpty
         let stored = kept ?? (hasFiles ? "" : nil)
         guard let stored else { return }
         let question = kept ?? AttachmentQuestion.modelPrompt
@@ -184,6 +252,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         cancel();voice.stopListening();error=nil;busy=true;sentAt=Date()
         let id=UUID();requestID=id;let chatID=chat.id
         let previousTitle = chat.title
+        let previousRetryQuestion = retry ? chat.messages.last : nil
         if !retry {
             let naming = stored.isEmpty ? (chat.pendingAttachments.first?.name ?? "") : stored
             chat.messages.append(Message(role:"user",text:stored,attachments:chat.pendingAttachments));chat.pendingAttachments=[];chat.updated=Date()
@@ -194,7 +263,12 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         }
         guard persist() else {
             busy = false
-            if !retry {
+            if retry, let previousRetryQuestion, previousRetryQuestion.role == "user" {
+                // A failed save must not erase the persisted recovery signal before any request exists.
+                updateActive { chat in
+                    if let index = chat.messages.firstIndex(where: { $0.id == previousRetryQuestion.id }) { chat.messages[index] = previousRetryQuestion }
+                }
+            } else if !retry {
                 let restored = SendSave.restore(previousTitle: previousTitle, messages: active?.messages ?? [], pending: active?.pendingAttachments ?? [], question: stored, draft: composerBeforeSend)
                 updateActive { $0.title = restored.title; $0.messages = restored.messages; $0.pendingAttachments = restored.pending; $0.draft = restored.draft }
                 loading = true; draft = restored.draft; loading = false
@@ -205,15 +279,17 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if ComposerFocus.returns(afterSending: override == nil && !spoken && !pointing && !reveal && !guideRequested) { composerFocus += 1 }
         var history=chat
         if history.messages.last?.role=="user", history.messages.last?.text==stored { history.messages.removeLast() }
-        let newest = (chat.messages.last { $0.role == "user" }?.attachments ?? []).map(\.id) + chat.pendingAttachments.map(\.id)
-        let records=FileBudget.ordered(chat.files, newest: newest);let files=fileStore;let wantsSearch=chat.webEnabled
+        let newest = (chat.messages.last { $0.role == "user" }?.attachments ?? []).map(\.id) + (retry ? [] : chat.pendingAttachments.map(\.id))
+        let records=FileBudget.ordered(retry ? chat.messages.flatMap(\.attachments) : chat.files, newest: newest);let files=fileStore;let wantsSearch=chat.webEnabled
         let wantsGuide = guideRequested || GuideRequest.explicit(question)
         let startedGuide = guideEpoch
         let requestedSpeechGeneration = spokenReplyGeneration
+        contextAssemblyID = id
         captureTask=Task { [weak self] in
             guard let self else{return}
             var handedOff=false
             defer {
+                if self.contextAssemblyID == id { self.contextAssemblyID = nil }
                 if QuestionSend.shouldClearWaiting(request:id, current:self.requestID, handedOff:handedOff) {
                     self.busy=false
                     if self.error==nil { self.error="That question didn’t go out. It’s saved; try again." }
@@ -221,15 +297,21 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             }
             var snapshot:ContextSnapshot?
             do {
-                if self.context.hasSelection {snapshot=try await self.context.captureForQuestion()}
+                let manualWindow = self.context.hasSelection
+                let usesAutomaticContext = self.workContext.enabled
+                let currentWork = try await self.workContext.captureForQuestion(includeScreen: !manualWindow)
+                if manualWindow { snapshot = try await self.context.captureForQuestion() }
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
-                let leadingImages = snapshot == nil ? 0 : 1
+                let screen = snapshot ?? currentWork.screen
+                let leadingImages = screen == nil ? 0 : 1
                 let fileContext=try await Task.detached(priority:.userInitiated) {try files?.context(for:records, leadingImages: leadingImages) ?? FileContext()}.value
                 guard !Task.isCancelled,self.requestID==id,self.activeID==chatID else{return}
-                var images=snapshot.map{[$0.data]} ?? [];images+=fileContext.images
+                guard !usesAutomaticContext || self.workContext.isCurrent(currentWork.generation) else { throw AppError("Your screen context changed. The question is saved; retry for the current view.") }
+                var images=screen.map{[$0.data]} ?? [];images+=fileContext.images
                 if QuestionPreview.shouldCloseOpenedPreview(questionWasSent: true) { self.closePreview?() }
-                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:wantsGuide)
+                let prompt=TutorPrompt.build(session:history,question:question,hasImage:!images.isEmpty,pointing:pointing,reveal:reveal,fileContext:fileContext.text,hasWindow:snapshot != nil,guideRequested:wantsGuide,hasCurrentScreen:currentWork.screen != nil,selectedText:currentWork.selectedText,contextNotice:currentWork.notice)
                 handedOff=true
+                if self.contextAssemblyID == id { self.contextAssemblyID = nil }
                 self.provider.ask(prompt:prompt,images:images,search:wantsSearch) { [weak self] result in
                     Task { @MainActor [weak self] in
                         guard let self, ReplyDelivery.shouldApply(request: id, current: self.requestID, chat: chatID, active: self.activeID) else{return}
@@ -246,8 +328,13 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                             }
                             self.persist()
                             var fresh:ContextSnapshot?
-                            if snapshot != nil,self.context.hasSelection{fresh=try? await self.context.capture()}
+                            let verificationGeneration = self.context.generation
+                            let verifyingManualContext = snapshot != nil && self.context.hasSelection && !self.companionHiddenByUser
+                            if snapshot != nil,self.context.hasSelection,!self.companionHiddenByUser{fresh=try? await self.context.capture()}
                             guard ReplyDelivery.shouldApply(request: id, current: self.requestID, chat: chatID, active: self.activeID) else { return }
+                            // Hide suspends capture and changes its generation. Even
+                            // a rapid show must not revive this earlier verification.
+                            guard !verifyingManualContext || (!self.companionHiddenByUser && self.context.generation == verificationGeneration) else { return }
                             let matches: Bool? = snapshot == nil ? nil : fresh.map { snapshot!.evidence.reflectsSameView($0.evidence) }
                             let changed = WindowCheck.changed(matches: matches)
                             let checked=shown.withWindowChanged(changed)
@@ -262,11 +349,11 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
                                 if let plan=reply.guide,installGuide{chat.guide=GuideProgress(plan:plan)}
                             }
                             guard self.requestID==id,self.activeID==chatID else{self.persist();return}
-                            let shouldSpeak = self.readAloud || self.conversation || (spoken && self.spokenReplyGeneration == requestedSpeechGeneration)
+                            let shouldSpeak = !self.companionHiddenByUser && (self.readAloud || self.conversation || (spoken && self.spokenReplyGeneration == requestedSpeechGeneration))
                             if !changed,shouldSpeak{self.voice.speak(checked.text)}
                             else if changed,shouldSpeak{self.voice.speak("Your window changed while I was answering. Ask again for the current view.")}
                             else if self.conversation{self.listenForNextTurn()}
-                            if canPoint,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
+                            if canPoint,!self.companionHiddenByUser,self.context.generation == verificationGeneration,let point=reply.point,let snapshot{self.showPoint?(point,snapshot)}
                             self.persist()
                         case .failure(let failure):
                             self.busy=false;self.conversation=false
@@ -279,13 +366,14 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
 
             } catch {
                 guard self.requestID==id else{return};self.busy=false
+                if Task.isCancelled, self.contextAssemblyID != id { return }
                 self.conversation=false
                 self.setAnswerFailed(true);self.persist()
                 self.error=(error as? AppError)?.message ?? "Couldn’t read the selected context. Your message is saved; check the window or attachments and retry."
             }
         }
     }
-    func retry(){if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
+    func retry(){guard canRetry else{return};if let question=failedQuestion ?? active?.messages.last.flatMap({$0.role == "user" ? $0.text : nil}){send(question,retry:true)}}
     func nextHint(){updateActive{$0.hintLevel=min(3,$0.hintLevel+1)};send(HintRequest.prompt,preserveDraft:true)}
     func pointItOut(){guard context.hasSelection else{error="Share a window first so I can point to something specific.";return};guard let frame=context.currentFrame(),frame.width>1,frame.height>1,context.windowID != nil else{error="The window’s position is unavailable. Choose it again, or continue with text help.";return};send(PointRequest.prompt,pointing:true,preserveDraft:true)}
     func toggleVoice(){
@@ -325,7 +413,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
             persist()
         }
     }
-    func stopInteraction(){stopResponse();context.stop();hideOverlay?()}
+    func stopInteraction(){stopResponse();context.stop();workContext.suspend();hideOverlay?()}
     func startGuide(){
         guard !paused,!busy else{return}
         let goal=draft.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -380,13 +468,23 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         guard active != nil else { return }
         editDraft(DroppedLink.inserted(into:draft,links:links))
     }
+    /// A one-shot hold for generated native evidence; production imports have no artificial delay.
+    func installImportFixtureGate(_ gate: @escaping @MainActor () async -> Void) throws {
+        guard provider.account.isDisposableFixture,
+              CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else {
+            throw AppError("Import holds are restricted to disposable native fixtures")
+        }
+        fixtureImportGate = gate
+    }
     func importFiles(_ urls:[URL]) async {
         if let refusal = AttachmentRefusal.message(libraryAvailable: fileStore != nil, hasChat: activeID != nil, importing: importing) { error = refusal; return }
         guard let chatID=activeID,let files=fileStore else{return}
         let valid=urls.filter(\.isFileURL)
         let existing = active?.files.count ?? 0
         guard existing+valid.count<=8 else{error="Attach up to 8 files in a chat. Remove a file or start a new chat.";return}
-        importing=true;defer{importing=false}
+        importOwnerID=chatID;importing=true;defer{importing=false;importOwnerID=nil}
+        let fixtureGate = fixtureImportGate; fixtureImportGate = nil
+        if let fixtureGate { await fixtureGate() }
         let extraRoom = 8-existing-valid.count
         let outcomes=await Task.detached(priority:.userInitiated){ () -> [ImportOutcome] in
             var room = extraRoom; var outcomes: [ImportOutcome] = []

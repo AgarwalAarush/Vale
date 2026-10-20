@@ -97,6 +97,10 @@ extension AppController {
         model.endGuide()
         model.updateActive{$0.messages=(0..<30).map{Message(role:"user",text:"Generated earlier context message \($0)")}}
         await settle();results["fixture_contextLimitIsExposed"]=model.active?.contextLimited==true;try snapshot(workspace,to:output.appendingPathComponent("21-context-limit.png"))
+        model.newSession(title:"Explicit collapse safety fixture");model.draft="Keep this draft when collapsing active voice and sharing."
+        selectFixture();model.context.startLive();model.setConversation(true);await until{model.context.latest != nil};await settle()
+        let collapseDraft=model.draft;model.collapseCompanion();await settle()
+        results["fixture_explicitCollapseStopsVoiceAndSharingWithoutLosingDraft"] = !model.companionExpanded && !model.busy && !model.conversation && !model.voice.listening && !model.voice.speaking && !model.context.hasSelection && model.context.latest==nil && model.draft==collapseDraft
         model.newSession(title:"Own-window keyboard checks");selectFixture();model.context.startLive();model.setConversation(true);await settle()
         let previousID=model.activeID
         if let key=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.command,timestamp:0,windowNumber:workspace.windowNumber,context:nil,characters:"n",charactersIgnoringModifiers:"n",isARepeat:false,keyCode:45){NSApp.sendEvent(key)}
@@ -133,12 +137,15 @@ extension AppController {
         denied.removeFile(record);results["fixture_fileDeletionFailureKeepsAttachmentAndReportsError"]=denied.active?.files.contains(record)==true && denied.fileStore?.image(for:record) != nil && denied.error != nil
         denied.delete(id);results["fixture_forgetFailureKeepsRetryableChat"]=denied.sessions.contains{$0.id==id} && denied.error != nil
         denied.selectedID=id
-        let originalContent = workspace.contentView
-        let host = NSHostingView(rootView: WorkspaceView(model: denied)); host.sizingOptions = []; host.autoresizingMask = [.width, .height]
-        workspace.contentView = host; workspace.setContentSize(NSSize(width: 1040, height: 740))
-        await settle();try snapshot(workspace,to:output.appendingPathComponent("22-deletion-error.png"))
+        workspace.orderOut(nil)
+        let window = NativeWorkspaceWindow(model: denied)
+        defer { window.close(); workspace.makeKeyAndOrderFront(nil) }
+        denied.expandCompanion(); window.makeKeyAndOrderFront(nil)
+        await settle(); applyHarnessCompanionLayout(window)
+        try snapshot(window,to:output.appendingPathComponent("22-deletion-error.png"),provenance:.generatedHarness(account:denied.provider.account))
         fault.recover();denied.delete(id);results["fixture_retryForgetRemovesBytesAndChat"]=denied.sessions.isEmpty && denied.fileStore?.image(for:record)==nil && denied.error==nil
-        await settle();try snapshot(workspace,to:output.appendingPathComponent("23-forget-recovered.png"));workspace.contentView = originalContent
+        await settle(); applyHarnessCompanionLayout(window)
+        try snapshot(window,to:output.appendingPathComponent("23-forget-recovered.png"),provenance:.generatedHarness(account:denied.provider.account))
         denied.suspend();fixture.suspend();model.error=nil;openWorkspace()
     }
 }

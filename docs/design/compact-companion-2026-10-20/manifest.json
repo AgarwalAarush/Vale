@@ -1,0 +1,33 @@
+{
+  "type": "generated compact companion design exploration",
+  "ownerApproved": true,
+  "runtimeEvidence": false,
+  "images": [
+    {
+      "name": "01-pearl-glass.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "a8f6b21d6ec9db7bf01316ea939831b3af735d5c046306992c656a53e5cd597a",
+      "bytes": 1698522,
+      "source": "built-in image_gen; generated concept, not runtime screenshot"
+    },
+    {
+      "name": "02-smoke-glass.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "7ed21cdee155cecf7ef842083b3da469d8edf01712709e2bc0e6e55341e7d5c5",
+      "bytes": 2003209,
+      "source": "built-in image_gen; generated concept, not runtime screenshot"
+    },
+    {
+      "name": "03-reading-lens.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "4671636c021027eec5405343e614a1ce111216851b4abb7b9fc5ff437a617e67",
+      "bytes": 1750467,
+      "source": "built-in image_gen; generated concept, not runtime screenshot"
+    }
+  ],
+  "approvedComp": "01-pearl-glass.png",
+  "approvedCompSHA256": "a8f6b21d6ec9db7bf01316ea939831b3af735d5c046306992c656a53e5cd597a"
+}

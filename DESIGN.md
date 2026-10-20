@@ -1,52 +1,132 @@
-# Vale design
+---
+name: Vale
+description: A tiny native Mac companion beside the user's work.
+platform: macos
+---
 
-## Direction
+# Design System: Vale
 
-A quiet native reading workspace: one resizable macOS window, where the conversation and composer carry the interface. The owner explicitly requests a substantial single-window redesign, confirmed capability preservation and code-first native inspection. This replaces the legacy capsule/coach/library composition while preserving Vale's name and ribbon-V artwork.
+## Approved visual authority
 
-Design read: a personal native assistant for recurring chat, document and learning work, with an editorial, restrained language. Taste values: DESIGN_VARIANCE5, MOTION_INTENSITY2, VISUAL_DENSITY5; native Operate behavior takes precedence over marketing motifs.
+The owner selected [Pearl Glass](docs/design/compact-companion-2026-10-20/01-pearl-glass.png)
+on2026-10-20: “this one is phenomenal lets build this out”.
+Its .png.json sidecar records approval. Pearl supersedes the large workspace
+and the coordinator's earlier Lens recommendation.
 
-## Reference interpretation
+The three columns show successive Ready, Ask and Answer states of one panel.
+The textbook, desktop chrome, monitor bezel, example prose and equation are
+contextual illustrations, not shipped UI rasters or answer-correctness claims.
+Use native text, symbols and controls. The October20 14:32 owner report overrides the earlier in-panel icon direction: remove the raster V from Ready and expanded chrome. Retain the canonical app icon only for Dock/Finder/system identity.
 
-- [Intercom](https://styles.refero.design/style/12255b63-e506-4bc1-a4cd-d05487de32f3): warm light neutrals, careful spacing and hairlines. Translate into readable native density, not a website hero.
-- [Superhuman](https://styles.refero.design/style/418b374a-be64-44f0-b17e-1d45308c7e62): disciplined action hierarchy and comfortable text. Exclude marketing photography.
-- [Dala](https://styles.refero.design/style/e5f5f8cf-e68d-4ed1-bbf5-6b67569af648): clarity and negative space inform the dark counterpart. Exclude particles and theatrical display scale.
+## Product and composition
 
-## First viewport and layout
+Vale is a shortcut-summoned helper at the top right while the user reads or works.
+The working app stays dominant. One physical panel expands left/down around a
+fixed top-right anchor. History/settings/files/notes/Learn tools reveal on demand
+inside it. Native OS dialogs and click-through pointing feedback retain their
+limited existing roles.
 
-Default1040×740, minimum740×560, verified at compact/default/wide sizes. One standard NSWindow, normal traffic lights, native resize/minimize/fullscreen and remembered frame. Collapsible history rail (~224points), compact toolbar, readable conversation (~680point max measure), bottom composer. Below~860points the rail yields to the current task. File/notes/context details live in an in-window inspector; at narrow widths a detail route replaces the reading region with a clear Back action. Settings is an in-window route, never a detached preferences app.
+| State | Native implementation |
+| --- | --- |
+| Ready | 300×45pt; editable Ask Vale…, microphone, overflow; no raster logo |
+| Ask | 320pt wide, content-led height; concise header, optional context/status/files, top-aligned native editor, plus/mic/send |
+| Answer | 350pt wide; latest exchange, measured reply viewport up to320pt, one-row connected follow-up composer |
+| History | 400×500pt in the same panel |
+| Files/notes/context | 460×540pt in the same panel |
+| Settings | 380×520pt in the same panel, compact preference rows and on-demand details |
+| Bounds | Ordinary height capped650pt; visible-frame inset18pt; fixed composer above scrollable overflow |
 
-First launch: one brief invitation, actual editable composer, useful Attach/Share/Talk actions. No extra status capsule, giant empty slab, duplicated branding, decorative prompt cards or permanently visible configuration badges. Populated conversation prioritizes the answer; readable author distinctions and code/links/attachments remain literal.
+All sizes are logical AppKit points and implementation choices. Long content
+scrolls; never restore the old740pt minimum or1040pt default. A permanent toolbar,
+sidebar, traffic-light titlebar, greeting hero or second assistant workspace
+conflicts with the approved composition.
 
-## Tokens
+Control–Option–Space shows Vale on the pointer's display and focuses the composer,
+or hides it when already active. Remember the external source app/display and
+read its selection before activation. Control–Option–D explicitly toggles
+dictation with visible permission/status/Stop handling. Ordinary state
+changes retain the anchor. The floating panel supports all Spaces/fullscreen
+auxiliary behavior; physical display/Space acceptance is separate.
 
-Use dynamic semantic colors throughout native views and NSTextView/PDF controls. Default System appearance; explicit Light/Dark override may be offered.
+## Material, color and type
 
-| Role | Light | Dark |
-| --- | --- | --- |
-| Canvas | #f7f6f2 | #18191d |
-| Navigation | #eeede8 | #141519 |
-| Raised/input | #ffffff | #22242a |
-| Primary text | #252629 | #f0f0ed |
-| Secondary text | #67686b | #b0b1b8 |
-| Divider | #ddddd6 | #363840 |
-| Accent | #5759c6 | #b9bcff |
-| Primary action | #28292d | #ecece8 |
+NativeCompanionMaterial wraps real NSGlassEffectView regular material on macOS26,
+using contentView for stable hosted content. On14/15 it uses active
+NSVisualEffectView popover material with behind-window blending. The window is
+transparent, rounded and uses a native shadow. One neutral legibility surface covers the full panel, including settings, with matched native/SwiftUI appearance and readable text over contrasting work. Do not add an outer border to imitate the OS glass edge. Reduce Transparency supplies an
+opaque semantic surface. Corners are22.5pt at rest and24pt expanded.
 
-Semantic warning/error colors must remain legible in both modes. Do not reuse white opacity as a light-surface fill. Contrast≥4.5:1 body/placeholder,≥3:1 large text and meaningful controls.
+Swift6.2.4 matches the installed Xcode26.2SDK. Explicitly override inherited
+SDKROOT, which pointed to an older CLTSDK. This host runs macOS15: compiling
+the26path does not verify its optics. In-process native rasters do not reproduce
+compositor backdrop blur/shadow exactly.
 
-System SF typography: body15, controls13, secondary12, section20–24, welcome30–32 with normal/light weight. No all-caps decorative eyebrows, microscopic labels, custom marketing fonts or icon-font substitutes. SF Symbols for native controls, with accessible labels/help.
+Use system type and SF Symbols. Current Ready editor13pt, expanded editor14pt,
+message prose13pt, header12pt and status/context around11–12pt. Preserve labels,
+native hit areas and visible focus. Do not shrink text to force mockup dimensions.
 
-Shape scale:8point controls/rows,12point composer and real inset groups; native window shape. Depth comes from surface tone and one quiet divider, not glass borders plus shadows. Spacing4/8/12/16/24/32.
+Theme's adaptive source pairs remain: ink #252629/#f0f0ed, muted #595b60/#c2c3c7,
+accent #5759c6/#b9bcff, action #28292d/#ecece8, on-action #ffffff/#252629.
+Secondary fills are adaptive neutrals; the main shell is a native material.
+Avoid nested glass cards, glow and decorative idle waveforms. A200ms shape
+transition respects Reduce Motion. Feedback must not shift controls.
 
-## Navigation and interaction
+## Interaction and retained capabilities
 
-Selecting history resumes it directly in the same window. Commit active IME text and persist old draft/pending files before changing chat identity. Settings and inspector navigation preserve composer/selection/scroll state. New chat retains the previous draft in history. Rename/export/Forget remain discoverable and deliberate.
+Keep one DraftEditor/NSTextView mounted across states and secondary routes.
+Preserve draft ownership, marked text, selection, undo, paste/drop and files.
+Covered editors reject focus/send. Return sends only when permitted;
+Shift–Return inserts a line. Browser return never sends.
 
-Share state and Stop sharing remain visible when active; mic/listening/playback/conversation state and stop controls stay inside the window. Native permission/file/save dialogs and intentional transient click-through pointing annotation are the only secondary OS surfaces; no second assistant content panel. Closing pauses transient capture/voice and preserves data. Reopening never grants consent or rearms capture.
+Disconnected drafting/attachments work locally, with one clear connection/retry
+action replacing unavailable Send. Busy exposes Stop. Failed questions retain
+original retry/file ownership while newer drafts stay unsent. Async imports keep
+their originating owner and show accurate status across routes.
 
-The signature interaction is continuity: revealing context beside the answer and returning to the same composer without changing windows. Transitions are brief state feedback; Reduce Motion removes animation. Reduced Transparency gets solid surfaces. No idle pulse animation.
+Automatic current-work context defaults on with an off control and a compact
+context row in expanded states. On an explicit question, capture a fresh current
+display screenshot excluding Vale and refresh read-only AXSelectedText from the
+remembered external source app. Invocation reads selection before Vale activates;
+app-activation observation tracks identity only. Keep screenshots at most1600px
+on the long edge and selected text at most16000 UTF-16 units; skip secure/password
+fields. Screen Recording/Accessibility prompts require explicit user actions.
+Denied permissions leave typing available with concise context status. No
+startup capture, background screen/selection polling or simulated clipboard Copy
+to read selection.
 
-## Delivery and verification
+Explicitly selected-window context has an identifying/removable chip, preview
+and Live controls, and takes precedence over the automatic display screenshot.
+Refresh at request time; send only on an explicit question/guide request. Screen,
+selection and microphone buffers remain transient in RAM/current provider input;
+never append raw context to saved user questions or retain it as attachments. Disable, pause/hide, sleep/lock and
+session changes clear transient context and invalidate pending capture.
+Dictation requires explicit activation
+and visible status/Stop. Conversation rearming requires opt-in and completed
+playback. Pause, Escape, sleep/lock, session changes and errors stop interaction.
+Do not call this full-duplex streaming.
 
-Inspect actual native empty/populated/history/settings/files/notes/context/loading/retry/guide states in light/dark at compact/default/wide sizes in one batched pass, then one confirmation pass after fixes. Screenshots must use generated fixtures, not private user content. Native interaction, genuine provider, signing/update installation, hardware and target-laptop evidence stay separate. A configured label without a real signed update path is not updater completion.
+Replies provide Copy/read-aloud. Overflow retains new/history/earlier messages,
+Learn/hints/guide/walkthrough, timer, notes/files, Web opt-in, Talk/Conversation,
+rename/export/Forget, pause/close, settings and updates. Secondary routes provide
+Back and applicable Stop/import status.
+
+## Compatibility and acceptance
+
+Preserve local.lilt.companion, legacy storage, chats/drafts/files/settings and the
+assistant persona. No startup mic/capture, automatic selected-window choice, paid
+fallback, model command/file/app/browser tools, credentials logging or login agent.
+Forget still purges target backup content and exposes deletion failures/retry.
+
+The [native product pipeline](docs/design/native-product-pipeline.md) and current
+Factory round own checks, actual native visual review, independent review and
+delivery. Old large-window results are historical; approved mockups are not
+runtime acceptance. Bind complete-panel generated captures to source/executable
+hashes. Inspect Ready/Ask/Answer, long replies, combined states, secondary routes,
+light/dark and keyboard recovery. Keep raster/injected-event evidence distinct
+from compositor, physical accessibility, real voice/screen consent, genuine
+ChatGPT, package/feed and target-laptop installation. Preview is not production
+readiness.
+
+## Owner defect reopening, October20 14:32
+
+The owner screenshots of1.3.3 reject washed-out Ready contrast, raster icon/vertical alignment, caret cutting through placeholder, excess empty Ask space, a translucent-header/solid-dark Settings split and verbose preferences. Placeholder must use actual native text geometry; preserved editor identity and typing behavior remain required. Attachment commands must be discoverable while typing: CmdShiftA files/images, native CmdV image paste, CmdShiftS explicit window chooser. Keep dialog guards. The later owner request authorizes automatic current-display/selected-text context at explicit invocation/question time as specified above; startup/background capture remains prohibited. Earlier preview visual acceptance does not close these defects.

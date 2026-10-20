@@ -77,10 +77,16 @@ struct ContextSnapshot {
         }
     }
     func stopLive(){liveTask?.cancel();liveTask=nil;live=false;latest=nil;lastCapture=nil}
+    /// Stop local work without forgetting the explicitly chosen window. A late
+    /// capture can no longer satisfy a question or recreate a preview/overlay.
+    func suspendCapture(){
+        stopLive();inFlight?.cancel();inFlight=nil;captureID=UUID();generation=UUID();capturing=false;requestedLive=false
+        SCContentSharingPicker.shared.isActive=false
+    }
     func stop(){
-        stopLive();inFlight?.cancel();inFlight=nil;captureID=UUID();capturing=false
-        filter=nil;fixtureSource=nil;fixtureFrame=nil;captureTimeout=6;title=nil;windowID=nil;generation=UUID();requestedLive=false
-        SCContentSharingPicker.shared.isActive=false;changed?()
+        suspendCapture()
+        filter=nil;fixtureSource=nil;fixtureFrame=nil;captureTimeout=6;title=nil;windowID=nil
+        changed?()
     }
     nonisolated func contentSharingPicker(_ picker:SCContentSharingPicker,didCancelFor stream:SCStream?){DispatchQueue.main.async{self.requestedLive=false}}
     nonisolated func contentSharingPickerStartDidFailWithError(_ error:Error){
