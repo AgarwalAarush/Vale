@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Offline release-boundary tests. No production seed, network, app build or GUI."""
 import hashlib
+import base64
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -115,6 +118,7 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 release.check_monotonic(tree, bad)
         original = ET.tostring(tree.find('./channel/item'))
+        original_tree = ET.tostring(tree)
         with tempfile.TemporaryDirectory() as folder:
             archive = Path(folder) / 'Vale-1.3.3-macOS-universal.zip'
             archive.write_bytes(b'generated archive')
@@ -124,8 +128,91 @@ class ReleaseTests(unittest.TestCase):
             items = result.findall('./channel/item')
             self.assertEqual(len(items), 2)
             self.assertEqual(ET.tostring(items[1]), original)
+            self.assertEqual(ET.tostring(tree), original_tree)
             self.assertEqual(items[0].findtext('description'), '<b>plain text</b>')
             self.assertEqual(items[0].find('enclosure').get('url'), f'https://github.com/{release.REPO}/releases/download/v1.3.3/{archive.name}')
+
+    def test_fresh_prepare_orchestrates_signing_and_compares_unmodified_prior_feed(self):
+        """Exercise main's fresh-feed branch; only external Git/signature/prepared-app boundaries are fixtures."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary)
+            common = fixture / 'common'
+            common.mkdir()
+            tools = fixture / 'bin'
+            tools.mkdir()
+            signer = tools / 'sign_update'
+            signer.touch()
+            seed = fixture / 'empty-fixture-seed.key'
+            seed.touch(mode=0o600)
+            original = fixture / 'reviewed-assets'
+            original.mkdir()
+            source = 'a' * 40
+            head = 'b' * 40
+            public = base64.b64encode(bytes(32)).decode()
+            signature = base64.b64encode(bytes(64)).decode()
+            old_feed = f'<rss xmlns:sparkle="{release.SPARKLE}"><channel><title>Vale</title><item><title>Vale1.3.0</title><sparkle:version>7</sparkle:version><enclosure url="https://github.com/{release.REPO}/releases/download/v1.3.0/old.zip" /></item></channel></rss>'.encode()
+            commands = []
+
+            def fixture_run(*arguments, env=None):
+                args = tuple(str(a) for a in arguments)
+                commands.append(args)
+                if args == ('git', 'status', '--porcelain'):
+                    return ''
+                if args == ('git', 'rev-parse', 'HEAD'):
+                    return head
+                if args == ('git', 'rev-parse', '--git-common-dir'):
+                    return str(common)
+                if args == (str(signer), '--ed-key-file', str(seed), '-p', str(common / 'codex-factory/releases/v1.3.3/assets/Vale-1.3.3-macOS-universal.zip')):
+                    return signature
+                if args[:3] == (str(signer), '--ed-key-file', str(seed)) and len(args) == 4:
+                    feed = Path(args[-1])
+                    content = feed.read_bytes()
+                    feed.write_bytes(content + f'<!-- sparkle-signatures:\nedSignature: {signature}\nlength: {len(content)}\n-->\n'.encode())
+                    return ''
+                self.fail('Fresh preparation reached an unexpected external action: ' + repr(args))
+
+            def fixture_prepared(folder, version, output, tooling_head):
+                self.assertEqual(folder, original)
+                self.assertEqual(tooling_head, head)
+                assets = []
+                for suffix in ('macOS-universal.zip', 'source-and-evidence.zip', 'laptop-setup.zip', 'laptop-setup.dmg', 'release-manifest.json', 'SHA256SUMS.txt'):
+                    path = output / f'Vale-{version}-{suffix}'
+                    path.write_bytes(('generated immutable ' + suffix).encode())
+                    assets.append(path)
+                return ({'signature': {'kind': 'ad-hoc'}, 'releaseReady': False, 'genuineChatGPTVerified': False},
+                        {'CFBundleVersion': '10', 'CFBundleShortVersionString': version, 'LSMinimumSystemVersion': '14.0',
+                         'SUFeedURL': release.FEED, 'SURequireSignedFeed': True, 'SUPublicEDKey': public}, source, assets)
+
+            def fixture_download(url, target):
+                self.assertEqual(url, release.FEED)
+                target.write_bytes(old_feed)
+
+            with patch.object(sys, 'argv', ['release.py', '1.3.3', '--prepare-only', '--prepared-assets', str(original)]), \
+                    patch.dict(os.environ, {'VALE_SPARKLE_TOOLS_DIR': str(tools)}), \
+                    patch.object(release, 'key_path', return_value=seed), \
+                    patch.object(release, 'run', side_effect=fixture_run), \
+                    patch.object(release, 'prepared_assets', side_effect=fixture_prepared), \
+                    patch.object(release, 'download', side_effect=fixture_download), \
+                    patch.object(release, 'verifier') as verify, contextlib.redirect_stdout(io.StringIO()) as stdout:
+                release.main()
+            work = common / 'codex-factory/releases/v1.3.3'
+            result = json.loads(stdout.getvalue())
+            self.assertTrue(result['prepared'])
+            self.assertFalse(result['published'])
+            self.assertEqual((work / 'production-before.xml').read_bytes(), old_feed)
+            entries = ET.fromstring((work / 'assets/appcast.xml').read_bytes()).findall('./channel/item')
+            self.assertEqual(len(entries), 2)
+            self.assertEqual(entries[0].findtext(f'{{{release.SPARKLE}}}version'), '10')
+            self.assertEqual(entries[1].findtext(f'{{{release.SPARKLE}}}version'), '7')
+            binding = json.loads((work / 'release-binding.json').read_text())
+            self.assertEqual(binding['sourceCommit'], source)
+            self.assertEqual(len(binding['files']), 9)
+            signing = [args for args in commands if args[0] == str(signer)]
+            self.assertEqual(len(signing), 2)
+            self.assertIn('-p', signing[0])
+            self.assertTrue(signing[1][-1].endswith('/assets/appcast.xml'))
+            self.assertEqual(verify.call_count, 4)
+            self.assertFalse((work / 'publication.json').exists())
 
     def native_clone_case(self, *, instruction_tamper=False):
         with tempfile.TemporaryDirectory() as temporary:

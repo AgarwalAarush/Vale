@@ -2,6 +2,7 @@
 """Build, sign and publish one immutable Vale automatic update. See docs/releases.md."""
 import argparse
 import base64
+import copy
 import datetime
 import email.utils
 import hashlib
@@ -130,6 +131,8 @@ def check_monotonic(tree, build):
 
 def create_feed(tree, info, archive, signature, notes, output):
     check_monotonic(tree, info['CFBundleVersion'])
+    # Keep the verified production tree intact for the independent prior-entry comparison.
+    tree = copy.deepcopy(tree)
     channel = tree.find('channel')
     item = ET.Element('item')
     ET.SubElement(item, 'title').text = 'Vale ' + info['CFBundleShortVersionString']
