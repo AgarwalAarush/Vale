@@ -14,7 +14,7 @@ A personal desktop companion for chat, writing, learning and help grounded in us
 
 ## Operating context
 
-Typing is first-class. The 1.3.1 candidate connects through OpenAI’s supported direct ChatGPT browser sign-in and eligible plan usage, with no Codex CLI or paid API fallback. Genuine personal consent and inference must be verified separately from protocol fixtures. Optional selected-window capture and voice stay explicit and visible. Current factory execution is on Intel macserver; target laptop runtime is a separate delivery acceptance.
+Typing is first-class. The 1.3.1 candidate connects through direct ChatGPT browser sign-in and eligible plan usage, with no Codex CLI or paid API fallback. Genuine personal consent and inference must be verified separately from protocol fixtures. Optional selected-window capture and voice stay explicit and visible. Current factory execution is on Intel macserver; target laptop runtime is a separate delivery acceptance.
 
 ## Capabilities and constraints
 
@@ -28,7 +28,7 @@ Vale name and canonical folded-ribbon V artwork remain. The owner requests signi
 
 ## Evidence on hand
 
-The published 1.3.0 bootstrap includes the latest Cursor PR212 consolidation and the reviewed single-window/updater implementation (PR213). Anonymous signed release downloads and an actual configured Vale/Sparkle live-feed check passed. Current 1.3.1 work replaces the CLI connection with direct ChatGPT and adds native UI polish. The prior1.2.3DMG has no active update source; it cannot bootstrap itself. Existing native/provider checks are historical, overlapping and not acceptance of the redesign. The uploaded screenshot documents the disliked split capsule/coach UI. Use generated fixtures for screenshots and keep private user content out of evidence.
+The published 1.3.0 bootstrap includes the latest Cursor PR212 consolidation and the reviewed single-window/updater implementation (PR213). Anonymous signed release downloads and an actual configured Vale/Sparkle live-feed check passed. The published 1.3.1 preview replaced the CLI connection with direct ChatGPT; protocol fixtures do not establish official third-party support or genuine account use. The current rework must repair its rejected native composition. The prior1.2.3DMG has no active update source; it cannot bootstrap itself. Existing native/provider checks are historical, overlapping and not acceptance of the redesign. The latest owner screenshot rejects the published 1.3.1 single-window preview itself: duplicate chrome, oversized empty modules and ambiguous connection/send hierarchy. The original split capsule/coach screenshot is historical. Earlier visual approval is reopened. Use generated fixtures for screenshots and keep private user content out of evidence.
 
 ## Product principles
 

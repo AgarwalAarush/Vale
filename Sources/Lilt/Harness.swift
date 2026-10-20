@@ -4,11 +4,7 @@ import LiltCore
 
 extension AppController {
     func snapshot(_ window:NSWindow,to file:URL)throws{
-        guard let view=window.contentView else{throw AppError("Missing content view")}
-        view.layoutSubtreeIfNeeded();view.displayIfNeeded()
-        guard let rep=view.bitmapImageRepForCachingDisplay(in:view.bounds) else{throw AppError("Couldn’t render native view")}
-        view.cacheDisplay(in:view.bounds,to:rep)
-        guard let data=rep.representation(using:.png,properties:[:]) else{throw AppError("Couldn’t encode native view")};try data.write(to:file)
+        try NativeWindowEvidence.capture(window, to: file)
     }
     func settle()async{try? await Task.sleep(nanoseconds:650_000_000)}
     func waitForReply()async{let start=Date();while model.busy && Date().timeIntervalSince(start)<155{try? await Task.sleep(nanoseconds:200_000_000)}}

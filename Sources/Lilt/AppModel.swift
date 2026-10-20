@@ -42,7 +42,7 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     } }
     let context = WindowContext()
     let voice = VoiceController()
-    let provider = TutorProvider()
+    let provider: TutorProvider
     let updates = UpdateController()
     let fileStore: AttachmentStore?
     private let store: SessionStore?
@@ -79,7 +79,19 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
         if line == "Voice off" { return CompanionStatus(canSend: hasInput && active != nil).line }
         return line
     }
-    init(dataDirectory: URL? = nil,fileRemoval:(@Sendable(URL)throws->Void)?=nil) {
+    convenience init(dataDirectory: URL? = nil,fileRemoval:(@Sendable(URL)throws->Void)?=nil) {
+        self.init(dataDirectory: dataDirectory, fileRemoval: fileRemoval, account: .shared)
+    }
+    /// Generated account state for the app-owned native harness; never a personal session.
+    convenience init(testingAccount: ChatGPTAccount, dataDirectory: URL) throws {
+        guard testingAccount.isDisposableFixture,
+              CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test") else {
+            throw AppError("Generated account models are restricted to the disposable native harness")
+        }
+        self.init(dataDirectory: dataDirectory, fileRemoval: nil, account: testingAccount)
+    }
+    private init(dataDirectory: URL?, fileRemoval: (@Sendable(URL) throws -> Void)?, account: ChatGPTAccount) {
+        provider = TutorProvider(account: account)
         // Retain the 1.0 storage identifier so the Vale rename never strands chats.
         let directory = dataDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("Lilt")
         var loadedStore: SessionStore?; var loadedFiles: AttachmentStore?

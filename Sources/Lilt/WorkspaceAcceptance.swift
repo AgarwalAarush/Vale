@@ -25,19 +25,28 @@ extension AppController {
             try snapshot(workspace, to: output.appendingPathComponent(name + ".png"))
         }
         model.voice.enableFixtures()
-        model.newSession(title: "Workspace continuity fixture")
+        model.sessions = []; model.activeID = nil; model.selectedID = nil
+        model.newSession(title: "New chat")
         workspace.appearance = NSAppearance(named: .aqua)
         workspace.setContentSize(NSSize(width: 1040, height: 740))
         model.sidebarVisible = true; model.compactHistoryVisible = false
         openWorkspace()
         try await capture("workspace-01-empty-light")
         results["workspaceOneWindowAtLaunch"] = oneWorkspace()
+        results["workspaceUsesNativeCompactToolbar"] = workspace.toolbar != nil && workspace.toolbarStyle == .unifiedCompact
         let emptyEditor = workspace.contentView.flatMap { composer(in: $0) }
+        workspace.appearance = NSAppearance(named: .darkAqua)
+        try await capture("workspace-01b-empty-dark")
+        workspace.setContentSize(NSSize(width: 740, height: 560))
+        try await capture("workspace-01c-empty-minimum-dark")
+        workspace.appearance = NSAppearance(named: .aqua)
+        workspace.setContentSize(NSSize(width: 1040, height: 740))
 
         let fixtureFiles = [output.appendingPathComponent("fixtures/A.png"), output.appendingPathComponent("fixtures/Brief.pdf")]
         await model.importFiles(fixtureFiles)
         model.draft = "My unsent review, kept while I check the details."
         model.updateActive { chat in
+            chat.title = "Planning a research project with diagrams, reading notes and a deliberately long conversation title"
             chat.messages = [
                 Message(role: "user", text: "Compare the diagrams and summarize the planning notes."),
                 Message(role: "assistant", text: "The first diagram contains a red circle; the second has a blue square.\n\nThe public PDF fixture includes the verification token **HARBOR-73**. Keep that token with the brief, then turn the notes into a short checklist.\n\nYou can keep the supporting details in this chat’s notes and return to this draft when you are ready.")
@@ -45,6 +54,13 @@ extension AppController {
             chat.takeaway = "Public fixture note: compare the shapes, retain HARBOR-73, and bring a notebook."
         }
         model.persist(); await settle()
+        for (index, title) in ["Weekly reading notes", "A clearer project brief", "Working through the probability problem", "Compare the revised diagrams", "Notes for the next conversation", "A saved thought with an unfinished draft", "A long research conversation about native macOS workflows and precise interface design"].enumerated() {
+            var chat = LearningSession(title: title)
+            chat.updated = Date().addingTimeInterval(-Double(index + 1) * 3600)
+            chat.messages = [Message(role: "user", text: "Generated history content for native layout review.")]
+            if index == 5 { chat.draft = "An unfinished thought, preserved locally." }
+            model.sessions.append(chat)
+        }
         let originalID = model.activeID
         let savedDraft = model.draft
         let pendingIDs = model.pendingFiles.map(\.id)
@@ -164,6 +180,11 @@ extension AppController {
         results["workspaceWideInspectorKeepsWindowIdentity"] = oneWorkspace() && model.draft == composedDraft
         model.closeInspector(); model.backToChat()
 
+        // Combined panel sizing is a visual acceptance case, not independent panel thumbnails.
+        workspace.setContentSize(NSSize(width: 1040, height: 740)); model.sidebarVisible = true
+        model.showInspector(.notes); try await capture("workspace-12b-default-details")
+        model.closeInspector(); model.backToChat()
+
         model.persist(); let readyBeforeClose = !model.paused
         workspace.performClose(nil); await settle()
         results["workspaceCloseStopsTransientActivityAndPreservesDraft"] = !workspace.isVisible && !model.voice.listening && !model.voice.speaking && !model.context.hasSelection && model.draft == composedDraft
@@ -177,6 +198,45 @@ extension AppController {
         await runNativeUndoAcceptance(editor: editor, results: &results)
         try runClosedChatInputAcceptance(output: output, results: &results)
         try await runChatGPTSettingsVisualAcceptance(output: output)
+        try await runChatGPTWorkspaceVisualAcceptance(output: output, results: &results)
+    }
+}
+
+extension AppController {
+    /// The exact production window/view composition, with a generated account and isolated store.
+    /// Generated credentials cannot reach the production Responses transport.
+    func runChatGPTWorkspaceVisualAcceptance(output: URL, results: inout [String: Bool]) async throws {
+        workspace.orderOut(nil)
+        defer { workspace.makeKeyAndOrderFront(nil) }
+        for granted in [true, false] {
+            let account = try await ChatGPTAccountChecks.makeSettingsFixture(planGranted: granted)
+            let fixture = try AppModel(testingAccount: account, dataDirectory: output.appendingPathComponent("workspace-account-layout-\(granted)-fixture"))
+            fixture.voice.enableFixtures(); fixture.newSession()
+            let window = NativeWorkspaceWindow(model: fixture, rememberFrame: false)
+            defer { fixture.suspend(); window.close() }
+            window.setContentSize(NSSize(width: 1040, height: 740)); window.center()
+            window.makeKeyAndOrderFront(nil)
+            let state = granted ? "connected" : "grant-needed"
+            for dark in [false, true] {
+                window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                await settle()
+                try snapshot(window, to: output.appendingPathComponent("workspace-full-\(state)-\(dark ? "dark" : "light")-generated-account.png"))
+            }
+            if granted {
+                fixture.draft = "Please turn the research into a practical plan."
+                fixture.updateActive { chat in
+                    chat.title = "Research notes and a practical plan"
+                    chat.messages = [Message(role: "user", text: "How should I organize the work?"), Message(role: "assistant", text: "Start with the task you need to finish.\n\nKeep the supporting files in this conversation, write down the decisions, and work through one concrete step at a time. You can keep drafting while you review the answer.")]
+                }
+                await settle()
+                try snapshot(window, to: output.appendingPathComponent("workspace-full-connected-conversation-dark-generated-account.png"))
+                var refusedProduction = false
+                fixture.provider.ask(prompt: "Generated account must remain offline") { result in
+                    if case .failure = result { refusedProduction = true }
+                }
+                results["workspaceGeneratedAccountUsesRealViewsAndCannotReachProduction"] = fixture.provider.account === account && refusedProduction
+            }
+        }
     }
 }
 

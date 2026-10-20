@@ -2,64 +2,43 @@
 
 ## Direction
 
-A quiet native reading workspace: one resizable macOS window, where the conversation and composer carry the interface. The owner explicitly requests a substantial single-window redesign, confirmed capability preservation and code-first native inspection. This replaces the legacy capsule/coach/library composition while preserving Vale's name and ribbon-V artwork.
+A compact native Mac conversation workspace. Writing and reading are primary; the app should feel ordinary and precise beside other Mac apps. The owner rejected the published1.3.1 single-window composition: double chrome, empty hero, oversized editor and competing first-run actions are anti-references. Earlier visual approval is reopened. Keep the ribbon-V artwork, one workspace and all PRODUCT capabilities.
 
-Design read: a personal native assistant for recurring chat, document and learning work, with an editorial, restrained language. Taste values: DESIGN_VARIANCE5, MOTION_INTENSITY2, VISUAL_DENSITY5; native Operate behavior takes precedence over marketing motifs.
+Design read: a recurring native personal tool, Operate mode, restrained system typography and familiar controls. Follow [native pipeline](docs/design/native-product-pipeline.md), grounded in written research and independent critique. Web landing-page recipes and arbitrary design dials are not Mac acceptance.
 
-## Reference interpretation
+## References
 
-- [Intercom](https://styles.refero.design/style/12255b63-e506-4bc1-a4cd-d05487de32f3): warm light neutrals, careful spacing and hairlines. Translate into readable native density, not a website hero.
-- [Superhuman](https://styles.refero.design/style/418b374a-be64-44f0-b17e-1d45308c7e62): disciplined action hierarchy and comfortable text. Exclude marketing photography.
-- [Dala](https://styles.refero.design/style/e5f5f8cf-e68d-4ed1-bbf5-6b67569af648): clarity and negative space inform the dark counterpart. Exclude particles and theatrical display scale.
+The owner's Refero Apple, Linear, Cursor, Vercel, Intercom, Superhuman and Dala links guide quiet surfaces, precise alignment and restrained action hierarchy. Refero measurements/recommendations are interpreted and HTML is reconstructed; these are not source components or native specifications. The uploaded desktop-product images add compact navigation, aligned headers and adjacent muted context. Uiarc is inspiration, not a dependency or a claim every demo was viewed. Apple conventions and native evidence govern implementation. No marketing heroes, display scale, CSS, imported fonts, decorative dashboard furniture or theatrical motion.
 
-The owner's subsequent native-UI direction sharpens that baseline:
+## Window and layout
 
-- [Vercel](https://styles.refero.design/style/f24daf3a-d43f-4dec-85a9-8ac1d5148a03): achromatic precision, hairlines and compact controls translate into clear native action states and disciplined chrome.
-- [Cursor](https://styles.refero.design/style/4e3b4717-84c8-4599-baaf-a343c3d619b6): warm flat paper, light headings and restrained shapes inform the quiet writing surface.
-- [Linear](https://styles.refero.design/style/90ce5883-bb24-4466-93f7-801cd617b0d1): dark tonal levels and sharp action hierarchy guide the existing dark counterpart.
-- [Apple](https://styles.refero.design/style/a73148b9-449b-42cd-9f38-86ef694f500e): SF type, useful whitespace and product clarity keep controls familiar and writing primary.
+One actual NSWindow with ordinary traffic lights, drag/resize/full-screen behavior, accessible title and a real compact NSToolbar owned by AppKit. No blank top spacer or second custom toolbar in content. Standard sidebar/new-chat/detail commands and a useful conversation title orient the task without large repeated branding. Toolbar commands remain accessible through native menus and narrowing behavior.
 
-Retain DESIGN_VARIANCE5, MOTION_INTENSITY2 and VISUAL_DENSITY5 as native Operate values: a distinct composition, quiet immediate feedback, and readable working density. These references guide hierarchy and spacing within the existing SF typography, semantic palette and native controls; marketing display fonts, giant headings, promotional cards and decorative metadata do not enter the workspace.
+Start at existing1040×740 content and740×560 minimum; inspect actual full-frame geometry. History is a conventional quiet collection, initially around200pt with compact rows that accommodate meaningful text. Search is compact. Omit the pristine untitled active empty chat as a redundant retrieval row; preserve real unsent drafts/files. Settings remains a quiet persistent destination.
 
-The uploaded desktop-product screenshots add compact aligned navigation rows, primary text with adjacent muted context, quiet gray-to-white surface steps, and selective action color. Apply those relationships to Vale’s history, composer and detail routes. UiArc reinforces stable local async feedback, anchored grouped native menus and brief interruptible transitions. Keep the reference’s useful density within the current reading measure and native control scale.
+Conversation prose uses a comfortable maximum around680pt and normal24pt gutters, naturally less in narrow windows. Details appear alongside only when useful conversation width remains; otherwise replace chat with Back. Test combined sidebar/details layouts instead of inheriting the rejected860pt threshold blindly.
 
-## First viewport and layout
+The same mounted composer stays at the bottom across empty/populated and secondary-route states. Start near one or two text lines and grow for actual content before scrolling. No empty slab or centered first-run hero. Native NSTextView retains focus, selection, marked text, undo and draft ownership. Empty content is one short useful invitation near the task. Remove permanent Ready-to-type and idle voice/status footer modules.
 
-Default1040×740, minimum740×560, verified at compact/default/wide sizes. One standard NSWindow, normal traffic lights, native resize/minimize/fullscreen and remembered frame. Collapsible history rail (~224points), compact toolbar, readable conversation (~680point max measure), bottom composer. Below~860points the rail yields to the current task. File/notes/context details live in an in-window inspector; at narrow widths a detail route replaces the reading region with a clear Back action. Settings is an in-window route, never a detached preferences app.
+## State hierarchy
 
-First launch: one brief invitation and the actual editable composer form a balanced central writing area, with useful Attach/Share/Talk actions. The same mounted native editor moves to the bottom when messages arrive. Only the empty transcript's natural content height is measured; flexible outer space collapses first at compact heights or as contextual controls grow, leaving the welcome scrollable and composer bounded. No extra status capsule, giant empty slab, duplicated branding, decorative prompt cards or permanently visible configuration badges. Populated conversation prioritizes the answer; readable author distinctions and code/links/attachments remain literal. A quiet mixed-case author label distinguishes replies without a persistent colored rule. Audio action symbols use explicit monochrome semantic foregrounds in both appearances.
+- Disconnected: local draft/attachments work; one Connect ChatGPT to send action replaces unavailable Send at the composer. Explain the dependency once.
+- Connecting/error: local progress, Cancel or Retry and precise error; preserve draft/files. Browser return never sends automatically.
+- Connected empty: focused editor and normal Send, no setup block. Restored work resumes directly.
+- Busy/retry: visible Stop; continued drafting; failures preserve original message/files/request identity.
+- Saved Web on/off stays visible and accessible. Opt-in does not imply hosted-tool success.
+- Group Talk/Conversation under a recognizable voice entry. Starting/listening/speaking/conversation has precise state and immediate Stop. Active selected-window context names target and retains Stop sharing. No automatic microphone/screen consent.
 
-## Tokens
+Learn, hints, walkthrough, guide, timer, notes/files, rename/export/Forget, read-aloud and all retained features have recognizable contextual/menu routes. Covered routes retain a stop for active work. Back restores the originating task. Native file/save/permission/updater dialogs and transient click-through pointing feedback keep their documented limited roles.
 
-Use dynamic semantic colors throughout native views and NSTextView/PDF controls. Default System appearance; explicit Light/Dark override may be offered.
+## Native grammar
 
-| Role | Light | Dark |
-| --- | --- | --- |
-| Canvas | #f7f6f2 | #18191d |
-| Navigation | #eeede8 | #141519 |
-| Raised/input | #ffffff | #22242a |
-| Primary text | #252629 | #f0f0ed |
-| Secondary text | #67686b | #b0b1b8 |
-| Divider | #ddddd6 | #363840 |
-| Accent | #5759c6 | #b9bcff |
-| Primary action | #28292d | #ecece8 |
+SF via framework APIs and SF Symbols. Initial defaults: controls13, metadata12, message prose15, short empty heading20–22. Product hypotheses, not fixed HIG mandates. Remove excess padding before shrinking type. Long titles wrap/truncate purposefully with full accessible values. Tiny text is not density.
 
-Semantic warning/error colors must remain legible in both modes. Do not reuse white opacity as a light-surface fill. Contrast≥4.5:1 body/placeholder,≥3:1 large text and meaningful controls.
+Use semantic system colors, native selection/accent and familiar control feedback. Custom starting surfaces retain warm light and charcoal dark: canvas#f7f6f2/#18191d, navigation#eeede8/#141519, input#ffffff/#22242a, text#252629/#f0f0ed, secondary#67686b/#b0b1b8, divider#ddddd6/#363840. No stacked shadow/border furniture or card around every action. Custom shapes6–10pt, native window/control shapes where provided; spacing4/8/12/16/24.
 
-System SF typography: body15, controls13, secondary12, section20–24, welcome30–32 with normal/light weight. No all-caps decorative eyebrows, microscopic labels, custom marketing fonts or icon-font substitutes. SF Symbols for native controls, with accessible labels/help.
+Controls need accurate disabled/pressed/hover/keyboard focus without layout movement. Accent is functional. Focus belongs only to the actually focused visible editor. Warning/recording states use words/symbols as well as color. Verify light/dark/increased contrast and native caret/text colors. Reduce Motion removes optional transitions; Reduce Transparency gives solid legible surfaces. No idle animation or launch choreography.
 
-Shape scale:8point controls/rows,12point composer and real inset groups; native window shape. Depth comes from surface tone and one quiet divider, not glass borders plus shadows. Spacing4/8/12/16/24/32.
+## Acceptance
 
-## Navigation and interaction
-
-Selecting history resumes it directly in the same window. Commit active IME text and persist old draft/pending files before changing chat identity. Settings and inspector navigation preserve composer/selection/scroll state. New chat retains the previous draft in history. Rename/export/Forget remain discoverable and deliberate.
-
-Share state and Stop sharing remain visible when active; mic/listening/playback/conversation state and stop controls stay inside the window. Native permission/file/save dialogs and intentional transient click-through pointing annotation are the only secondary OS surfaces; no second assistant content panel. Closing pauses transient capture/voice and preserves data. Reopening never grants consent or rearms capture.
-
-The signature interaction is continuity: revealing context beside the answer and returning to the same composer without changing windows. Transitions are brief state feedback; Reduce Motion removes animation. Reduced Transparency gets solid surfaces. No idle pulse animation.
-
-Quiet actions share an enabled hover/pressed surface and a keyboard focus outline, without moving content. Rounded backgrounds and content shapes define their bounds; label contents are not clipped, preserving native SF Symbol rendering. The composer shows the saved per-chat “Web on” or “Web off” choice and gives accessibility the same state; this describes opt-in, not a claim that a hosted search succeeded. Composer focus is observed from its mounted native text view; only the visible, actually focused editor receives an accent stroke. History search uses its existing native focus state for the same stroke, and literal excerpts keep matching text in view. Notes and Files are direct detail destinations; previews name their current content. An inline inspector closes with “Close details,” while a replacing route returns with “Back to chat.” Notes and Files use the existing 680-point content measure with aligned 24-point gutters, shrinking naturally in the 320-point inspector. Related read-aloud, consent text and voice options share one 12-point-spaced settings group.
-
-## Delivery and verification
-
-Inspect actual native empty/populated/history/settings/files/notes/context/loading/retry/guide states in light/dark at compact/default/wide sizes in one batched pass, then one confirmation pass after fixes. Screenshots must use generated fixtures, not private user content. Native interaction, genuine provider, signing/update installation, hardware and target-laptop evidence stay separate. A configured label without a real signed update path is not updater completion.
+Inspect complete native windows at minimum/default/wide and both appearances with realistic content/title/history and important combinations. Content-only raster cannot establish chrome; full-frame in-process render is explicitly labeled and does not establish compositor or physical input. Genuine provider/hardware/feed/publication/laptop installation are separate. A fresh critic compares the integrated result with the owner rejection and actual task, and may reject composition. Follow the bounded native pipeline and Factory repair rounds.

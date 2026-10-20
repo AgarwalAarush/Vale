@@ -17,7 +17,7 @@ Vale is a general-purpose native macOS companion with an optional learning mode.
 3. Run the packaged app on Apple Silicon. Universal compilation is already supported; Intel is the only runtime verified so far.
 4. Review VoiceOver, keyboard navigation, contrast, large text, and physical file picker/drop/paste flows.
 5. Test account expiry/quota/offline recovery, cold restarts, large histories, and difficult PDFs/documents.
-6. Complete 1.3.1 direct ChatGPT consent/inference acceptance, frozen-source review and signed release delivery. The 1.3.0 bootstrap is published: anonymous signed downloads and an actual configured Sparkle production check passed. One-time laptop bootstrap installation remains pending; source, package, live feed and target installation require separate evidence. Preserve the private signing seed across repository maintenance. Developer ID/notarization and an encrypted external key backup remain distribution/maintenance follow-up work.
+6. Rebuild the owner-rejected1.3.1 native composition under [the native pipeline](design/native-product-pipeline.md), then complete genuine direct ChatGPT consent/inference, frozen-source review and signed candidate delivery. The1.3.2 candidate is not visually accepted or production ready yet. The 1.3.0 bootstrap is published: anonymous signed downloads and an actual configured Sparkle production check passed. One-time laptop bootstrap installation remains pending; source, package, live feed and target installation require separate evidence. Preserve the private signing seed across repository maintenance. Developer ID/notarization and an encrypted external key backup remain distribution/maintenance follow-up work.
 
 ## Scope
 
