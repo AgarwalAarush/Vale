@@ -99,16 +99,36 @@ final class ComposerTextView: NSTextView {
     var pasteImage: ((Data) -> Void)?
     var pastePDF: ((Data) -> Void)?
     var focusChanged: ((Bool) -> Void)?
+    var permitsInteraction: () -> Bool = { true }
+    var commitToDraft: (() -> Void)?
     private(set) var observedFocus = false
     private var focusObservationPending = false
+    private var resizeObservation: NSObjectProtocol?
     override func becomeFirstResponder() -> Bool {
+        guard permitsInteraction() else { return false }
         let accepted = super.becomeFirstResponder()
         if accepted { observeFocus() }
         return accepted
     }
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if let resizeObservation { NotificationCenter.default.removeObserver(resizeObservation) }
+        resizeObservation = nil
+        if let window {
+            resizeObservation = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.resignIfCovered() }
+            }
+        }
+        resignIfCovered()
         observeFocus()
+    }
+    deinit { if let resizeObservation { NotificationCenter.default.removeObserver(resizeObservation) } }
+    /// The window width and model may change before SwiftUI updates this mounted view.
+    /// Consult live policy and affect only this editor's own responder/window.
+    func resignIfCovered() {
+        guard !permitsInteraction(), let window, window.firstResponder === self else { return }
+        commitToDraft?()
+        window.makeFirstResponder(nil)
     }
     /// AppKit finishes the responder transition before SwiftUI receives an update.
     /// Coalesce changes and read the current responder, never a queued focus value.
@@ -125,6 +145,7 @@ final class ComposerTextView: NSTextView {
         }
     }
     override func paste(_ sender: Any?) {
+        guard permitsInteraction() else { resignIfCovered(); return }
         let board = NSPasteboard.general
         let plain = board.string(forType: .string)
         let urls = board.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
@@ -160,6 +181,7 @@ final class ComposerTextView: NSTextView {
         sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
     }
     override func keyDown(with event: NSEvent) {
+        guard permitsInteraction() else { resignIfCovered(); return }
         if (event.keyCode == 36 || event.keyCode == 76), LineBreak.sends(shift: event.modifierFlags.contains(.shift), option: event.modifierFlags.contains(.option), marked: hasMarkedText()) { submit?(); return }
         if event.keyCode == 53 { escape?(); return }
         // NSTextView has no period-substitution setter. Insert a literal space before
@@ -171,6 +193,7 @@ final class ComposerTextView: NSTextView {
         super.keyDown(with: event)
     }
     override func resignFirstResponder() -> Bool {
+        commitToDraft?()
         commitMarkedTextIfNeeded()
         let accepted = super.resignFirstResponder()
         if accepted { observeFocus() }
@@ -196,6 +219,7 @@ struct DraftEditor: NSViewRepresentable {
     @Binding var text: String
     var draftID: UUID? = nil
     var focusToken: Int = 0
+    var ownsDraft: () -> Bool = { true }
     var permitsFocus: (NSWindow) -> Bool = { _ in true }
     var submit: () -> Void
     var cancel: () -> Void
@@ -226,11 +250,12 @@ struct DraftEditor: NSViewRepresentable {
         editor.smartInsertDeleteEnabled = PasteSpacing.adjustsAutomatically
         editor.delegate = context.coordinator; editor.identifier = NSUserInterfaceItemIdentifier("lilt.composer")
         context.coordinator.editor = editor
+        configureInteraction(editor, coordinator: context.coordinator)
         editor.focusChanged = { [weak editor, weak coordinator = context.coordinator] focused in
             guard let editor, let coordinator, coordinator.editor === editor else { return }
             coordinator.parent.onFocusChange?(focused)
         }
-        editor.setAccessibilityLabel("Message Vale"); editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
+        editor.setAccessibilityLabel("Message Vale"); editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         editor.registerForDraggedTypes([.fileURL])
         keepFieldClear(scroll)
         scroll.documentView = editor; return scroll
@@ -239,11 +264,13 @@ struct DraftEditor: NSViewRepresentable {
         context.coordinator.parent = self
         keepFieldClear(nsView)
         guard let editor = nsView.documentView as? ComposerTextView else { return }
+        configureInteraction(editor, coordinator: context.coordinator)
+        editor.resignIfCovered()
         editor.observeFocus()
         editor.textColor = Theme.inkColor; editor.insertionPointColor = Theme.accentColor
-        editor.submit = submit; editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
+        editor.escape = cancel; editor.pasteFiles = pasteFiles; editor.pasteImage = pasteImage; editor.pastePDF = pastePDF
         installCommit { [weak editor, weak coordinator = context.coordinator] in
-            guard let editor, let coordinator else { return }
+            guard let editor, let coordinator, coordinator.draftID == coordinator.parent.draftID, coordinator.parent.ownsDraft() else { return }
             // Ordinary edits already publish through textDidChange. Only a live IME
             // composition can need committing here; model changes may be newer than this view.
             guard ComposerSubmit.commitsMarkedTextBeforeSend(hasMarkedText: editor.hasMarkedText()) else { return }
@@ -269,10 +296,9 @@ struct DraftEditor: NSViewRepresentable {
             if ComposerFocus.returns(afterSending: true) {
                 DispatchQueue.main.async { [weak editor, weak coordinator = context.coordinator] in
                     guard let editor, let coordinator, coordinator.parent.focusToken == focusToken, let window = editor.window,
-                          window.isVisible, !window.isMiniaturized, window.attachedSheet == nil, NSApp.modalWindow == nil,
-                          NSApp.keyWindow?.isSheet != true,
+                          window.isVisible, !window.isMiniaturized, !window.isSheet, window.attachedSheet == nil, NSApp.modalWindow == nil,
                           !NSApp.windows.contains(where: { $0.isVisible && ($0.isSheet || $0.attachedSheet != nil) }),
-                          coordinator.parent.permitsFocus(window) else { return }
+                          editor.permitsInteraction() else { return }
                     window.makeFirstResponder(editor)
                 }
             }
@@ -282,8 +308,24 @@ struct DraftEditor: NSViewRepresentable {
             coordinator.parent.onMeasuredHeight?(Self.measuredHeight(editor))
         }
     }
+    private func configureInteraction(_ editor: ComposerTextView, coordinator: Coordinator) {
+        editor.permitsInteraction = { [weak editor, weak coordinator] in
+            guard let editor, let coordinator, let window = editor.window else { return false }
+            return coordinator.draftID == coordinator.parent.draftID && coordinator.parent.ownsDraft() && coordinator.parent.permitsFocus(window)
+        }
+        editor.commitToDraft = { [weak editor, weak coordinator] in
+            guard let editor, let coordinator, coordinator.draftID == coordinator.parent.draftID, coordinator.parent.ownsDraft() else { return }
+            guard ComposerSubmit.commitsMarkedTextBeforeSend(hasMarkedText: editor.hasMarkedText()) else { return }
+            editor.commitMarkedTextIfNeeded()
+            if editor.string != coordinator.parent.text { coordinator.parent.text = editor.string }
+        }
+        editor.submit = { [weak editor, weak coordinator] in
+            guard let editor, let coordinator, editor.permitsInteraction() else { editor?.resignIfCovered(); return }
+            coordinator.parent.submit()
+        }
+    }
     static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
-        (nsView.documentView as? ComposerTextView)?.focusChanged = nil
+        if let editor = nsView.documentView as? ComposerTextView { editor.focusChanged = nil; editor.commitToDraft = nil; editor.permitsInteraction = { false }; editor.submit = nil }
         coordinator.editor = nil
     }
     final class Coordinator: NSObject, NSTextViewDelegate {
@@ -293,7 +335,7 @@ struct DraftEditor: NSViewRepresentable {
         var draftID: UUID?
         init(_ parent: DraftEditor) { self.parent = parent; lastFocus = parent.focusToken; draftID = parent.draftID }
         func textDidChange(_ notification: Notification) {
-            guard let editor = notification.object as? NSTextView else { return }
+            guard let editor = notification.object as? NSTextView, draftID == parent.draftID, parent.ownsDraft() else { return }
             parent.text = editor.string
             parent.onMeasuredHeight?(DraftEditor.measuredHeight(editor))
         }

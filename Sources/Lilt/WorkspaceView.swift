@@ -181,7 +181,7 @@ private struct WorkspaceHistory: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
-                TextField("Search chats", text: $model.historyQuery).textFieldStyle(.plain).focused($searchFocused).accessibilityLabel("Search messages, notes, and files")
+                TextField("Search chats", text: $model.historyQuery, prompt: Text("Search chats").foregroundStyle(Theme.muted)).textFieldStyle(.plain).focused($searchFocused).accessibilityLabel("Search messages, notes, and files")
                 if !model.historyQuery.isEmpty { Button { model.historyQuery = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(ActionButton()).accessibilityLabel("Clear search").foregroundStyle(Theme.muted) }
             }.font(.system(size: 12)).padding(.horizontal, 7).padding(.vertical, 6).background(Theme.fillRaised).clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(searchFocused ? Theme.accent : Theme.line, lineWidth: 1)).padding(.horizontal, 8)

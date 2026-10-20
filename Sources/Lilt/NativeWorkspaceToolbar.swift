@@ -14,6 +14,7 @@ import LiltCore
         static let actions = NSToolbarItem.Identifier("vale.actions")
         static let stop = NSToolbarItem.Identifier("vale.stop")
         static let back = NSToolbarItem.Identifier("vale.back")
+        static let activity = NSToolbarItem.Identifier("vale.activity")
     }
     private weak var window: NSWindow?
     private let model: AppModel
@@ -39,7 +40,7 @@ import LiltCore
         [Item.sidebar, Item.newChat, .flexibleSpace, Item.mode, Item.details, Item.actions]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        toolbarDefaultItemIdentifiers(toolbar) + [Item.stop, Item.back]
+        toolbarDefaultItemIdentifiers(toolbar) + [Item.stop, Item.back, Item.activity]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         switch identifier {
@@ -52,6 +53,16 @@ import LiltCore
         case Item.stop:
             let item = button(identifier, label: "Stop", symbol: "stop.fill", action: #selector(stopAction))
             item.title = "Stop"; item.visibilityPriority = .high; return item
+        case Item.activity:
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            let label = NSTextField(labelWithString: activityText)
+            label.font = .systemFont(ofSize: 12); label.textColor = .secondaryLabelColor
+            label.lineBreakMode = .byTruncatingTail; label.maximumNumberOfLines = 1
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            NSLayoutConstraint.activate([label.widthAnchor.constraint(greaterThanOrEqualToConstant: 80), label.widthAnchor.constraint(lessThanOrEqualToConstant: 200)])
+            item.view = label; item.label = activityText; item.paletteLabel = "Active voice and sharing"
+            item.visibilityPriority = .high; item.autovalidates = false
+            return item
         case Item.mode:
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
             item.label = "Chat mode"; item.paletteLabel = "Chat mode"; item.title = "Assistant"
@@ -78,6 +89,18 @@ import LiltCore
         DispatchQueue.main.async { [weak self] in self?.refreshQueued = false; self?.refresh() }
     }
     private var hasActivity: Bool { model.busy || model.context.hasSelection || model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
+    private var activityText: String {
+        var states: [String] = []
+        if model.voice.starting { states.append("Starting microphone…") }
+        else if model.voice.listening { states.append(model.conversation ? "Conversation · listening" : "Listening") }
+        else if model.voice.speaking { states.append(model.conversation ? "Conversation · speaking" : "Speaking") }
+        else if model.conversation { states.append("Conversation on") }
+        if model.busy { states.append("Thinking…") }
+        if model.context.hasSelection {
+            states.append(model.context.capturing ? "Refreshing window" : model.context.live ? "Live window" : "Window shared")
+        }
+        return states.joined(separator: " · ")
+    }
     private var dialogOpen: Bool { window?.attachedSheet != nil || NSApp.modalWindow != nil || NSApp.windows.contains { $0.isVisible && ($0.isSheet || $0.attachedSheet != nil) } }
     private func refresh() {
         guard let window else { return }
@@ -91,6 +114,8 @@ import LiltCore
         setPresent(Item.stop, hasActivity, at: toolbar.items.count)
         let layout = WorkspaceLayout(width: window.contentView?.bounds.width ?? 0, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
         setPresent(Item.back, model.workspaceRoute != .chat || !layout.chatVisible, at: 1)
+        let stopIndex = toolbar.items.firstIndex(where: { $0.itemIdentifier == Item.stop }) ?? toolbar.items.count
+        setPresent(Item.activity, hasActivity && (model.workspaceRoute != .chat || !layout.chatVisible), at: stopIndex)
         for item in toolbar.items {
             if item.itemIdentifier == Item.mode {
                 item.title = model.active?.mode == .learn ? "Learn" : "Assistant"
@@ -99,6 +124,12 @@ import LiltCore
                 item.isEnabled = model.active != nil && !dialogOpen
             } else if item.itemIdentifier == Item.stop {
                 item.toolTip = "Stop response, voice and window sharing (Escape)"; item.isEnabled = !dialogOpen
+            } else if item.itemIdentifier == Item.activity {
+                let text = activityText
+                (item.view as? NSTextField)?.stringValue = text
+                item.label = text; item.toolTip = text
+                let overflow = NSMenuItem(title: text, action: nil, keyEquivalent: ""); overflow.isEnabled = false
+                item.menuFormRepresentation = overflow
             }
         }
     }

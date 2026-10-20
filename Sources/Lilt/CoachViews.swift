@@ -7,7 +7,7 @@ struct CoachView: View {
     @State private var composerHeight: CGFloat = CGFloat(ComposerHeight.minimum)
     @State private var composerFocused = false
     private var account: ChatGPTAccount { model.provider.account }
-    private var sendReady: Bool { account.permitsPlanUsage && model.hasInput && PausedTyping.allowsQuestion(paused: model.paused) && model.active != nil && !model.importing }
+    private var sendReady: Bool { chatVisible && account.permitsPlanUsage && model.hasInput && PausedTyping.allowsQuestion(paused: model.paused) && model.active != nil && !model.importing }
     private var webEnabled: Bool { model.active?.webEnabled == true }
     private var empty: Bool { model.active?.messages.isEmpty == true && model.active?.guide == nil && !model.busy }
     private var voiceActive: Bool { model.voice.starting || model.voice.listening || model.voice.speaking || model.conversation }
@@ -100,13 +100,15 @@ struct CoachView: View {
         }
     }
     private var composer: some View {
-        VStack(spacing: 8) {
+        let draftID = model.activeID
+        return VStack(spacing: 8) {
             if !model.pendingFiles.isEmpty { ScrollView(.horizontal) { HStack(spacing: 8) { ForEach(model.pendingFiles) { FileChip(record: $0, among: model.pendingFiles, model: model, removable: true) } } }.scrollIndicators(.hidden).fixedSize(horizontal: false, vertical: true) }
             ZStack(alignment: .topLeading) {
                 if FieldPrompt.showsIdle(model.draft) { Text(model.busy ? "Add a thought for your next message…" : "Message Vale…").font(.system(size: 15)).foregroundStyle(Theme.muted).padding(.top, 5).padding(.leading, 2).allowsHitTesting(false).accessibilityHidden(true) }
-                DraftEditor(text: Binding(get: { model.draft }, set: { model.editDraft($0) }), draftID: model.activeID, focusToken: model.composerFocus, permitsFocus: { _ in
-                    chatVisible && model.workspaceRoute == .chat
-                }, submit: { if account.permitsPlanUsage && ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
+                DraftEditor(text: Binding(get: { model.draft }, set: { if model.activeID == draftID { model.editDraft($0) } }), draftID: draftID, focusToken: model.composerFocus, ownsDraft: { model.activeID == draftID }, permitsFocus: { window in
+                    let layout = WorkspaceLayout(width: window.contentView?.bounds.width ?? 0, sidebarVisible: model.sidebarVisible, historyOverlay: model.compactHistoryVisible, inspectorOpen: model.inspector != nil)
+                    return model.workspaceRoute == .chat && layout.chatVisible
+                }, submit: { if chatVisible && model.workspaceRoute == .chat && account.permitsPlanUsage && ComposerReturn.sends(whileWaiting: model.busy) { model.send() } }, cancel: { model.stopInteraction() }, pasteFiles: { model.importDroppedFiles($0) }, pasteImage: { model.pasteImage($0) }, pastePDF: { model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { measured in
                     let height = CGFloat(ComposerHeight.clamped(Double(measured))); if abs(composerHeight - height) > 0.5 { composerHeight = height }
                 }, onFocusChange: { composerFocused = $0 }).frame(height: composerHeight)
             }.help(account.permitsPlanUsage ? "Return sends. Shift–Return adds a line." : "Your draft is saved locally. Continue with ChatGPT to send. Shift–Return adds a line.")
@@ -155,7 +157,7 @@ struct CoachView: View {
                     .buttonStyle(.borderedProminent).tint(Theme.action).disabled(account.isSigningOut)
             }
         } else {
-            Button { model.send() } label: { Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30) }
+            Button { if chatVisible { model.send() } } label: { Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.onAction).frame(width: 30, height: 30) }
                 .buttonStyle(ActionButton(background: Theme.action, feedback: Theme.onAction)).disabled(!sendReady).help("Send message (Return)").accessibilityLabel("Send message")
         }
     }
