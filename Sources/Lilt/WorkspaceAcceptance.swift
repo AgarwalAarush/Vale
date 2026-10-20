@@ -148,6 +148,61 @@ extension AppController {
         try runMultipageAttachmentAcceptance(output: output, results: &results)
         try await runCursorReplyAcceptance(output: output, results: &results)
         await runNativeUndoAcceptance(editor: editor, results: &results)
+        try runClosedChatInputAcceptance(output: output, results: &results)
+    }
+}
+
+extension AppController {
+    /// Real model/store transitions on generated data; not a physical URL-drop or button-click claim.
+    func runClosedChatInputAcceptance(output: URL, results: inout [String: Bool]) throws {
+        let directory = output.appendingPathComponent("closed-chat-input-fixture-" + UUID().uuidString)
+        let link = URL(string: "https://example.com/vale-close-drop")!
+        let fixture = AppModel(dataDirectory: directory)
+        fixture.voice.enableFixtures()
+        fixture.newSession(title: "Generated only chat before Close")
+        let originalID = fixture.activeID
+        fixture.complete()
+        let closedOnlyChat = fixture.sessions.count == 1 && fixture.active == nil && fixture.draft.isEmpty
+        fixture.keepDroppedLinks([link])
+        results["workspaceClosedChatURLDropOwnsEditableDraft"] = closedOnlyChat && fixture.activeID == originalID && fixture.active != nil && fixture.active?.draft == link.absoluteString && fixture.draft == link.absoluteString && fixture.hasInput && !fixture.paused
+        let saved = fixture.persist()
+        fixture.suspend()
+
+        let restored = AppModel(dataDirectory: directory)
+        restored.voice.enableFixtures()
+        defer { restored.suspend() }
+        restored.prepareChat()
+        results["workspaceClosedChatURLDropSurvivesModelRelaunch"] = saved && restored.activeID == originalID && restored.active?.draft == link.absoluteString && restored.draft == link.absoluteString && restored.hasInput
+
+        let originalText = "Generated review kept exactly."
+        restored.editDraft(originalText)
+        restored.keepDroppedLinks([link])
+        let appendedWithoutNewline = restored.draft == originalText + "\n" + link.absoluteString
+        restored.editDraft(originalText + "\n")
+        restored.keepDroppedLinks([link])
+        results["workspaceDroppedURLPreservesDraftWithOneNewline"] = appendedWithoutNewline && restored.draft == originalText + "\n" + link.absoluteString && restored.active?.draft == restored.draft
+
+        // The empty workspace's central New chat control now calls this same model action.
+        // Verify its actual identity/data behavior without treating a direct call as a native click.
+        restored.pasteImage(try Data(contentsOf: output.appendingPathComponent("fixtures/A.png")))
+        let previousID = restored.activeID
+        let previousDraft = restored.draft
+        let previousFiles = restored.pendingFiles
+        let previousBytes = try previousFiles.map { record -> Data in
+            guard let fileStore = restored.fileStore else { throw AppError("Generated chat attachment store unavailable") }
+            return try Data(contentsOf: fileStore.url(for: record))
+        }
+        restored.complete()
+        let closedPreviousChat = restored.active == nil && restored.draft.isEmpty
+        restored.newSession()
+        let newID = restored.activeID
+        let persisted = restored.persist()
+        let retained = try SessionStore(directory: directory).load().first { $0.id == previousID }
+        let retainedBytes = try (retained?.pendingAttachments ?? []).map { record -> Data in
+            guard let fileStore = restored.fileStore else { throw AppError("Generated chat attachment store unavailable") }
+            return try Data(contentsOf: fileStore.url(for: record))
+        }
+        results["workspaceClosedChatNewChatKeepsPriorDraftAndFiles"] = closedPreviousChat && newID != nil && newID != previousID && restored.active != nil && restored.draft.isEmpty && restored.pendingFiles.isEmpty && persisted && retained?.draft == previousDraft && !previousFiles.isEmpty && retained?.pendingAttachments.map(\.id) == previousFiles.map(\.id) && retainedBytes == previousBytes
     }
 }
 

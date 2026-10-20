@@ -376,6 +376,8 @@ private struct ImportOutcome: Sendable { var record: AttachmentRecord?; var erro
     }
     func keepDroppedLinks(_ urls:[URL]){
         guard let links=DroppedLink.text(from:urls) else{return}
+        if active == nil { prepareChat() }
+        guard active != nil else { return }
         editDraft(DroppedLink.inserted(into:draft,links:links))
     }
     func importFiles(_ urls:[URL]) async {

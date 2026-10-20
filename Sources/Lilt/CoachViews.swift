@@ -22,7 +22,7 @@ struct CoachView: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("A place to pick up the thread.").font(.system(size: 28))
                                 Text("Choose a chat from history, or start something new.").font(.system(size: 15)).foregroundStyle(Theme.muted)
-                                Button("New chat") { model.prepareChat() }.buttonStyle(QuietButton(filled: true))
+                                Button("New chat") { model.newSession() }.buttonStyle(QuietButton(filled: true))
                             }.padding(.vertical, 32)
                         }
                         if model.busy { HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking…").font(.system(size: 13)).foregroundStyle(Theme.muted) }.id("thinking") }
