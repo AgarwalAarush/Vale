@@ -8,6 +8,7 @@ struct CoachView: View {
     @State private var composerFocused = false
     @State private var welcomeContentHeight: CGFloat = 150
     private var sendReady: Bool { model.hasInput && PausedTyping.allowsQuestion(paused: model.paused) && model.active != nil && !model.importing }
+    private var webEnabled: Bool { model.active?.webEnabled == true }
     private var centersWelcome: Bool { model.active?.messages.isEmpty == true && model.active?.guide == nil && !model.busy }
     var body: some View {
         VStack(spacing: 0) {
@@ -108,7 +109,11 @@ struct CoachView: View {
                 Menu {
                     Toggle("Web search", isOn: Binding(get: { model.active?.webEnabled == true }, set: { model.setWeb($0) })).disabled(!WebToggle.changes(waiting: model.busy))
                     Text("Availability depends on your ChatGPT account and selected model.")
-                } label: { Image(systemName: "globe").frame(width: 24, height: 24) }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Web search availability").accessibilityLabel("Web search options")
+                } label: {
+                    Label(webEnabled ? "Web on" : "Web off", systemImage: "globe").foregroundStyle(webEnabled ? Theme.accent : Theme.muted)
+                }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                    .help(webEnabled ? "Web search is enabled for this chat. Availability depends on your account and model." : "Web search is off for this chat.")
+                    .accessibilityLabel("Web search").accessibilityValue(webEnabled ? "On" : "Off")
                 Spacer(minLength: 8)
                 if model.voice.speaking { IconButton(symbol: "stop.fill", label: "Stop playback", tint: Theme.accent) { model.stopResponse() } }
                 IconButton(symbol: model.voice.listening ? "mic.fill" : "mic", label: model.voice.listening ? "Finish speaking" : "Talk", tint: model.voice.listening ? Theme.accent : Theme.muted) { model.toggleVoice() }.disabled(model.paused)

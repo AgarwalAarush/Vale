@@ -63,7 +63,6 @@ private struct ActionFeedback<Label: View>: View {
                 shape.fill(background)
                     .overlay(shape.fill(feedback.opacity(isEnabled ? (isPressed ? 0.12 : hovered ? 0.06 : 0) : 0)))
             }
-            .clipShape(shape)
             .overlay(shape.strokeBorder(isEnabled && isFocused ? Theme.accent : outlined ? Theme.line : .clear, lineWidth: isEnabled && isFocused ? 1 : 0.7))
             .opacity(isEnabled ? 1 : 0.45)
             .onHover { hovered = $0 }

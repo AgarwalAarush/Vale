@@ -58,6 +58,14 @@ extension AppController {
         editor.setSelectedRange(NSRange(location: 3, length: 5))
         let selection = editor.selectedRange()
         try await capture("workspace-02-conversation-light")
+        // Synthetic playback/listening only; capture active control contrast without audio hardware.
+        model.setConversation(true)
+        if let answer = model.active?.messages.last?.text { model.voice.speak(answer) }
+        try await capture("workspace-02b-audio-active-light")
+        workspace.appearance = NSAppearance(named: .darkAqua)
+        try await capture("workspace-02c-audio-active-dark")
+        model.setConversation(false); model.voice.stop()
+        workspace.appearance = NSAppearance(named: .aqua)
 
         model.openSettings(); await settle()
         let observesCoveredEditor = !editor.observedFocus && workspace.firstResponder !== editor
@@ -88,6 +96,19 @@ extension AppController {
         model.historyQuery = "HARBOR-73"
         try await capture("workspace-07-search-light")
         model.historyQuery = ""; model.compactHistoryVisible = false
+        model.backToChat(); model.setWeb(true); model.persist()
+        try await capture("workspace-07b-web-on-light")
+        workspace.appearance = NSAppearance(named: .darkAqua)
+        try await capture("workspace-07c-web-on-dark")
+        workspace.appearance = NSAppearance(named: .aqua)
+        model.newSession(title: "Generated Web-off chat")
+        let freshWebOff = model.active?.webEnabled == false
+        try await capture("workspace-07d-web-off-light")
+        if let originalID { model.navigateToChat(originalID) }
+        await settle()
+        let savedWebChat = try SessionStore(directory: output.appendingPathComponent("test-library")).load().first { $0.id == originalID }
+        results["workspaceSavedWebOptInFollowsResumedChat"] = freshWebOff && model.activeID == originalID && model.active?.webEnabled == true && savedWebChat?.webEnabled == true && model.draft == savedDraft && model.pendingFiles.map(\.id) == pendingIDs
+        model.setWeb(false)
 
         // A real NSTextView marked composition must be committed into the old draft before New chat.
         model.backToChat(); await settle()
