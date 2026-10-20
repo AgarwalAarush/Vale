@@ -6,7 +6,9 @@ struct CoachView: View {
     var chatVisible = true
     @State private var composerHeight: CGFloat = 61
     @State private var composerFocused = false
+    @State private var welcomeContentHeight: CGFloat = 150
     private var sendReady: Bool { model.hasInput && PausedTyping.allowsQuestion(paused: model.paused) && model.active != nil && !model.importing }
+    private var centersWelcome: Bool { model.active?.messages.isEmpty == true && model.active?.guide == nil && !model.busy }
     var body: some View {
         VStack(spacing: 0) {
             if let warning = ShortcutNotice.text(model.shortcutWarning) { notice(warning) }
@@ -14,9 +16,10 @@ struct CoachView: View {
                 Text("Using recent messages. Full history stays saved here.").font(.system(size: 12)).foregroundStyle(Theme.muted).padding(.top, 12)
             }
             if let guide = model.active?.guide { GuideCard(model: model, guide: guide).frame(maxWidth: 740) }
+            Spacer(minLength: 0).frame(maxHeight: centersWelcome ? .infinity : 0).layoutPriority(-1)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: centersWelcome ? 0 : 28) {
                         if let session = model.active {
                             if session.messages.isEmpty { EmptyGreeting(model: model, session: session) }
                             ForEach(session.messages) { message in CoachMessage(model: model, session: session, message: message).id(message.id) }
@@ -29,13 +32,21 @@ struct CoachView: View {
                         }
                         if model.busy { HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking…").font(.system(size: 13)).foregroundStyle(Theme.muted) }.id("thinking") }
                         Color.clear.frame(height: 1).id("bottom")
-                    }.padding(.horizontal, 32).padding(.top, 28).padding(.bottom, 24).frame(maxWidth: 740, alignment: .leading).frame(maxWidth: .infinity)
+                    }.padding(.horizontal, 32).padding(.top, centersWelcome ? 0 : 28).padding(.bottom, 24).frame(maxWidth: 740, alignment: .leading).frame(maxWidth: .infinity)
+                        .background {
+                            GeometryReader { geometry in
+                                Color.clear.preference(key: WelcomeContentHeight.self, value: centersWelcome ? geometry.size.height : 0)
+                            }
+                        }
                 }
                 .clipped()
                 .onChange(of: model.active?.messages.count) { revealLatest(proxy) }
                 .onChange(of: model.busy) { revealLatest(proxy) }
                 .onChange(of: model.activeID) { revealLatest(proxy) }
-            }.frame(minHeight: 0, maxHeight: .infinity)
+            }.frame(minHeight: 0, maxHeight: centersWelcome ? welcomeContentHeight : .infinity)
+                .onPreferenceChange(WelcomeContentHeight.self) { height in
+                    if centersWelcome, height > 0, abs(welcomeContentHeight - height) > 0.5 { welcomeContentHeight = height }
+                }
             VStack(spacing: 12) {
                 if let error = model.error {
                     VStack(alignment: .leading, spacing: 8) {
@@ -66,6 +77,7 @@ struct CoachView: View {
                     }.padding(.horizontal, 2)
                 }
             }.fixedSize(horizontal: false, vertical: true).layoutPriority(1).padding(.horizontal, 32).padding(.bottom, 22).frame(maxWidth: 740).frame(maxWidth: .infinity)
+            Spacer(minLength: 0).frame(maxHeight: centersWelcome ? .infinity : 0).layoutPriority(-1)
         }.background(Theme.background)
         .dropDestination(for: URL.self) { urls, _ in
             model.keepDroppedLinks(urls)
@@ -109,6 +121,11 @@ struct CoachView: View {
         else if let id = latest?.id { proxy.scrollTo(id, anchor: opensAtStart ? .top : .bottom) }
         else { proxy.scrollTo("bottom", anchor: .bottom) }
     }
+}
+
+private struct WelcomeContentHeight: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 private struct CoachMessage: View {
@@ -248,7 +265,7 @@ struct EmptyGreeting: View {
             Text(session.mode == .learn ? "What are we working through?" : "How can I help?").font(.system(size: 30, weight: .regular)).tracking(-0.6)
             Text(session.mode == .learn ? "Take it one step at a time, with a little guidance." : "Think something through, make sense of a file, or start with a question.").font(.system(size: 15)).foregroundStyle(Theme.muted).lineSpacing(4)
             if CodexNotice.shows(executableKnown: model.provider.executable != nil, lookupFinished: model.provider.lookupFinished) { CodexSignInCard(model: model).padding(.top, 8) }
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 32)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 16)
     }
 }
 

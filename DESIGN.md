@@ -12,11 +12,20 @@ Design read: a personal native assistant for recurring chat, document and learni
 - [Superhuman](https://styles.refero.design/style/418b374a-be64-44f0-b17e-1d45308c7e62): disciplined action hierarchy and comfortable text. Exclude marketing photography.
 - [Dala](https://styles.refero.design/style/e5f5f8cf-e68d-4ed1-bbf5-6b67569af648): clarity and negative space inform the dark counterpart. Exclude particles and theatrical display scale.
 
+The owner's subsequent native-UI direction sharpens that baseline:
+
+- [Vercel](https://styles.refero.design/style/f24daf3a-d43f-4dec-85a9-8ac1d5148a03): achromatic precision, hairlines and compact controls translate into clear native action states and disciplined chrome.
+- [Cursor](https://styles.refero.design/style/4e3b4717-84c8-4599-baaf-a343c3d619b6): warm flat paper, light headings and restrained shapes inform the quiet writing surface.
+- [Linear](https://styles.refero.design/style/90ce5883-bb24-4466-93f7-801cd617b0d1): dark tonal levels and sharp action hierarchy guide the existing dark counterpart.
+- [Apple](https://styles.refero.design/style/a73148b9-449b-42cd-9f38-86ef694f500e): SF type, useful whitespace and product clarity keep controls familiar and writing primary.
+
+Retain DESIGN_VARIANCE5, MOTION_INTENSITY2 and VISUAL_DENSITY5 as native Operate values: a distinct composition, quiet immediate feedback, and readable working density. These references guide hierarchy and spacing within the existing SF typography, semantic palette and native controls; marketing display fonts, giant headings, promotional cards and decorative metadata do not enter the workspace.
+
 ## First viewport and layout
 
 Default1040×740, minimum740×560, verified at compact/default/wide sizes. One standard NSWindow, normal traffic lights, native resize/minimize/fullscreen and remembered frame. Collapsible history rail (~224points), compact toolbar, readable conversation (~680point max measure), bottom composer. Below~860points the rail yields to the current task. File/notes/context details live in an in-window inspector; at narrow widths a detail route replaces the reading region with a clear Back action. Settings is an in-window route, never a detached preferences app.
 
-First launch: one brief invitation, actual editable composer, useful Attach/Share/Talk actions. No extra status capsule, giant empty slab, duplicated branding, decorative prompt cards or permanently visible configuration badges. Populated conversation prioritizes the answer; readable author distinctions and code/links/attachments remain literal.
+First launch: one brief invitation and the actual editable composer form a balanced central writing area, with useful Attach/Share/Talk actions. The same mounted native editor moves to the bottom when messages arrive. Only the empty transcript's natural content height is measured; flexible outer space collapses first at compact heights or as contextual controls grow, leaving the welcome scrollable and composer bounded. No extra status capsule, giant empty slab, duplicated branding, decorative prompt cards or permanently visible configuration badges. Populated conversation prioritizes the answer; readable author distinctions and code/links/attachments remain literal.
 
 ## Tokens
 

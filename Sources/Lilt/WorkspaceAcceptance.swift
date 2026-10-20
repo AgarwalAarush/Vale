@@ -32,6 +32,7 @@ extension AppController {
         openWorkspace()
         try await capture("workspace-01-empty-light")
         results["workspaceOneWindowAtLaunch"] = oneWorkspace()
+        let emptyEditor = workspace.contentView.flatMap { composer(in: $0) }
 
         let fixtureFiles = [output.appendingPathComponent("fixtures/A.png"), output.appendingPathComponent("fixtures/Brief.pdf")]
         await model.importFiles(fixtureFiles)
@@ -52,6 +53,7 @@ extension AppController {
             return
         }
         results["workspaceComposerMounted"] = editor.window === workspace
+        results["workspaceEmptyToConversationKeepsMountedEditor"] = emptyEditor === editor
         let observesFocusedEditor = editor.observedFocus && workspace.firstResponder === editor
         editor.setSelectedRange(NSRange(location: 3, length: 5))
         let selection = editor.selectedRange()
