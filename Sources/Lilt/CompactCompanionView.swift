@@ -35,7 +35,7 @@ struct CompactCompanionView: View {
     }
     private func panel(availableHeight: CGFloat) -> some View {
         VStack(spacing: 0) {
-            header.frame(height: expanded ? 43 : 0).clipped().accessibilityHidden(!expanded)
+            header.frame(height: expanded ? 43 : 0).clipped().allowsHitTesting(expanded).accessibilityHidden(!expanded)
             ScrollView {
                 VStack(spacing: 0) {
                     if expanded {
@@ -65,7 +65,7 @@ struct CompactCompanionView: View {
                 }.frame(maxWidth: .infinity)
             }.scrollIndicators(.automatic)
                 .frame(maxHeight: expanded ? .infinity : 0)
-                .accessibilityHidden(!expanded)
+                .allowsHitTesting(expanded).accessibilityHidden(!expanded)
             composer.fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -122,7 +122,7 @@ struct CompactCompanionView: View {
                         CompactCompanionMessage(model: model, message: message).id(message.id)
                     }
                     if model.busy {
-                        HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 3)
+                        HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking…").font(.system(size: 12)).foregroundStyle(Theme.muted) }.padding(.vertical, 3).id("vale.companion.thinking")
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                     .background(GeometryReader { geometry in Color.clear.preference(key: CompanionReplyHeightKey.self, value: geometry.size.height) })
@@ -133,8 +133,21 @@ struct CompactCompanionView: View {
                     DispatchQueue.main.async { model.companionReplyHeight = height }
                 }
                 .onChange(of: model.active?.messages.last?.id) { _, id in
-                    guard model.companionShowsEarlierMessages, let id else { return }
-                    proxy.scrollTo(id, anchor: .top)
+                    guard let id else { return }
+                    // Wait for the new row to enter the native scroll layout.
+                    DispatchQueue.main.async {
+                        guard model.active?.messages.last?.id == id else { return }
+                        if model.busy && !model.companionShowsEarlierMessages {
+                            proxy.scrollTo("vale.companion.thinking", anchor: .bottom)
+                        } else { proxy.scrollTo(id, anchor: .top) }
+                    }
+                }
+                .onChange(of: model.busy) { _, busy in
+                    guard busy, !model.companionShowsEarlierMessages else { return }
+                    DispatchQueue.main.async {
+                        guard model.busy else { return }
+                        proxy.scrollTo("vale.companion.thinking", anchor: .bottom)
+                    }
                 }
         }
     }
@@ -146,7 +159,7 @@ struct CompactCompanionView: View {
             HStack(alignment: .center, spacing: inlineReply ? 5 : expanded ? 0 : 7) {
                 Button { model.expandCompanion() } label: { LogoMark(size: 19).frame(width: 24, height: 26) }
                     .buttonStyle(ActionButton()).help("Expand Vale").accessibilityLabel("Expand Vale")
-                    .frame(width: expanded ? 0 : 24).opacity(expanded ? 0 : 1).clipped().accessibilityHidden(expanded)
+                    .frame(width: expanded ? 0 : 24).opacity(expanded ? 0 : 1).clipped().allowsHitTesting(!expanded).accessibilityHidden(expanded)
                 attachmentMenu.frame(width: inlineReply ? 32 : 0).opacity(inlineReply ? 1 : 0).clipped()
                     .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
                 micButton.frame(width: inlineReply ? 32 : 0).opacity(inlineReply ? 1 : 0).clipped()
@@ -158,6 +171,9 @@ struct CompactCompanionView: View {
                     }, cancel: { if let escape = model.requestCompanionEscape { escape() } else { model.stopInteraction() } }, pasteFiles: { model.expandCompanion(); model.importDroppedFiles($0) }, pasteImage: { model.expandCompanion(); model.pasteImage($0) }, pastePDF: { model.expandCompanion(); model.pastePDF($0) }, installCommit: { model.commitComposer = $0 }, onMeasuredHeight: { height in
                         guard chatVisible, model.chatSurfaceVisible else { return }
                         let value = min(110, max(26, height)); if abs(model.companionInputHeight - value) > 1 { model.companionInputHeight = value }
+                    }, onPointerInteraction: {
+                        guard chatVisible, model.chatSurfaceVisible, model.activeID == draftID else { return }
+                        model.companionExpanded = true
                     })
                     .id("vale.continuous.composer")
                     .allowsHitTesting(model.active != nil).accessibilityHidden(model.active == nil)
@@ -171,8 +187,8 @@ struct CompactCompanionView: View {
                     .padding(.horizontal, inlineReply ? 7 : 0)
                     .background(inlineReply ? Theme.fillRaised.opacity(0.3) : .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                micButton.frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().accessibilityHidden(expanded)
-                CompactOverflowMenu(model: model).frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().accessibilityHidden(expanded)
+                micButton.frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().allowsHitTesting(!expanded).accessibilityHidden(expanded)
+                CompactOverflowMenu(model: model).frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().allowsHitTesting(!expanded).accessibilityHidden(expanded)
                 submitButton.frame(width: inlineReply ? 34 : 0).opacity(inlineReply ? 1 : 0).clipped()
                     .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
             }

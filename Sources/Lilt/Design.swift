@@ -99,6 +99,7 @@ final class ComposerTextView: NSTextView {
     var pasteImage: ((Data) -> Void)?
     var pastePDF: ((Data) -> Void)?
     var focusChanged: ((Bool) -> Void)?
+    var pointerInteracted: (() -> Void)?
     var permitsInteraction: () -> Bool = { true }
     var commitToDraft: (() -> Void)?
     private(set) var observedFocus = false
@@ -143,6 +144,13 @@ final class ComposerTextView: NSTextView {
             self.observedFocus = focused
             self.focusChanged?(focused)
         }
+    }
+    override func mouseDown(with event: NSEvent) {
+        guard permitsInteraction() else { resignIfCovered(); return }
+        // Let AppKit finish selection/tracking before the panel changes shape.
+        super.mouseDown(with: event)
+        guard permitsInteraction() else { return }
+        pointerInteracted?()
     }
     override func paste(_ sender: Any?) {
         guard permitsInteraction() else { resignIfCovered(); return }
@@ -230,6 +238,7 @@ struct DraftEditor: NSViewRepresentable {
     var installCommit: (@escaping () -> Void) -> Void = { _ in }
     var onMeasuredHeight: ((CGFloat) -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
+    var onPointerInteraction: (() -> Void)? = nil
     static func measuredHeight(_ editor: NSTextView) -> CGFloat {
         guard let layout = editor.layoutManager, let container = editor.textContainer else { return CGFloat(ComposerHeight.minimum) }
         layout.ensureLayout(for: container)
@@ -311,6 +320,12 @@ struct DraftEditor: NSViewRepresentable {
         }
     }
     private func configureInteraction(_ editor: ComposerTextView, coordinator: Coordinator) {
+        editor.pointerInteracted = { [weak editor, weak coordinator] in
+            guard let editor, let coordinator, coordinator.editor === editor,
+                  coordinator.draftID == coordinator.parent.draftID, coordinator.parent.ownsDraft(),
+                  editor.permitsInteraction() else { return }
+            coordinator.parent.onPointerInteraction?()
+        }
         editor.permitsInteraction = { [weak editor, weak coordinator] in
             guard let editor, let coordinator, let window = editor.window else { return false }
             return coordinator.draftID == coordinator.parent.draftID && coordinator.parent.ownsDraft() && coordinator.parent.permitsFocus(window)

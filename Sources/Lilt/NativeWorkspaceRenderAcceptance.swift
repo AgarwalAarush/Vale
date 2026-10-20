@@ -74,6 +74,8 @@ extension AppController {
         case "vale.companion.back": point = NSPoint(x: 60, y: window.frame.height - 24)
         case "vale.companion.collapse": point = NSPoint(x: window.frame.width - 26, y: window.frame.height - 21.5)
         case "vale.companion.expand": point = NSPoint(x: 23, y: 22.5)
+        case "vale.companion.ready-input-top": point = NSPoint(x: 110, y: 34)
+        case "vale.companion.ready-input-center": point = NSPoint(x: 110, y: 22.5)
         case "vale.companion.stop-response": point = NSPoint(x: window.frame.width - 33, y: 29.5)
         default: return false
         }
@@ -136,6 +138,15 @@ extension AppController {
         panel.summon(on: panel.screen); panel.summon(on: panel.screen)
         results["companionRepeatedSummonKeepsWindowAndIdleState"] = panel.windowNumber == identity && !model.companionExpanded && model.draft.isEmpty && !model.voice.listening && !model.context.hasSelection
         panel.appearance = NSAppearance(named: .aqua)
+        let readyChat = model.activeID
+        var readyClicks: [Bool] = []
+        for location in ["top", "center"] {
+            let clicked = pressCompanionControl(in: panel, identifier: "vale.companion.ready-input-" + location)
+            await settle(); applyHarnessCompanionLayout(panel)
+            readyClicks.append(clicked && model.companionExpanded && model.chatSurfaceVisible && model.activeID == readyChat && model.draft.isEmpty && panel.firstResponder === input && panel.contentView.flatMap({ editor(in: $0) }) === input && !model.voice.listening && !model.busy && !model.context.hasSelection)
+            model.collapseCompanion(); await settle(); applyHarnessCompanionLayout(panel)
+        }
+        results["companionReadyPointerClicksExpandSameEditorWithoutHiddenHeaderAction"] = readyClicks.count == 2 && readyClicks.allSatisfy { $0 }
         panel.makeFirstResponder(input)
         input.insertText("Why is kinetic energy squared?", replacementRange: NSRange(location: NSNotFound, length: 0))
         await settle(); applyHarnessCompanionLayout(panel)
@@ -149,6 +160,26 @@ extension AppController {
         let expanded = pressCompanionControl(in: panel, identifier: "vale.companion.expand", label: "Expand Vale")
         await settle(); applyHarnessCompanionLayout(panel)
         results["companionNativeCollapseExpandPreservesDraftSelectionAndEditor"] = collapsedPreserved && expanded && model.companionExpanded && model.draft == draft && input.selectedRange() == selection && panel.contentView.flatMap({ editor(in: $0) }) === input
+        // A long user question must not bury progress or the arriving answer.
+        let longQuestion = (1...45).map { "Generated question paragraph \($0): explain the relationship between speed, work and kinetic energy while I read this textbook." }.joined(separator: "\n\n")
+        model.draft = ""; model.updateActive { $0.messages = [Message(role: "user", text: longQuestion)] }
+        model.busy = true
+        try await capture("companion-long-question-thinking-light")
+        func replyTailVisible(_ phase: String) -> Bool {
+            let candidates = companionScrollViews(in: panel.contentView).filter {
+                $0 !== input.enclosingScrollView && ($0.documentView?.bounds.height ?? 0) > $0.contentView.bounds.height + 100 && $0.contentView.bounds.height > 45
+            }
+            guard let scroll = candidates.max(by: { ($0.documentView?.bounds.height ?? 0) < ($1.documentView?.bounds.height ?? 0) }), let document = scroll.documentView else { return false }
+            let visible = scroll.documentVisibleRect
+            let tail = document.isFlipped ? document.bounds.maxY - visible.maxY : visible.minY - document.bounds.minY
+            CompanionControlProbeTrace.events.append(["phase": phase, "method": "native-reply-scroll-viewport", "documentHeight": document.bounds.height, "viewportY": visible.minY, "viewportHeight": visible.height, "distanceFromTail": tail, "physicalInputVerified": false])
+            return tail <= 4 && visible.height > 45 && document.bounds.height > visible.height + 100
+        }
+        results["companionLongQuestionRevealsThinkingInNativeViewport"] = model.busy && !model.companionShowsEarlierMessages && replyTailVisible("long-question-thinking")
+        model.busy = false
+        model.updateActive { $0.messages.append(Message(role: "assistant", text: "Generated arriving answer: doubling speed requires four times the work. Kinetic energy grows with v².")) }
+        try await capture("companion-long-question-arriving-answer-light")
+        results["companionLongQuestionRevealsArrivingAnswerInNativeViewport"] = !model.busy && !model.companionShowsEarlierMessages && replyTailVisible("long-question-answer")
         model.updateActive { $0.messages = [Message(role: "user", text: "Why is kinetic energy squared?"), Message(role: "assistant", text: "Doubling speed takes four times the work. That is why kinetic energy grows with v².\n\nEₖ = ½mv²")] }
         model.draft = ""
         try await capture("companion-answer-short-light")
