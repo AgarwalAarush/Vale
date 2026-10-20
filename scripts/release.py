@@ -57,6 +57,16 @@ def write_json(path, value):
     path.chmod(0o600)
 
 
+def write_prepared_file(path, content, frozen_binding):
+    if frozen_binding is not None:
+        expected = {'sha256': hashlib.sha256(content).hexdigest(), 'bytes': len(content)}
+        if frozen_binding['files'].get(path.name) != expected or regular(path).read_bytes() != content:
+            fail('Release preparation differs from its frozen file; no frozen bytes were rewritten.')
+        return
+    path.write_bytes(content)
+    path.chmod(0o600)
+
+
 def regular(path):
     if path.is_symlink() or not path.is_file():
         fail('Expected a regular, non-symlink release file.')
@@ -643,16 +653,24 @@ def main():
     output = work / 'assets'
     output.mkdir(exist_ok=True, mode=0o700)
     binding_path = work / 'release-binding.json'
+    frozen_binding = None
     if binding_path.exists():
-        binding = json.loads(binding_path.read_text())
-        if binding['toolingCommit'] != head:
+        frozen_binding = json.loads(regular(binding_path).read_text())
+        if frozen_binding['toolingCommit'] != head:
             fail('Existing release preparation belongs to another tooling revision.')
+        for name, expected in frozen_binding['files'].items():
+            if Path(name).name != name:
+                fail('Invalid frozen asset name.')
+            file = regular(output / name)
+            if sha(file) != expected['sha256'] or file.stat().st_size != expected['bytes']:
+                fail('An existing frozen asset changed; no preparation files were rewritten.')
     notes = args.notes_file.read_text() if args.notes_file else f'Vale {args.version}: compact native companion update.'
     policy().scan_bytes('release-notes.md', notes.encode())
     notes_file = work / 'release-notes.md'
     if notes_file.exists() and notes_file.read_text() != notes:
         fail('Release notes changed during an existing preparation.')
-    notes_file.write_text(notes)
+    if not notes_file.exists():
+        notes_file.write_text(notes)
     if args.prepared_assets:
         manifest, info, source, assets = prepared_assets(args.prepared_assets.absolute(), args.version, output, head)
     else:
@@ -706,17 +724,19 @@ def main():
         'releaseReady': manifest.get('releaseReady') is True,
         'supersedesPreparationDeliveryStatus': True,
         'boundary': 'Automatic update delivery acceptance is separate from product/provider/hardware acceptance. Original preparation-time manifests and setup README remain unchanged; this receipt and current release notes supersede their unpublished/preview-channel delivery status only.'}
-    write_json(receipt, receipt_value)
+    write_prepared_file(receipt, (json.dumps(receipt_value, indent=2, sort_keys=True) + '\n').encode(), frozen_binding)
     assets += [appcast, receipt]
+    assets.sort(key=lambda path: path.name)
     sums = output / f'Vale-{args.version}-update-SHA256SUMS.txt'
-    sums.write_text(''.join(f'{sha(p)}  {p.name}\n' for p in assets))
+    write_prepared_file(sums, ''.join(f'{sha(p)}  {p.name}\n' for p in assets).encode(), frozen_binding)
     assets.append(sums)
     binding = {'version': args.version, 'toolingCommit': head, 'sourceCommit': source,
         'previousAppcastSHA256': sha(old_feed), 'notesSHA256': sha(notes_file),
         'files': {p.name: {'sha256': sha(p), 'bytes': p.stat().st_size} for p in assets}}
-    if binding_path.exists() and json.loads(binding_path.read_text()) != binding:
+    if frozen_binding is not None and frozen_binding != binding:
         fail('Release preparation changed from its frozen binding.')
-    write_json(binding_path, binding)
+    if frozen_binding is None:
+        write_json(binding_path, binding)
     if args.publish:
         # A normal Git push rejects non-fast-forward changes; never force-push or alter main implicitly.
         if publication_branch() != branch:

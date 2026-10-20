@@ -136,7 +136,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(items[0].findtext('description'), '<b>plain text</b>')
             self.assertEqual(items[0].find('enclosure').get('url'), f'https://github.com/{release.REPO}/releases/download/v1.3.3/{archive.name}')
 
-    def test_fresh_prepare_orchestrates_signing_and_compares_unmodified_prior_feed(self):
+    def preparation_case(self, *, resume=False):
         """Exercise main's fresh-feed branch; only external Git/signature/prepared-app boundaries are fixtures."""
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary)
@@ -176,13 +176,16 @@ class ReleaseTests(unittest.TestCase):
                 self.fail('Fresh preparation reached an unexpected external action: ' + repr(args))
 
             def fixture_prepared(folder, version, output, tooling_head):
-                self.assertEqual(folder, original)
+                self.assertIn(folder, (original, output))
                 self.assertEqual(tooling_head, head)
                 assets = []
                 for suffix in ('macOS-universal.zip', 'source-and-evidence.zip', 'laptop-setup.zip', 'laptop-setup.dmg', 'release-manifest.json', 'SHA256SUMS.txt'):
                     path = output / f'Vale-{version}-{suffix}'
-                    path.write_bytes(('generated immutable ' + suffix).encode())
+                    if not path.exists():
+                        path.write_bytes(('generated immutable ' + suffix).encode())
                     assets.append(path)
+                if folder == output:
+                    assets.sort(key=lambda path: path.name)
                 return ({'signature': {'kind': 'ad-hoc'}, 'releaseReady': False, 'genuineChatGPTVerified': False},
                         {'CFBundleVersion': '10', 'CFBundleShortVersionString': version, 'LSMinimumSystemVersion': '14.0',
                          'SUFeedURL': release.FEED, 'SURequireSignedFeed': True, 'SUPublicEDKey': public}, source, assets)
@@ -191,14 +194,29 @@ class ReleaseTests(unittest.TestCase):
                 self.assertEqual(url, release.FEED)
                 target.write_bytes(old_feed)
 
-            with patch.object(sys, 'argv', ['release.py', '1.3.3', '--prepare-only', '--prepared-assets', str(original)]), \
+            arguments = ['release.py', '1.3.3', '--prepare-only'] + ([] if resume else ['--prepared-assets', str(original)])
+            with patch.object(sys, 'argv', arguments), \
                     patch.dict(os.environ, {'VALE_SPARKLE_TOOLS_DIR': str(tools)}), \
                     patch.object(release, 'key_path', return_value=seed), \
                     patch.object(release, 'run', side_effect=fixture_run), \
-                    patch.object(release, 'prepared_assets', side_effect=fixture_prepared), \
+                    patch.object(release, 'prepared_assets', side_effect=fixture_prepared) as prepared, \
+                    patch.object(release, 'build_assets', side_effect=lambda version, output: fixture_prepared(original, version, output, head)) as build, \
                     patch.object(release, 'download', side_effect=fixture_download), \
                     patch.object(release, 'verifier') as verify, contextlib.redirect_stdout(io.StringIO()) as stdout:
                 release.main()
+                if resume:
+                    work = common / 'codex-factory/releases/v1.3.3'
+                    def snapshot():
+                        return {str(path.relative_to(work)): (path.read_bytes(), path.stat().st_mtime_ns)
+                                for path in work.rglob('*') if path.is_file()}
+                    frozen = snapshot()
+                    stdout.seek(0)
+                    stdout.truncate(0)
+                    with patch.object(sys, 'argv', ['release.py', '1.3.3', '--prepare-only']):
+                        release.main()
+                    self.assertEqual(snapshot(), frozen)
+                    self.assertEqual(build.call_count, 1)
+                    self.assertEqual(prepared.call_count, 1)
             work = common / 'codex-factory/releases/v1.3.3'
             result = json.loads(stdout.getvalue())
             self.assertTrue(result['prepared'])
@@ -215,8 +233,24 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(len(signing), 2)
             self.assertIn('-p', signing[0])
             self.assertTrue(signing[1][-1].endswith('/assets/appcast.xml'))
-            self.assertEqual(verify.call_count, 4)
+            self.assertEqual(verify.call_count, 8 if resume else 4)
             self.assertFalse((work / 'publication.json').exists())
+
+    def test_fresh_prepare_orchestrates_signing_and_compares_unmodified_prior_feed(self):
+        self.preparation_case()
+
+    def test_fresh_build_prepare_then_resume_preserves_frozen_bytes_and_mtimes(self):
+        self.preparation_case(resume=True)
+
+    def test_changed_generated_checksum_cannot_overwrite_frozen_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'generated-checksums.txt'
+            path.write_bytes(b'original frozen checksum order\n')
+            original = path.read_bytes(), path.stat().st_mtime_ns
+            binding = {'files': {path.name: {'sha256': release.sha(path), 'bytes': path.stat().st_size}}}
+            with self.assertRaises(SystemExit):
+                release.write_prepared_file(path, b'different order\n', binding)
+            self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), original)
 
     def native_clone_case(self, *, instruction_tamper=False):
         with tempfile.TemporaryDirectory() as temporary:
