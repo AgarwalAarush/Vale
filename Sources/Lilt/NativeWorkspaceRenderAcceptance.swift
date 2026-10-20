@@ -1,6 +1,27 @@
 import AppKit
 import LiltCore
 
+/// SwiftUI virtual accessibility nodes can implement the public selectors
+/// without declaring the full NSAccessibilityProtocol conformance. Optional
+/// Objective-C dispatch preserves those nodes instead of pruning their tree.
+struct CompanionAccessibilityElement {
+    let object: NSObject
+    func accessibilityIdentifier() -> String? { (object as AnyObject).accessibilityIdentifier?() ?? nil }
+    func accessibilityChildren() -> [Any] { (object as AnyObject).accessibilityChildren?() ?? [] }
+    func accessibilityLabel() -> String? { (object as AnyObject).accessibilityLabel?() ?? nil }
+    func accessibilityValue() -> Any? { (object as AnyObject).accessibilityValue?() ?? nil }
+    func accessibilityHelp() -> String? { (object as AnyObject).accessibilityHelp?() ?? nil }
+    func accessibilityFrame() -> NSRect { (object as AnyObject).accessibilityFrame?() ?? .zero }
+    func accessibilityRole() -> NSAccessibility.Role? { (object as AnyObject).accessibilityRole?() ?? nil }
+    func isAccessibilityEnabled() -> Bool { (object as AnyObject).isAccessibilityEnabled?() ?? false }
+    func isAccessibilityHidden() -> Bool { (object as AnyObject).isAccessibilityHidden?() ?? false }
+    func accessibilityPerformPress() -> Bool { (object as AnyObject).accessibilityPerformPress?() ?? false }
+}
+
+@MainActor enum CompanionControlProbeTrace {
+    static var events: [[String: Any]] = []
+}
+
 extension AppController {
     /// Drive the real production presentation; never substitute the rejected workspace sizes.
     func applyHarnessCompanionLayout(_ window: NSWindow) {
@@ -8,33 +29,67 @@ extension AppController {
         window.contentView?.layoutSubtreeIfNeeded()
     }
 
-    func companionAccessibilityElements(in window: NSWindow) -> [any NSAccessibilityProtocol] {
+    func companionAccessibilityElements(in window: NSWindow) -> [CompanionAccessibilityElement] {
         var seen = Set<ObjectIdentifier>()
-        var elements: [any NSAccessibilityProtocol] = []
-        func visit(_ object: Any) {
-            guard let element = object as? any NSAccessibilityProtocol else { return }
+        var elements: [CompanionAccessibilityElement] = []
+        func visit(_ value: Any) {
+            guard let object = value as? NSObject else { return }
+            let element = CompanionAccessibilityElement(object: object)
             guard !element.isAccessibilityHidden() else { return }
-            if let view = element as? NSView, view.isHiddenOrHasHiddenAncestor { return }
-            let identity = ObjectIdentifier(element as AnyObject)
+            if let view = object as? NSView, view.isHiddenOrHasHiddenAncestor { return }
+            let identity = ObjectIdentifier(object)
             guard seen.insert(identity).inserted else { return }
             elements.append(element)
-            for child in element.accessibilityChildren() ?? [] { visit(child) }
-            if let view = element as? NSView { for child in view.subviews { visit(child) } }
+            for child in element.accessibilityChildren() { visit(child) }
+            if let view = object as? NSView { for child in view.subviews { visit(child) } }
         }
         if let content = window.contentView { visit(content) }
         return elements
     }
 
-    func companionElement(in window: NSWindow, identifier: String, label: String? = nil) -> (any NSAccessibilityProtocol)? {
+    func companionElement(in window: NSWindow, identifier: String, label: String? = nil) -> CompanionAccessibilityElement? {
         let elements = companionAccessibilityElements(in: window)
         return elements.first { $0.accessibilityIdentifier() == identifier } ?? label.flatMap { label in
             elements.first { $0.accessibilityLabel() == label }
         }
     }
 
-    /// This is a native accessibility action, not a physical pointer/VoiceOver claim.
+    /// Prefer an exposed public AX action. SwiftUI's in-process AX tree may be
+    /// unavailable; then dispatch real mouse events only into a known generated
+    /// companion's own control region. Callers verify the resulting state/focus.
     @discardableResult func pressCompanionControl(in window: NSWindow, identifier: String, label: String? = nil) -> Bool {
-        companionElement(in: window, identifier: identifier, label: label)?.accessibilityPerformPress() == true
+        let matches = companionAccessibilityElements(in: window).filter {
+            $0.accessibilityIdentifier() == identifier || (label != nil && $0.accessibilityLabel() == label)
+        }
+        let ordered = matches.filter { $0.accessibilityRole() == .button } + matches.filter { $0.accessibilityRole() != .button }
+        for element in ordered where element.accessibilityPerformPress() {
+            CompanionControlProbeTrace.events.append(["identifier": identifier, "method": "public-native-accessibility-press", "windowNumber": window.windowNumber])
+            return true
+        }
+        guard (CommandLine.arguments.contains("--self-test") || CommandLine.arguments.contains("--integration-test")),
+              window is NativeWorkspaceWindow, window.identifier?.rawValue == "vale.workspace",
+              window.isVisible, let content = window.contentView as? NativeCompanionMaterial else { return false }
+        let point: NSPoint
+        switch identifier {
+        case "vale.companion.back": point = NSPoint(x: 60, y: window.frame.height - 24)
+        case "vale.companion.collapse": point = NSPoint(x: window.frame.width - 26, y: window.frame.height - 21.5)
+        case "vale.companion.expand": point = NSPoint(x: 23, y: 22.5)
+        case "vale.companion.stop-response": point = NSPoint(x: window.frame.width - 33, y: 29.5)
+        default: return false
+        }
+        guard NSRect(origin: .zero, size: window.frame.size).contains(point),
+              let hit = content.hitTest(content.convert(point, from: nil)) else { return false }
+        let time = ProcessInfo.processInfo.systemUptime
+        guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: time,
+                windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1),
+              let up = NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [], timestamp: time + 0.01,
+                windowNumber: window.windowNumber, context: nil, eventNumber: 2, clickCount: 1, pressure: 0) else { return false }
+        CompanionControlProbeTrace.events.append(["identifier": identifier, "method": "software-injected-native-mouse-events", "windowNumber": window.windowNumber,
+            "xInWindow": point.x, "yInWindow": point.y, "hitViewClass": String(describing: type(of: hit)), "accessibilityPressAvailable": false, "physicalInputVerified": false])
+        // A native control may run a synchronous tracking loop during mouseDown.
+        NSApp.postEvent(up, atStart: true)
+        window.sendEvent(down)
+        return true
     }
 
     func companionShowsImportStatus(in window: NSWindow, expected: String) -> Bool {
@@ -124,9 +179,10 @@ extension AppController {
         panel.contentView?.layoutSubtreeIfNeeded()
         let inputRect = input.convert(input.bounds, to: panel.contentView)
         try snapshot(panel, to: output.appendingPathComponent("companion-constrained-height-combined-synthetic-stress.png"))
-        let stop = companionElement(in: panel, identifier: "vale.companion.stop-response", label: "Stop response")
-        let stopFrame = stop?.accessibilityFrame() ?? .zero
-        results["companionConstrainedHeightKeepsComposerAndStopReachable"] = inputRect.minY >= -1 && inputRect.maxY <= panel.frame.height + 1 && inputRect.width > 100 && stop != nil && stopFrame.width > 0 && stopFrame.height > 0 && panel.frame.intersects(stopFrame) && model.pendingFiles.count == 1 && model.context.hasSelection
+        let combinedStateWasPresent = model.pendingFiles.count == 1 && model.context.hasSelection && model.busy
+        let stopDispatched = pressCompanionControl(in: panel, identifier: "vale.companion.stop-response", label: "Stop response")
+        await settle()
+        results["companionConstrainedHeightKeepsComposerAndStopReachable"] = inputRect.minY >= -1 && inputRect.maxY <= 361 && inputRect.width > 100 && combinedStateWasPresent && stopDispatched && !model.busy && model.draft == draft && model.pendingFiles.count == 1
         model.busy = false; model.error = nil; model.stopSharing()
         if let attachment = model.pendingFiles.first { model.removeFile(attachment) }
         applyHarnessCompanionLayout(panel)
@@ -153,14 +209,26 @@ extension AppController {
             guard let x = row["maxX"] as? CGFloat, let y = row["maxY"] as? CGFloat else { return false }
             return abs(x - anchor.x) <= 1 && abs(y - anchor.y) <= 1 && row["windowNumber"] as? Int == identity
         }
-        results["companionUsesOneProductionPanel"] = panel is NSPanel && panel.styleMask == .borderless && panel.toolbar == nil && NSApp.windows.filter { $0.isVisible && $0.identifier?.rawValue == "vale.workspace" }.count == 1
-        try JSONSerialization.data(withJSONObject: ["method": "generated native production-panel state and accessibility actions", "physicalInputVerified": false, "frames": frames], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("companion-state-transitions.json"), options: .atomic)
+        results["companionUsesOneProductionPanel"] = panel is NSPanel && panel.styleMask.subtracting(.resizable).isEmpty && panel.toolbar == nil && NSApp.windows.filter { $0.isVisible && $0.identifier?.rawValue == "vale.workspace" }.count == 1
+        try JSONSerialization.data(withJSONObject: ["method": "generated native production-panel state and software-injected native controls", "physicalInputVerified": false, "frames": frames, "controlEvents": CompanionControlProbeTrace.events], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("companion-state-transitions.json"), options: .atomic)
         model.draft = ""; model.updateActive { $0.messages = [] }; model.collapseCompanion()
         await settle(); applyHarnessCompanionLayout(panel)
     }
 
     func companionScrollViews(in root: NSView?) -> [NSScrollView] {
         guard let root else { return [] }
-        return (root as? NSScrollView).map { [$0] } ?? root.subviews.flatMap { companionScrollViews(in: $0) }
+        return ((root as? NSScrollView).map { [$0] } ?? []) + root.subviews.flatMap { companionScrollViews(in: $0) }
+    }
+
+    func performCompanionMenuAction(title: String) -> Bool {
+        func find(in menu: NSMenu) -> NSMenuItem? {
+            for item in menu.items {
+                if item.title == title, item.action != nil { return item }
+                if let submenu = item.submenu, let found = find(in: submenu) { return found }
+            }
+            return nil
+        }
+        guard let menu = NSApp.mainMenu, let item = find(in: menu), let action = item.action else { return false }
+        return NSApp.sendAction(action, to: item.target, from: item)
     }
 }

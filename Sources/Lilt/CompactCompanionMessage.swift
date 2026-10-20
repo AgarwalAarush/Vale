@@ -19,7 +19,20 @@ struct CompactCompanionMessage: View {
                     .background(message.role == "user" ? Theme.fill.opacity(0.7) : .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
             }
-            if let session = model.active, !message.attachments.isEmpty { MessageAttachments(model: model, session: session, records: message.attachments) }
+            if !message.attachments.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) {
+                        ForEach(message.attachments) { record in
+                            Button { model.showFile?(record) } label: {
+                                Label(record.name, systemImage: record.kind == .image ? "photo" : "doc")
+                                    .font(.system(size: 11)).lineLimit(1)
+                                    .padding(.horizontal, 8).padding(.vertical, 6)
+                                    .background(Theme.fill.opacity(0.65)).clipShape(Capsule())
+                            }.buttonStyle(ActionButton()).help("Preview " + record.name)
+                        }
+                    }
+                }.scrollIndicators(.hidden).frame(height: 29)
+            }
             if message.replyStopped { Text(StoppedReply.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
             if message.answerFailed && !model.busy { Text(FailedAnswer.label).font(.system(size: 11)).foregroundStyle(Theme.muted) }
             if message.highlightUnavailable { Label("Highlight unavailable", systemImage: "eye.slash").font(.system(size: 11)).foregroundStyle(Theme.muted) }

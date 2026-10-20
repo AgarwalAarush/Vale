@@ -27,9 +27,12 @@ import CryptoKit
         }
         var frameView = content
         while let parent = frameView.superview { frameView = parent }
+        // Hosting may add only the resizable style bit to a borderless panel.
+        // It adds no titlebar/chrome; every other style bit remains forbidden.
         let companion = window is NativeWorkspaceWindow && window is NSPanel &&
-            window.identifier?.rawValue == "vale.workspace" && window.styleMask == .borderless &&
-            content is NativeCompanionMaterial && !window.isOpaque
+            window.identifier?.rawValue == "vale.workspace" && window.styleMask.subtracting(.resizable).isEmpty &&
+            content is NativeCompanionMaterial && !window.isOpaque && window.toolbar == nil &&
+            window.standardWindowButton(.closeButton) == nil
         var controlsInHierarchy = false
         if let close = window.standardWindowButton(.closeButton) {
             var ancestor: NSView? = close
@@ -39,7 +42,13 @@ import CryptoKit
         guard (companion || controlsInHierarchy),
               abs(frameView.bounds.width - window.frame.width) < 1,
               abs(frameView.bounds.height - window.frame.height) < 1 else {
-            throw AppError("Full-window evidence does not include the complete native window root")
+            // Fixed geometry/type fields only: never title, document, account or view text.
+            throw AppError("Full-window evidence does not include the complete native window root " +
+                "[windowClass=\(type(of: window)); style=\(window.styleMask.rawValue); knownCompanion=\(companion); " +
+                "contentClass=\(type(of: content)); rootClass=\(type(of: frameView)); " +
+                "windowSize=\(window.frame.width)x\(window.frame.height); " +
+                "rootSize=\(frameView.bounds.width)x\(frameView.bounds.height); " +
+                "contentSize=\(content.bounds.width)x\(content.bounds.height); controls=\(controlsInHierarchy)]")
         }
         if companion {
             guard abs(content.bounds.width - window.frame.width) < 1,
@@ -84,6 +93,7 @@ import CryptoKit
             "appearance": window.effectiveAppearance.name.rawValue,
             "windowClass": String(describing: type(of: window)),
             "windowIdentifier": window.identifier?.rawValue ?? "none",
+            "styleMaskRawValue": window.styleMask.rawValue,
             "chromeKind": companion ? "borderless-companion" : "standard-titled-window",
             "completeRootMatchesWindowFrame": true,
             "includesWindowControlsInHierarchy": controlsInHierarchy,

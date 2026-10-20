@@ -25,7 +25,8 @@ import AppKit
         return max(40, min(wanted, min(650, availableHeight) - nonReplyHeight(for: model) - 8))
     }
     private static func nonReplyHeight(for model: AppModel) -> CGFloat {
-        var height: CGFloat = 43 + max(hasReply(for: model) ? 36 : 70, min(110, model.companionInputHeight)) + 51
+        let inlineReply = hasReply(for: model) && model.provider.account.permitsPlanUsage
+        var height: CGFloat = 43 + max(hasReply(for: model) ? 36 : 70, min(110, model.companionInputHeight)) + (inlineReply ? 8 : 51)
         if model.context.hasSelection { height += 38 }
         if !model.pendingFiles.isEmpty { height += 36 }
         if model.importing { height += 27 }

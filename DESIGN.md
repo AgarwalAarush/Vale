@@ -30,7 +30,7 @@ limited existing roles.
 | --- | --- |
 | Ready | 300×45pt; V, editable Ask Vale…, microphone, overflow |
 | Ask | 320pt wide, at least188pt high; header, optional context/status/files, editor, plus/mic/send |
-| Answer | 350pt wide; latest exchange, measured reply viewport up to320pt, follow-up composer |
+| Answer | 350pt wide; latest exchange, measured reply viewport up to320pt, one-row connected follow-up composer |
 | History | 400×500pt in the same panel |
 | Files/notes/context | 460×540pt in the same panel |
 | Settings | 520×610pt in the same panel |

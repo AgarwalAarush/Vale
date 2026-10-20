@@ -30,6 +30,15 @@ extension AppController {
         do{
             try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
             model.voice.enableFixtures();model.sessions=[];model.activeID=nil;model.selectedID=nil;model.prepareChat();await settle()
+            if CommandLine.arguments.contains("--compact-control-probe") {
+                _ = try makeFixtures(in: output)
+                try await runCompactCompanionAcceptance(output: output, results: &results)
+                try await runImportFeedbackAcceptance(output: output, results: &results)
+                try await runChatGPTWorkspaceVisualAcceptance(output: output, results: &results)
+                let data = try JSONSerialization.data(withJSONObject: results, options: [.prettyPrinted, .sortedKeys])
+                try data.write(to: output.appendingPathComponent("results.json")); print(String(data: data, encoding: .utf8)!)
+                model.suspend(); exit(results.values.allSatisfy { $0 } ? 0 : 1)
+            }
             results["generalChatOpensWithoutSetup"]=model.active?.mode == .assistant && model.active?.duration == 0 && workspace.isVisible
             try snapshot(workspace,to:output.appendingPathComponent("01-new-chat.png"))
             func findEditor(_ view:NSView)->ComposerTextView?{if let editor=view as? ComposerTextView{return editor};for child in view.subviews{if let found=findEditor(child){return found}};return nil}

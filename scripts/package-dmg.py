@@ -70,11 +70,20 @@ def create(args):
         preview = proof.get('status') == 'preview-needs-chatgpt-consent'
         if preview and (proof.get('releaseReady') is not False or proof.get('genuineChatGPTVerified') is not False):
             raise SystemExit('A ChatGPT preview must retain explicit unaccepted integration labels.')
-        heading = 'ChatGPT sign-in preview' if preview else 'configured bootstrap setup'
+        pearl = proof.get('interface') == 'pearl-companion'
+        heading = 'Pearl compact companion preview' if preview and pearl else 'ChatGPT sign-in preview' if preview else 'configured bootstrap setup'
         readme = f'''Vale {version} (build {build}) — {heading}
 
 '''
         if preview:
+            if pearl:
+                readme += '''Control–Option–Space opens the top-right companion. Its small input pill
+expands in place for questions, selected context and replies. Type or explicitly
+start dictation; use + for files/window context and … for history, Learn and Settings.
+On macOS26 it uses native Liquid Glass; macOS14–15 use native frosted material.
+The26appearance is compiled but not runtime-verified on the macOS15 build host.
+
+'''
             readme += '''This preview includes direct Continue with ChatGPT and the compact native
 companion. Local checks and generated account/stream fixtures do not establish
 genuine sign-in or replies. Connect your own eligible account in Vale; personal

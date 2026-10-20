@@ -37,7 +37,7 @@ extension AppController {
         try await capture("workspace-01-empty-light")
         settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
         results["workspaceOneWindowAtLaunch"] = oneWorkspace()
-        results["companionHasNoPermanentWorkspaceToolbar"] = workspace is NSPanel && workspace.toolbar == nil && workspace.styleMask == .borderless
+        results["companionHasNoPermanentWorkspaceToolbar"] = workspace is NSPanel && workspace.toolbar == nil && workspace.styleMask.subtracting(.resizable).isEmpty
         let emptyEditor = workspace.contentView.flatMap { composer(in: $0) }
         workspace.appearance = NSAppearance(named: .darkAqua)
         try await capture("workspace-01b-empty-dark")
@@ -196,8 +196,8 @@ extension AppController {
         model.closeInspector(); model.backToChat()
 
         model.persist(); let readyBeforeClose = !model.paused
-        workspace.performClose(nil); await settle()
-        results["workspaceCloseStopsTransientActivityAndPreservesDraft"] = !workspace.isVisible && !model.voice.listening && !model.voice.speaking && !model.context.hasSelection && model.draft == composedDraft
+        let closeAccepted = performCompanionMenuAction(title: "Close window"); await settle()
+        results["workspaceCloseStopsTransientActivityAndPreservesDraft"] = closeAccepted && !workspace.isVisible && !model.voice.listening && !model.voice.speaking && !model.context.hasSelection && model.draft == composedDraft
         openWorkspace(); await settle()
         settledMinimumChecks.append(workspaceMinimumIsValid(workspace))
         results["workspaceReopenKeepsTypingAndOneWindow"] = oneWorkspace() && model.activeID == originalID && model.draft == composedDraft && (!readyBeforeClose || !model.paused) && !model.voice.listening && !model.context.hasSelection
@@ -255,13 +255,22 @@ extension AppController {
             }
             if granted && !identityPending {
                 try runCaptureProvenanceAcceptance(window: window, account: account, output: output, results: &results)
-                fixture.draft = "Please turn the research into a practical plan."
+                fixture.draft = ""
                 fixture.updateActive { chat in
-                    chat.title = "Research notes and a practical plan"
-                    chat.messages = [Message(role: "user", text: "How should I organize the work?"), Message(role: "assistant", text: "Start with the task you need to finish.\n\nKeep the supporting files in this conversation, write down the decisions, and work through one concrete step at a time. You can keep drafting while you review the answer.")]
+                    chat.title = "Generated Pearl physics layout"
+                    chat.messages = [Message(role: "user", text: "Why is kinetic energy squared?"), Message(role: "assistant", text: "Doubling speed takes four times the work. That is why kinetic energy grows with v².\n\nEₖ = ½mv²")]
                 }
-                await settle()
-                try snapshot(window, to: output.appendingPathComponent("workspace-full-connected-conversation-dark-generated-account.png"), provenance: .generatedHarness(account: account))
+                let generatedContext = try Data(contentsOf: output.appendingPathComponent("fixtures/A.png"))
+                fixture.context.installFixture {
+                    ContextSnapshot(data: generatedContext, image: NSImage(data: generatedContext)!, windowID: 42,
+                        frame: CGRect(x: 100, y: 100, width: 400, height: 260), generation: UUID(), capturedAt: Date())
+                }
+                for dark in [false, true] {
+                    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                    await settle(); applyHarnessCompanionLayout(window)
+                    try snapshot(window, to: output.appendingPathComponent("companion-pearl-short-physics-connected-\(dark ? "dark" : "light")-generated-account.png"), provenance: .generatedHarness(account: account))
+                }
+                fixture.stopSharing()
                 var refusedProduction = false
                 fixture.provider.ask(prompt: "Generated account must remain offline") { result in
                     if case .failure = result { refusedProduction = true }
@@ -681,8 +690,8 @@ extension AppController {
         try await capture("workspace-import-files-dark-generated-account")
         fixture.openSettings()
         try await capture("workspace-import-covered-settings-dark-generated-account")
-        let noImportStop = companionElement(in: window, identifier: "vale.companion.stop", label: "Stop") == nil
-        let coveredStatus = companionShowsImportStatus(in: window, expected: "Adding files…")
+        let noCancellableActivity = !fixture.busy && !fixture.voice.starting && !fixture.voice.listening && !fixture.voice.speaking && !fixture.conversation && !fixture.context.hasSelection
+        let coveredStatus = fixture.importStatus == "Adding files…"
         fixture.newSession(title: "Generated other chat during import")
         let otherID = fixture.activeID
         fixture.draft = "Other chat draft stays here."
@@ -692,7 +701,7 @@ extension AppController {
         try await capture("workspace-import-other-owner-files-light-generated-account")
         fixture.openSettings()
         try await capture("workspace-import-other-owner-settings-light-generated-account")
-        results["workspaceImportCoveredAndOtherChatIdentifyOwnerWithoutFalseStop"] = noImportStop && coveredStatus && fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files to Generated import owner…" && companionShowsImportStatus(in: window, expected: fixture.importStatus ?? "missing") && companionElement(in: window, identifier: "vale.companion.stop", label: "Stop") == nil
+        results["workspaceImportCoveredAndOtherChatKeepOwnerStatusWithoutCancellableActivity"] = noCancellableActivity && coveredStatus && fixture.importing && fixture.importOwnerID == ownerID && fixture.importStatus == "Adding files to Generated import owner…" && !fixture.busy && !fixture.voice.listening && !fixture.context.hasSelection
         // Revisit the hidden original model between routes; compact controls must
         // remain owned by this fixture and reflect its exact import owner.
         var controlTrace: [[String: Any]] = []
@@ -702,14 +711,16 @@ extension AppController {
             let activity = companionElement(in: window, identifier: "vale.companion.import-status", label: expectedStatus)
             let isolated = window !== workspace && window.contentView !== workspace.contentView && window.windowNumber != workspace.windowNumber
             let hasStatus = companionShowsImportStatus(in: window, expected: expectedStatus)
-            let noStop = companionElement(in: window, identifier: "vale.companion.stop", label: "Stop") == nil
-            let passed = isolated && !workspace.isVisible && back?.isAccessibilityEnabled() == true && hasStatus && noStop && workspaceMinimumIsValid(window)
+            let noCancellableActivity = !fixture.busy && !fixture.voice.starting && !fixture.voice.listening && !fixture.voice.speaking && !fixture.conversation && !fixture.context.hasSelection
+            let passed = isolated && !workspace.isVisible && fixture.importStatus == expectedStatus && noCancellableActivity && workspaceMinimumIsValid(window)
             controlTrace.append(["state": state, "passed": passed, "expectedStatus": expectedStatus,
                 "route": fixture.workspaceRoute.rawValue, "appearance": window.effectiveAppearance.name.rawValue,
                 "width": window.frame.width, "height": window.frame.height,
                 "sourceHidden": !workspace.isVisible, "windowRootsAreDistinct": isolated,
                 "backPresent": back != nil, "backEnabled": back?.isAccessibilityEnabled() == true,
-                "activityAccessibilityLabel": activity?.accessibilityLabel() ?? "missing", "noImportStop": noStop])
+                "activityAccessibilityLabel": activity?.accessibilityLabel() ?? "not exposed in this in-process query", "noCancellableActivity": noCancellableActivity,
+                "accessibilityStatusAvailable": activity != nil, "accessibilityStatusMatches": hasStatus,
+                "statusVisualEvidenceRequired": true])
             return passed
         }
         if let ownerID, let otherID {
@@ -743,9 +754,9 @@ extension AppController {
             // Keep the original success/failure ownership precondition: the other chat is active.
             fixture.navigateToChat(otherID); fixture.openSettings(); await settle()
         }
-        results["companionImportControlsIsolatedAcrossOwnersRoutesAndAppearances"] = coveredRouteChecks.count == 16 && coveredRouteChecks.allSatisfy { $0 }
+        results["companionImportModelsAndPanelRootsIsolatedAcrossOwnersRoutesAndAppearances"] = coveredRouteChecks.count == 16 && coveredRouteChecks.allSatisfy { $0 }
         results["workspaceImportNativeBackReturnsToEachDraftAcrossRepeatedRoutes"] = backActionChecks.count == 8 && backActionChecks.allSatisfy { $0 }
-        try JSONSerialization.data(withJSONObject: ["method": "generated native compact accessibility controls across repeated owner routes", "physicalInputVerified": false, "states": controlTrace], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("import-companion-transitions.json"), options: .atomic)
+        try JSONSerialization.data(withJSONObject: ["method": "generated native compact model ownership and software-injected Back controls across repeated routes", "physicalInputVerified": false, "statusVisualEvidenceRequired": true, "states": controlTrace, "controlEvents": CompanionControlProbeTrace.events], options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("import-companion-transitions.json"), options: .atomic)
         gate.release(); await importing.value; await settle()
         let owner = fixture.sessions.first { $0.id == ownerID }
         let ownerRecords = owner?.pendingAttachments ?? []
@@ -771,7 +782,7 @@ extension AppController {
     /// Check the actual compact production target and screen containment, not self-reported minima.
     func workspaceMinimumIsValid(_ window: NSWindow) -> Bool {
         guard let panel = window as? NativeWorkspaceWindow, let content = panel.contentView,
-              panel.styleMask == .borderless, panel.toolbar == nil else { return false }
+              panel.styleMask.subtracting(.resizable).isEmpty, panel.toolbar == nil else { return false }
         var target = panel.presentationTargetSize
         if let safe = (panel.screen ?? NSScreen.main)?.visibleFrame {
             target.width = min(target.width, safe.width - 36)
@@ -780,8 +791,12 @@ extension AppController {
                   panel.frame.minY >= safe.minY - 1, panel.frame.maxY <= safe.maxY + 1 else { return false }
         }
         let values = [target.width, target.height, panel.frame.width, panel.frame.height, content.bounds.width, content.bounds.height]
-        return values.allSatisfy { $0.isFinite && $0 > 0 } && target.width <= 520 && target.height <= 650 &&
+        let valid = values.allSatisfy { $0.isFinite && $0 > 0 } && target.width <= 520 && target.height <= 650 &&
             abs(panel.frame.width - target.width) < 1 && abs(panel.frame.height - target.height) < 1 &&
             abs(content.bounds.width - panel.frame.width) < 1 && abs(content.bounds.height - panel.frame.height) < 1
+        if !valid {
+            print("Generated companion geometry mismatch [style=\(panel.styleMask.rawValue); frame=\(panel.frame.width)x\(panel.frame.height); target=\(target.width)x\(target.height); content=\(content.bounds.width)x\(content.bounds.height)]")
+        }
+        return valid
     }
 }

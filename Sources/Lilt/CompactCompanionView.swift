@@ -140,12 +140,17 @@ struct CompactCompanionView: View {
     }
     private var composer: some View {
         let draftID = model.activeID
+        let inlineReply = expanded && hasReply && account.permitsPlanUsage
         let editorHeight = expanded ? max(hasReply ? 36 : 70, min(110, model.companionInputHeight)) : 26
         return VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: expanded ? 0 : 7) {
+            HStack(alignment: .center, spacing: inlineReply ? 5 : expanded ? 0 : 7) {
                 Button { model.expandCompanion() } label: { LogoMark(size: 19).frame(width: 24, height: 26) }
                     .buttonStyle(ActionButton()).help("Expand Vale").accessibilityLabel("Expand Vale")
                     .frame(width: expanded ? 0 : 24).opacity(expanded ? 0 : 1).clipped().accessibilityHidden(expanded)
+                attachmentMenu.frame(width: inlineReply ? 32 : 0).opacity(inlineReply ? 1 : 0).clipped()
+                    .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
+                micButton.frame(width: inlineReply ? 32 : 0).opacity(inlineReply ? 1 : 0).clipped()
+                    .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
                 ZStack(alignment: .topLeading) {
                     if model.active != nil && model.draft.isEmpty { Text(expanded ? (hasReply ? "Ask a follow-up…" : "Ask Vale anything…") : "Ask Vale…").font(.system(size: expanded ? 14 : 12)).foregroundStyle(Theme.muted.opacity(0.8)).padding(.leading, 2).padding(.top, 5).allowsHitTesting(false).accessibilityHidden(true) }
                     DraftEditor(text: Binding(get: { model.draft }, set: { if model.activeID == draftID { model.editDraft($0) } }), draftID: draftID, focusToken: model.composerFocus, fontSize: expanded ? 14 : 12, ownsDraft: { model.activeID == draftID }, permitsFocus: { _ in model.active != nil && model.chatSurfaceVisible && chatVisible }, submit: {
@@ -163,8 +168,13 @@ struct CompactCompanionView: View {
                         }.buttonStyle(.plain).accessibilityLabel("Start a new chat")
                     }
                 }.frame(height: editorHeight)
+                    .padding(.horizontal, inlineReply ? 7 : 0)
+                    .background(inlineReply ? Theme.fillRaised.opacity(0.3) : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 micButton.frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().accessibilityHidden(expanded)
                 CompactOverflowMenu(model: model).frame(width: expanded ? 0 : 25).opacity(expanded ? 0 : 1).clipped().accessibilityHidden(expanded)
+                submitButton.frame(width: inlineReply ? 34 : 0).opacity(inlineReply ? 1 : 0).clipped()
+                    .allowsHitTesting(inlineReply).accessibilityHidden(!inlineReply)
             }
             HStack(spacing: 8) {
                 attachmentMenu
@@ -172,7 +182,8 @@ struct CompactCompanionView: View {
                 if model.active?.webEnabled == true { Image(systemName: "globe").font(.system(size: 11)).foregroundStyle(Theme.accent).help("Web search on").accessibilityLabel("Web search on") }
                 Spacer(minLength: 3)
                 submitButton
-            }.frame(height: expanded ? 43 : 0).opacity(expanded ? 1 : 0).clipped().accessibilityHidden(!expanded)
+            }.frame(height: expanded && !inlineReply ? 43 : 0).opacity(expanded && !inlineReply ? 1 : 0).clipped()
+                .allowsHitTesting(expanded && !inlineReply).accessibilityHidden(!expanded || inlineReply)
         }.padding(.horizontal, expanded ? 16 : 11).padding(.top, expanded ? 0 : 9.5).padding(.bottom, expanded ? 8 : 9.5)
     }
     private var attachmentMenu: some View {
